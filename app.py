@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import glob
 import secrets
@@ -149,25 +150,173 @@ def safe_path(filename):
     return target
 
 
-def detect_type(content):
-    """Best-effort detection of block type + domain, for files created
-    either by this app or by hand outside of it."""
-    domain = ""
+def split_target(value):
+    """Split a Caddy upstream/target string like 'https://host:port' into
+    (scheme, host, port). Any part that isn't present comes back as ''."""
+    value = (value or "").strip()
+    scheme, rest = value.split("://", 1) if "://" in value else ("", value)
+    host, _, port = rest.partition(":")
+    return scheme, host, port
+
+
+def join_target(scheme, host, port):
+    """Inverse of split_target: build a Caddy upstream/target string from
+    parts, omitting any that are blank."""
+    target = (host or "").strip()
+    if port:
+        target = f"{target}:{port.strip()}"
+    if scheme:
+        target = f"{scheme.strip()}://{target}"
+    return target
+
+
+def extra_lines(extra_text):
+    return [line.strip() for line in (extra_text or "").splitlines() if line.strip()]
+
+
+def render_domain_block(domain, body_lines):
+    lines = [f"{domain} {{"]
+    lines.extend(f"    {line}" for line in body_lines)
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def render_reverse_proxy(domain, target, extra_text=""):
+    return render_domain_block(domain, [f"reverse_proxy {target}"] + extra_lines(extra_text))
+
+
+def render_redirect(domain, target, redirect_code=""):
+    redirect_code = (redirect_code or "").strip()
+    directive = f"redir {target} {redirect_code}" if redirect_code else f"redir {target}"
+    return render_domain_block(domain, [directive])
+
+
+def render_load_balancer(domain, upstreams, lb_policy="", extra_text=""):
+    inner = [f"lb_policy {lb_policy}"] if lb_policy else []
+    inner += extra_lines(extra_text)
+    body = [f"reverse_proxy {' '.join(upstreams)} {{"]
+    body += [f"    {line}" for line in inner]
+    body += ["}"]
+    return render_domain_block(domain, body)
+
+
+# ---------------------------------------------------------------------------
+# Conf parsing & metadata
+#
+# Every block gets a small sidecar metadata file (same base name as the
+# .conf, extension .json) holding its structured fields plus the .conf's
+# mtime/size at the time it was written. Listing a directory is then just
+# one JSON read per file -- the .conf itself is only re-parsed with regex
+# when a sidecar is missing or its stamped mtime/size no longer matches
+# the .conf on disk (i.e. it was created or hand-edited outside the app).
+# Blocks created/edited through this app's forms never take that path at
+# all: their metadata is written directly from the submitted fields.
+# ---------------------------------------------------------------------------
+
+REVERSE_PROXY_RE = re.compile(r"^\s*reverse_proxy\s+([^\n{]+?)\s*\{?\s*$", re.MULTILINE)
+LB_POLICY_RE = re.compile(r"^\s*lb_policy\s+(\S+)", re.MULTILINE)
+REDIR_RE = re.compile(r"^\s*redir(?:ect)?\s+(\S+)(?:\s+(\d{3}))?", re.MULTILINE)
+
+
+def extract_domain(content):
     for line in content.splitlines():
         stripped = line.strip()
         if stripped and "{" in stripped and not stripped.startswith("#"):
-            domain = stripped.split("{")[0].strip()
-            break
+            return stripped.split("{")[0].strip()
+    return ""
 
-    if "lb_policy" in content:
-        block_type = "load_balancer"
-    elif "reverse_proxy" in content:
-        block_type = "reverse_proxy"
-    elif "redir" in content:
-        block_type = "redirect"
-    else:
-        block_type = "custom"
-    return block_type, domain
+
+def parse_conf_content(content):
+    """Best-effort structured parse of a raw Caddy block. Only used as a
+    fallback for files this app didn't write itself (or that were
+    hand-edited since) -- app-created blocks skip this entirely because
+    their metadata is written straight from the form."""
+    domain = extract_domain(content)
+    rp_match = REVERSE_PROXY_RE.search(content)
+    lb_match = LB_POLICY_RE.search(content)
+
+    if rp_match and lb_match:
+        upstreams = rp_match.group(1).split()
+        return {"type": "load_balancer", "domain": domain, "upstreams": upstreams,
+                "lb_policy": lb_match.group(1), "extra": ""}
+
+    if rp_match:
+        tokens = rp_match.group(1).split()
+        target = tokens[0] if tokens else ""
+        scheme, host, port = split_target(target)
+        return {"type": "reverse_proxy", "domain": domain, "target": target,
+                "scheme": scheme, "host": host, "port": port, "extra": ""}
+
+    redir_match = REDIR_RE.search(content)
+    if redir_match:
+        return {"type": "redirect", "domain": domain, "target": redir_match.group(1),
+                "redirect_code": redir_match.group(2) or ""}
+
+    return {"type": "custom", "domain": domain}
+
+
+def meta_filename_for(conf_filename):
+    base = conf_filename[: -len(".disabled")] if conf_filename.endswith(".disabled") else conf_filename
+    if base.endswith(".conf"):
+        base = base[: -len(".conf")]
+    return base + ".json"
+
+
+def meta_path_for(conf_filename):
+    return safe_path(meta_filename_for(conf_filename))
+
+
+def write_metadata(conf_filename, conf_path, meta):
+    """Persist metadata for a block, stamped with the .conf's current
+    mtime/size so future reads know whether the cache is still valid."""
+    try:
+        st = os.stat(conf_path)
+    except OSError:
+        return
+    meta = {**meta, "source_mtime": st.st_mtime, "source_size": st.st_size}
+    try:
+        with open(meta_path_for(conf_filename), "w") as f:
+            json.dump(meta, f, indent=2)
+    except OSError:
+        pass
+
+
+def read_metadata(conf_filename, conf_path):
+    """Load metadata for a block: the cached sidecar if it's still fresh,
+    otherwise a fallback parse of the .conf content (which also refreshes
+    the cache so the next read is cheap again)."""
+    try:
+        st = os.stat(conf_path)
+    except OSError:
+        return {"type": "custom", "domain": ""}
+
+    meta_file = meta_path_for(conf_filename)
+    if os.path.isfile(meta_file):
+        try:
+            with open(meta_file) as f:
+                cached = json.load(f)
+            if cached.get("source_mtime") == st.st_mtime and cached.get("source_size") == st.st_size:
+                return cached
+        except (OSError, ValueError):
+            pass
+
+    try:
+        with open(conf_path) as f:
+            content = f.read()
+    except OSError:
+        content = ""
+    parsed = parse_conf_content(content)
+    write_metadata(conf_filename, conf_path, parsed)
+    return parsed
+
+
+def delete_metadata(conf_filename):
+    meta_file = meta_path_for(conf_filename)
+    if os.path.isfile(meta_file):
+        try:
+            os.remove(meta_file)
+        except OSError:
+            pass
 
 
 def list_blocks():
@@ -182,18 +331,20 @@ def list_blocks():
         fname = os.path.basename(path)
         disabled = fname.endswith(".disabled")
         fdate = datetime.fromtimestamp(os.path.getmtime(path))
-        try:
-            with open(path, "r") as f:
-                content = f.read()
-        except OSError:
-            content = ""
-        block_type, domain = detect_type(content)
-        
+        meta = read_metadata(fname, path)
+
         blocks.append({
             "filename": fname,
             "disabled": disabled,
-            "type": block_type,
-            "domain": domain,
+            "type": meta.get("type", "custom"),
+            "domain": meta.get("domain", ""),
+            "scheme": meta.get("scheme", ""),
+            "host": meta.get("host", ""),
+            "port": meta.get("port", ""),
+            "target": meta.get("target", ""),
+            "redirect_code": meta.get("redirect_code", ""),
+            "upstreams": meta.get("upstreams", []),
+            "lb_policy": meta.get("lb_policy", ""),
             "updated": fdate.strftime("%d/%m/%Y %I:%M%p"),
         })
     blocks.sort(key=lambda b: b["filename"].lower())
@@ -259,9 +410,10 @@ def sites():
 @app.route("/new/<block_type>", methods=["GET", "POST"])
 @login_required
 def new_block(block_type):
-    if block_type not in ("reverse_proxy", "redirect", "custom"):
+    if block_type not in ("reverse_proxy", "redirect", "load_balancer", "custom"):
         abort(404)
     error = None
+    meta = {}
 
     if request.method == "POST":
         domain = request.form.get("domain", "").strip()
@@ -270,45 +422,65 @@ def new_block(block_type):
         content = None
 
         if block_type == "reverse_proxy":
-            upstream = request.form.get("upstream", "").strip()
+            scheme = request.form.get("scheme", "").strip()
+            host = request.form.get("host", "").strip()
+            port = request.form.get("port", "").strip()
             extra = request.form.get("extra", "").strip()
-            if not domain or not upstream:
-                error = "Domain and upstream address are required."
+            meta = {"domain": domain, "scheme": scheme, "host": host, "port": port, "extra": extra}
+            if not domain or not host:
+                error = "Domain and host are required."
             else:
-                lines = [f"{domain} {{", f"    reverse_proxy {upstream}"]
-                for line in extra.splitlines():
-                    line = line.strip()
-                    if line:
-                        lines.append(f"    {line}")
-                lines.append("}")
-                content = "\n".join(lines) + "\n"
+                target = join_target(scheme, host, port)
+                content = render_reverse_proxy(domain, target, extra)
+                meta = {"type": "reverse_proxy", "target": target, **meta}
+
+        elif block_type == "load_balancer":
+            upstreams = [u.strip() for u in request.form.get("upstreams", "").splitlines() if u.strip()]
+            lb_policy = request.form.get("lb_policy", "").strip()
+            extra = request.form.get("extra", "").strip()
+            meta = {"domain": domain, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
+            if not domain or len(upstreams) < 2:
+                error = "Domain and at least two upstreams are required."
+            else:
+                content = render_load_balancer(domain, upstreams, lb_policy, extra)
+                meta = {"type": "load_balancer", **meta}
 
         elif block_type == "redirect":
             target = request.form.get("target", "").strip()
-            status_code = request.form.get("status_code", "301").strip()
+            redirect_code = request.form.get("redirect_code", "301").strip()
+            meta = {"domain": domain, "target": target, "redirect_code": redirect_code}
             if not domain or not target:
                 error = "Domain and redirect target are required."
             else:
-                content = f"{domain} {{\n    redir {target} {status_code}\n}}\n"
+                content = render_redirect(domain, target, redirect_code)
+                meta = {"type": "redirect", **meta}
 
         else:  # custom
             raw = request.form.get("raw_content", "").strip()
+            meta = {"domain": domain}
             if not raw:
                 error = "Block content is required."
             elif not filename_field and not domain:
                 error = "Please provide a filename or label so the file can be named."
             else:
                 content = raw + "\n"
+                meta = {"type": "custom", **meta}
 
         if not error:
             filename = unique_filename(filename_base)
             os.makedirs(get_caddy_dir(), exist_ok=True)
-            with open(safe_path(filename), "w") as f:
+            path = safe_path(filename)
+            with open(path, "w") as f:
                 f.write(content)
+            write_metadata(filename, path, meta)
             flash(f"Created {filename}", "success")
             return redirect(url_for("sites"))
 
-    return render_template("new_block.html", block_type=block_type, error=error)
+    upstreams_text = "\n".join(meta.get("upstreams") or [])
+    return render_template(
+        "block_form.html", mode="new", block_type=block_type,
+        meta=meta, upstreams_text=upstreams_text, error=error
+    )
 
 
 @app.route("/edit/<path:filename>", methods=["GET", "POST"])
@@ -318,12 +490,74 @@ def edit_block(filename):
     if not os.path.isfile(path):
         abort(404)
 
-    if request.method == "POST":
+    meta = read_metadata(filename, path)
+    block_type = meta.get("type", "custom")
+    structured = block_type in ("reverse_proxy", "redirect", "load_balancer")
+    error = None
+
+    if request.method == "POST" and structured:
+        domain = request.form.get("domain", "").strip()
+        content = None
+        new_meta = None
+
+        if block_type == "reverse_proxy":
+            scheme = request.form.get("scheme", "").strip()
+            host = request.form.get("host", "").strip()
+            port = request.form.get("port", "").strip()
+            extra = request.form.get("extra", "").strip()
+            meta = {**meta, "domain": domain, "scheme": scheme, "host": host, "port": port, "extra": extra}
+            if not domain or not host:
+                error = "Domain and host are required."
+            else:
+                target = join_target(scheme, host, port)
+                content = render_reverse_proxy(domain, target, extra)
+                new_meta = {"type": "reverse_proxy", "domain": domain, "scheme": scheme,
+                            "host": host, "port": port, "target": target, "extra": extra}
+
+        elif block_type == "load_balancer":
+            upstreams = [u.strip() for u in request.form.get("upstreams", "").splitlines() if u.strip()]
+            lb_policy = request.form.get("lb_policy", "").strip()
+            extra = request.form.get("extra", "").strip()
+            meta = {**meta, "domain": domain, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
+            if not domain or len(upstreams) < 2:
+                error = "Domain and at least two upstreams are required."
+            else:
+                content = render_load_balancer(domain, upstreams, lb_policy, extra)
+                new_meta = {"type": "load_balancer", "domain": domain, "upstreams": upstreams,
+                            "lb_policy": lb_policy, "extra": extra}
+
+        else:  # redirect
+            target = request.form.get("target", "").strip()
+            redirect_code = request.form.get("redirect_code", "").strip()
+            meta = {**meta, "domain": domain, "target": target, "redirect_code": redirect_code}
+            if not domain or not target:
+                error = "Domain and redirect target are required."
+            else:
+                content = render_redirect(domain, target, redirect_code)
+                new_meta = {"type": "redirect", "domain": domain, "target": target,
+                            "redirect_code": redirect_code}
+
+        if not error:
+            with open(path, "w") as f:
+                f.write(content)
+            write_metadata(filename, path, new_meta)
+            flash(f"Saved {filename}", "success")
+            return redirect(url_for("sites"))
+
+    elif request.method == "POST":  # raw edit -- custom blocks, or an unparseable/foreign file
         content = request.form.get("content", "")
         with open(path, "w") as f:
             f.write(content)
+        write_metadata(filename, path, {"type": "custom", "domain": extract_domain(content)})
         flash(f"Saved {filename}", "success")
         return redirect(url_for("sites"))
+
+    if structured:
+        upstreams_text = "\n".join(meta.get("upstreams") or [])
+        return render_template(
+            "block_form.html", mode="edit", block_type=block_type, filename=filename,
+            meta=meta, upstreams_text=upstreams_text, error=error
+        )
 
     with open(path, "r") as f:
         content = f.read()
@@ -354,6 +588,7 @@ def delete_block(filename):
     path = safe_path(filename)
     if os.path.isfile(path):
         os.remove(path)
+        delete_metadata(filename)
         flash(f"Deleted {filename}", "success")
     return redirect(url_for("sites"))
 
