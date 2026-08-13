@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Caddy Manager{% endblock %}
+{% block page_pretitle %}Home{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block header_actions %}
+{% endblock %}
+
+<!---->
+
+{% block content %}
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<!-- BEGIN SETTINGS CARD -->
+<div class="card">
+  <div class="row g-0">
+
+    <!-- BEGIN SETTINGS SIDEBAR -->
+    <div class="col-12 col-md-3 border-end">
+
+      <!-- BEGIN SETTINGS SIDEBAR MENU -->
+      <div class="card-body">
+
+        <div class="list-group list-group-transparent">
+          <h4 class="card-header subheader">Account Settings</h4>
+          <div>
+            <a href="#user" class="list-group-item list-group-item-action d-flex align-items-center active" data-bs-toggle="tab">User</a>
+            <a href="#password" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Password</a>
+          </div>
+          <h4 class="card-header subheader mt-4">Caddy Settings</h4>
+          <div>            
+            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>
+            <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Caddy API</a>
+            <a href="#logging" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Logging</a>
+          </div>
+          <h4 class="card-header subheader mt-4">Other Settings</h4>
+          <div>            
+            <a href="#setting1" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Setting 1</a>
+            <a href="#setting2" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Setting 2</a>
+          </div>
+        </div>
+      
+      </div>
+      <!-- END SETTINGS SIDEBAR MENU -->
+    
+    </div>
+    <!-- END SETTINGS SIDEBAR -->
+
+    <!-- BEGIN SETTINGS SIDEBAR CONTENT -->
+    <div class="col-12 col-md-9 d-flex flex-column">
+      <div class="tab-content">
+
+        <!-- TAB 1: USER --> 
+        <div id="user" class="tab-pane active">
+          <div class="card-body">
+            <h2 class="mb-4">User Settings</h2>
+            <h3 class="card-title">User Account</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB 2: PASSWORD --> 
+        <div id="password" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Password Settings</h2>
+            <h3 class="card-title">Change Password</h3>
+            <form method="post" autocomplete="off">
+              <input type="hidden" name="action" value="change_password">
+              <div class="mb-3">
+                <label class="form-label">Current password</label>
+                <input type="password" name="current_password" class="form-control" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">New password</label>
+                <input type="password" name="new_password" class="form-control" required minlength="6">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Confirm new password</label>
+                <input type="password" name="new_password2" class="form-control" required minlength="6">
+              </div>
+              <button type="submit" class="btn btn-primary">Change password</button>
+            </form>
+          </div>
+        </div>
+        
+        <!-- TAB 3: DIRECTORY --> 
+        <div id="directory" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Caddy Configuration Directories</h2>
+            <h3 class="card-title">Change Directories</h3>
+            <p class="text-secondary">
+              Ensure all directories exist and have correct permissions.
+            </p>
+            <form method="post">
+              <input type="hidden" name="action" value="update_dir">
+              <div class="mb-3">
+                <label class="form-label">Conf directory path</label>
+                <input type="text" name="caddy_dir" class="form-control" value="{{ cfg.caddy_dir }}" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Certifcate directory path</label>
+                <input type="text" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Logs directory path</label>
+                <input type="text" class="form-control">
+              </div>
+              <button type="submit" class="btn btn-primary">Update directories</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- TAB 4: API --> 
+        <div id="api" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Caddy API</h2>
+            <h3 class="card-title">Connect API</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB 5: LOGGING --> 
+        <div id="logging" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Caddy Logging</h2>
+            <h3 class="card-title">Log Level</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB 6 --> 
+        <div id="setting1" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Setting 1</h2>
+            <h3 class="card-title">Setting</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB 7 --> 
+        <div id="setting2" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Setting 2</h2>
+            <h3 class="card-title">Setting</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- END SETTINGS SIDEBAR CONTENT -->
+
+  </div>
+</div>
+<!-- END SETTINGS CARD -->
+{% endblock %}

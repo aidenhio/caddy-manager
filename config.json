@@ -1,0 +1,6 @@
+{
+  "secret_key": "24f3e614d6d1dfd6df23b4edfc9172bbcbeedd6375c1312fc96234141524b917",
+  "username": "aiden",
+  "password_hash": "scrypt:32768:8:1$lTC9HYIg0VTP969n$2bf0663c271406aa6c791f5485fbf7be5c4da78628895df9f460e69680e56225cc184a3350d6cc29ebd187a5c0685ae7c5f700d46091326bc1041c28a67de5c0",
+  "caddy_dir": "/mnt/www/caddy/caddy.d"
+}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}New Site - Caddy Manager{% endblock %}
+{% block page_pretitle %}Caddy{% endblock %}
+{% block page_title %}New Site{% endblock %}
+
+{% block header_actions %}
+{% endblock %}
+
+<!---->
+
+{% block content %}
+
+<div class="row">
+  <div class="col">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          {% if block_type == 'reverse_proxy' %}New Reverse Proxy Block
+          {% elif block_type == 'redirect' %}New Redirect Block
+          {% elif block_type == 'load_balancer' %}New Load Balancer Block
+          {% else %}New Custom Block{% endif %}
+        </h3>
+      </div>
+      <div class="card-body">
+        {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+        <form method="post">
+
+          {% if block_type == 'custom' %}
+          <div class="mb-3">
+            <label class="form-label">Label <span class="form-hint d-inline">(optional — used only to name the file)</span></label>
+            <input type="text" name="domain" id="domain" class="form-control" placeholder="app.example.com">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Full block content</label>
+            <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="app.example.com {&#10;    reverse_proxy 127.0.0.1:8080&#10;    encode gzip&#10;}" required></textarea>
+          </div>
+          {% else %}
+          <div class="mb-3">
+            <label class="form-label">Domain/host </label>
+            <input type="text" name="domain" id="domain" class="form-control" placeholder="app.example.com" required>
+          </div>
+          {% endif %}
+
+          {% if block_type == 'reverse_proxy' %}
+          <div class="mb-3">
+            <label class="form-label">Upstream address</label>
+            <input type="text" name="upstream" class="form-control" placeholder="127.0.0.1:8080" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
+            <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}"></textarea>
+          </div>
+          {% elif block_type == 'redirect' %}
+          <div class="mb-3">
+            <label class="form-label">Redirect target</label>
+            <input type="text" name="target" class="form-control" placeholder="https://new.example.com{uri}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Status code</label>
+            <select name="status_code" class="form-select">
+              <option value="301">301 (Permanent)</option>
+              <option value="302">302 (Temporary)</option>
+              <option value="307">307 (Temporary, preserve method)</option>
+              <option value="308">308 (Permanent, preserve method)</option>
+            </select>
+          </div>
+          {% endif %}
+
+         <!-- <div class="mb-3">
+            <label class="form-label">Filename <span class="form-hint d-inline">(without .conf, auto-generated)</span></label>
+            <input disabled type="text" name="filename" id="filename" class="form-control" placeholder="auto-generated">
+          </div>-->
+
+          <div class="form-footer d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Create Block</button>
+            <a href="{{ url_for('sites') }}" class="btn">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<!--<script>
+    const domainInput = document.getElementById('domain');
+    const filenameInput = document.getElementById('filename');
+    if (domainInput && filenameInput) {
+        domainInput.addEventListener('input', () => {
+            if (!filenameInput.dataset.touched) {
+                filenameInput.value = domainInput.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9.-]+/g, '-')
+                    .replace(/-+/g, '-')
+                    .replace(/^-|-$/g, '');
+            }
+        });
+        filenameInput.addEventListener('input', () => { filenameInput.dataset.touched = "1"; });
+    }
+</script> -->
+{% endblock %}

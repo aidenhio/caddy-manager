@@ -1,0 +1,21 @@
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.badge-type {
+    font-size: 0.7rem;
+}
+
+pre.caddy-preview {
+    background: #1e293b;
+    border-radius: 0 0 var(--tblr-card-border-radius) var(--tblr-card-border-radius);
+    font-size: var(--tblr-body-font-size);
+    tab-size: 2;
+}
+
+.table thead th {
+    border-radius: var(--tblr-card-border-radius);
+}

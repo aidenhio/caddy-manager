@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Sites - Caddy Manager{% endblock %}
+{% block page_pretitle %}Caddy{% endblock %}
+{% block page_title %}All Sites{% endblock %}
+
+{% block header_actions %}
+<div class="btn-list">
+  <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="btn btn-primary btn-5 d-none d-sm-inline-block">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M9 14l-4 -4l4 -4" />
+      <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+    </svg>
+    Add Reverse Proxy
+  </a>
+  <a href="#" class="btn btn-5 d-none d-sm-inline-block dropdown-toggle" data-bs-toggle="dropdown">
+    More
+  </a>
+  <div class="dropdown-menu">
+    <a class="dropdown-item" href="{{ url_for('new_block', block_type='redirect') }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-corner-up-right">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
+      </svg>
+      Add Redirect</a>
+    <a class="dropdown-item" href="#">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-fork-triple">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M12 3v18" />
+        <path d="M16 7l-4 -4l-4 4" />
+        <path d="M16 11h5v5" />
+        <path d="M8 11h-5v5" />
+        <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
+        <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
+      </svg>
+      Add Load Balancer</a>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item" href="{{ url_for('new_block', block_type='custom') }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
+        <path d="M12 11.875l3 -1.687" />
+        <path d="M12 11.875v3.375" />
+        <path d="M12 11.875l-3 -1.687" />
+        <path d="M12 11.875l3 1.688" />
+        <path d="M12 8.5v3.375" />
+        <path d="M12 11.875l-3 1.688" />
+        <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
+    </svg>
+    Add Custom Block</a>
+  </div>
+</div>
+{% endblock %}
+
+<!---->
+
+{% block content %}
+
+{% if not dir_exists %}
+  <div class="alert alert-danger">The Caddyfile conf directory doesn't exist yet. It will be created automatically when you add your first block.</div>
+{% endif %}
+
+<div class="card">
+  {% if blocks %}
+  <div class="table-responsive">
+    <table class="table card-table table-vcenter">
+      <thead>
+        <tr>
+          <th class="w-1"></th>
+          <th>Type</th>
+          <th>Host</th>
+          <th>Upstream</th>
+          <th>Updated</th>
+          <th class="w-1"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for b in blocks %}
+        <tr class="{{ 'text-muted' if b.disabled else '' }}">
+          <td>
+            {% if b.disabled %}
+              <span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-circle-minus">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                  <path d="M9 12l6 0" />
+                </svg>
+              </span>
+            {% else %}
+              <span class="text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-circle-check">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                  <path d="M9 12l2 2l4 -4" />
+                </svg>
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            {% if b.type == 'reverse_proxy' %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-primary-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M9 14l-4 -4l4 -4" />
+                  <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+                </svg>
+                Reverse Proxy
+              </span>
+            {% elif b.type == 'redirect' %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-purple-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-corner-up-right">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
+                </svg>
+                Redirect
+              </span>
+            {% elif b.type == 'load_balancer' %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-pink-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-fork-triple">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M12 3v18" />
+                  <path d="M16 7l-4 -4l-4 4" />
+                  <path d="M16 11h5v5" />
+                  <path d="M8 11h-5v5" />
+                  <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
+                  <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
+                </svg>
+                Load Balancer
+              </span>  
+            {% else %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-yellow-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
+                  <path d="M12 11.875l3 -1.687" />
+                  <path d="M12 11.875v3.375" />
+                  <path d="M12 11.875l-3 -1.687" />
+                  <path d="M12 11.875l3 1.688" />
+                  <path d="M12 8.5v3.375" />
+                  <path d="M12 11.875l-3 1.688" />
+                  <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
+                </svg>
+                Custom
+              </span>
+            {% endif %}
+          </td>
+          <td>{{ b.domain or '—' }}</td>
+          <td>
+            {% if b.type == 'reverse_proxy' %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace ">http://127.0.0.1</span>
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-primary-lt' }} font-monospace ">80</span>
+            {% elif b.type == 'redirect' %}
+              <code class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">https://google.com</code>
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-purple-lt' }} font-monospace ">301</span>
+            {% elif b.type == 'load_balancer' %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">multiple</span>  
+            {% else %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">custom</span>
+            {% endif %}
+          </td>
+          <td>{{ b.updated }}</td>
+          <td>
+            <div class="btn-list flex-nowrap">
+              <div class="dropdown">
+                <button class="btn btn-icon" data-bs-toggle="dropdown">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="icon icon-tabler icons-tabler-outline icon-tabler-dots">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                    <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                    <path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                  </svg>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
+
+                  <a class="dropdown-item" href="{{ url_for('edit_block', filename=b.filename) }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                      class="icon icon-tabler icons-tabler-outline icon-tabler-pencil">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+                      <path d="M13.5 6.5l4 4" />
+                    </svg>Edit
+                  </a>
+
+                  <a class="dropdown-item" href="#">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                      class="icon icon-tabler icons-tabler-outline icon-tabler-eye">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                      <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
+                    </svg>Preview
+                  </a>
+
+                  <div class="dropdown-divider"></div>
+
+                  {% if b.disabled %}   
+                  <form class="d-inline "method="post" action="{{ url_for('toggle_block', filename=b.filename) }}">
+                    <button class="dropdown-item text-warn" type="submit">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-toggle-right">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                      <path d="M14 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                      <path d="M2 12a6 6 0 0 1 6 -6h8a6 6 0 0 1 6 6a6 6 0 0 1 -6 6h-8a6 6 0 0 1 -6 -6" />
+                    </svg> Enable
+                    </button>
+                  </form>
+                  {% else %}
+                    <form class="d-inline" method="post" action="{{ url_for('toggle_block', filename=b.filename) }}">
+                      <button class="dropdown-item" type="submit">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-toggle-left">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                        <path d="M2 12a6 6 0 0 1 6 -6h8a6 6 0 0 1 6 6a6 6 0 0 1 -6 6h-8a6 6 0 0 1 -6 -6" />
+                      </svg> Disable
+                      </button>
+                    </form>
+                  {% endif %}
+
+                  <div class="dropdown-divider"></div>
+
+                  <a class="dropdown-item text-danger" href="{{ url_for('delete_block', filename=b.filename) }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                      class="icon icon-tabler icons-tabler-outline icon-tabler-trash">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                      <path d="M4 7l16 0" />
+                      <path d="M10 11l0 6" />
+                      <path d="M14 11l0 6" />
+                      <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                      <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                    </svg>Delete 
+                  </a>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-secondary">
+    No blocks found in this directory yet. Create one above, or drop a <code>.conf</code> file into the directory directly — it'll show up here.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

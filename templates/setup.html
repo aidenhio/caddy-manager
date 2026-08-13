@@ -1,0 +1,38 @@
+{% extends "auth.html" %}
+
+{% block title %}Initial Setup - Caddy Manager{% endblock %}
+
+<!---->
+
+{% block content %}
+
+<div class="card card-md">
+  <div class="card-body">
+    <h2 class="h2 text-center mb-4">Initial Setup</h2>
+    <p class="text-secondary text-center mb-4">Create your admin account and set the directory where Caddy <code>.conf</code> files will be stored.</p>
+    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+    <form method="post" autocomplete="off">
+      <div class="mb-3">
+        <label class="form-label">Admin username</label>
+        <input type="text" name="username" class="form-control" required autofocus>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" required minlength="6">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Confirm password</label>
+        <input type="password" name="password2" class="form-control" required minlength="6">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Caddy conf directory (caddy.d)</label>
+        <input type="text" name="caddy_dir" class="form-control" placeholder="/etc/caddy/caddy.d" required>
+        <small class="form-hint">Should match what your Caddyfile imports, e.g. <code>import caddy.d/*.conf</code>. Created automatically if it doesn't exist.</small>
+      </div>
+      <div class="form-footer">
+        <button type="submit" class="btn btn-primary w-100">Complete setup</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

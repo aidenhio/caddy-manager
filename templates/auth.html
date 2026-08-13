@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+
+  <!-- BEGIN HEAD -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{% block title %}Caddy Manager{% endblock %}</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/override.css') }}" />
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/caddy-favicon.png') }}" />
+
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+    {% block extra_head %}{% endblock %}
+
+  </head>
+  <!-- END HEAD -->
+
+  <body class="d-flex flex-column">
+
+    <!-- BEGIN PAGE -->
+    <div class="page page-center">
+      <div class="container container-tight py-4">
+
+        <!-- BEGIN LOGO -->
+        <div class="text-center mb-4">
+          <span class="d-inline-flex align-items-center gap-2 h1">
+            <img class="navbar-brand-image me-2" src="{{ url_for('static', filename='img/caddy.png') }}"></img>Caddy Manager
+          </span>
+        </div>
+        <!-- END LOGO -->
+        
+        <!-- BEGIN ALERTS --> 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        <!-- END ALERTS -->
+
+        <!-- BEGIB PAGE CONTENT --> 
+        {% block content %}{% endblock %}
+        <!-- END PAGE CONTENT -->
+
+      </div>
+    </div>
+    <!-- END PAGE -->
+
+  </body>
+</html>

@@ -1,0 +1,100 @@
+/*
+  Theme overrides layered on top of @tabler/core.
+  Palette: neutral (hueless gray) base + lime accent, dark mode only.
+  Corner radius: Tabler's --tblr-border-radius-scale set to 2.
+*/
+
+:root,
+[data-bs-theme="dark"] {
+  color-scheme: dark;
+
+  /* ---- Neutral gray scale (replaces Tabler's default cool-gray) ---- */
+  --tblr-gray-50: #fafafa;
+  --tblr-gray-100: #f5f5f5;
+  --tblr-gray-200: #e5e5e5;
+  --tblr-gray-300: #d4d4d4;
+  --tblr-gray-400: #a3a3a3;
+  --tblr-gray-500: #737373;
+  --tblr-gray-600: #525252;
+  --tblr-gray-700: #404040;
+  --tblr-gray-800: #262626;
+  --tblr-gray-900: #171717;
+  --tblr-gray-950: #0a0a0a;
+
+  /* ---- Core surfaces, pinned to the neutral scale ---- */
+  --tblr-body-bg: #101010;
+  --tblr-body-color: #e5e5e5;
+  --tblr-body-color-rgb: 229, 229, 229;
+  --tblr-emphasis-color: #ffffff;
+  --tblr-border-color: #2e2e2e;
+  --tblr-border-color-translucent: rgba(255, 255, 255, 0.09);
+  --tblr-secondary-bg: #1c1c1c;
+  --tblr-tertiary-bg: #191919;
+  --tblr-card-bg: #171717;
+  --tblr-bg-surface: #171717;
+  --tblr-bg-surface-secondary: #1c1c1c;
+  --tblr-bg-surface-tertiary: #1c1c1c;
+  --tblr-dark-bg-subtle: #1c1c1c;
+  --tblr-light-bg-subtle: #1c1c1c;
+  --tblr-code-color: var(--tblr-gray-300);
+  --tblr-highlight-color: var(--tblr-body-color);
+
+  /* ---- Accent: lime ---- */
+  --tblr-primary: #74b816;
+  --tblr-primary-rgb: 116, 184, 22;
+  --tblr-primary-fg: #0d1300;
+  --tblr-primary-lt: rgba(116, 184, 22, 0.16);
+  --tblr-primary-lt-rgb: 116, 184, 22;
+  --tblr-link-color: #9ccc3d;
+  --tblr-link-hover-color: #b7e35c;
+  --tblr-link-color-rgb: 156, 204, 61;
+
+  /* ---- Corner radius: Tabler's own scale multiplier, set to 2 ---- */
+  --tblr-border-radius-scale: 2;
+}
+
+/* Sidebar + top navbar stay on the same dark neutral surface, one step
+   darker than cards so content areas read as "raised". */
+.navbar-vertical {
+  --tblr-navbar-bg: #0a0a0a;
+  border-inline-end: 1px solid var(--tblr-border-color);
+}
+
+.navbar-vertical .nav-link.active,
+.navbar-vertical .nav-link:hover {
+  color: #fff;
+}
+
+.navbar-vertical .nav-link.active .nav-link-icon,
+.navbar-vertical .nav-item.active .nav-link-icon {
+  color: var(--tblr-primary);
+}
+
+.navbar-vertical .nav-item.active .nav-link {
+  background: var(--tblr-primary-lt);
+  border-radius: var(--tblr-border-radius);
+}
+
+/* Buttons/links/badges in primary color need a dark foreground since
+   lime is a light, high-luminance accent. */
+.btn-primary,
+.badge.bg-primary {
+  color: var(--tblr-primary-fg) !important;
+}
+
+.text-primary {
+  color: var(--tblr-primary) !important;
+}
+
+body {
+  background: var(--tblr-body-bg);
+}
+
+.card {
+  --tblr-card-bg: #171717;
+}
+
+code {
+  color: var(--tblr-gray-300);
+  background: var(--tblr-tertiary-bg);
+}

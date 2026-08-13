@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+
+  <!-- BEGIN HEAD -->
+  <head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    <title>{% block title %}Caddy Manager{% endblock %}</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/override.css') }}" />
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/caddy-favicon.png') }}" />
+
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+    {% block extra_head %}{% endblock %}
+    
+  </head>
+  <!-- END HEAD -->
+
+  <body>
+    <!-- BEGIN PAGE -->
+    <div class="page">
+
+      {% if session.get('logged_in') %}
+        <!-- BEGIN NAVBAR -->
+        {% include 'nav.html' %}
+        <!-- END NAVBAR -->
+      {% endif %}
+
+      <!-- BEGIN PAGE CONTENT -->
+      <div class="page-wrapper">
+        
+        <!-- BEGIN PAGE HEADER -->
+        <div class="page-header d-print-none" aria-label="Page header">
+          <div class="container-xl">
+            <div class="row g-2 align-items-center">
+              <div class="col">
+                <!-- BEGIN PAGE TITLE -->
+                <div class="page-pretitle">{% block page_pretitle %}{% endblock %}</div>
+                <h2 class="page-title">{% block page_title %}{% endblock %}</h2>
+                <!-- END PAGE TITLE -->
+              </div>
+              <!-- BEGIN PAGE HEADER BUTTONS -->
+              <div class="col-auto ms-auto d-print-none">
+                {% block header_actions %}{% endblock %}
+              </div>
+              <!-- END PAGE HEADER BUTTONS -->
+            </div>
+          </div>
+        </div>
+        <!-- END PAGE HEADER -->
+
+        <!-- BEGIN PAGE BODY -->
+        <div class="page-body">
+          <div class="container-xl">
+            
+            <!-- BEGIN ALERTS --> 
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %} 
+                  <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show mb-3" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}  
+            <!-- END ALERTS -->
+            <!-- BEGIN PAGE MAIN CONTENT --> 
+            {% block content %}{% endblock %}
+            <!-- END PAGE MAIN CONTENT --> 
+          </div>
+        </div>
+        <!-- END PAGE BODY -->
+
+        <!-- BEGIN PAGE FOOTER -->
+        <footer class="footer mt-auto">
+          <div class="container-xl">
+            <div class="row text-center align-items-center flex-row-reverse">
+              <div class="col-lg-auto ms-lg-auto">
+                <ul class="list-inline list-inline-dots mb-0">
+                  <li class="list-inline-item">
+                    <a class="link-secondary" target="_blank" rel="noopener" href="#">Documentation</a>
+                  </li>
+                  <li class="list-inline-item">
+                    <a href="/license" class="link-secondary">License</a>
+                  </li>
+                  <li class="list-inline-item">
+                    <a class="link-secondary" target="_blank" rel="noopener" href="#">Source code</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="col-12 col-lg-auto mt-3 mt-lg-0">
+                <ul class="list-inline list-inline-dots mb-0">
+                  <li class="list-inline-item">
+                    Caddy Manager © 2026
+                  </li>
+                  <li class="list-inline-item">
+                    Powered by <a href="https://caddyserver.com" class="link-secondary" target="_blank">Caddy</a>
+                  </li>
+                  <li class="list-inline-item">
+                    <a href="#" class="link-secondary" target="_blank" rel="noopener"> v0.0.1 </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </footer>
+        <!-- END PAGE FOOTER --> 
+
+      </div>
+      <!-- END PAGE CONTENT -->  
+
+    </div>
+    <!-- END PAGE -->
+
+    <!-- BEGIN PAGE SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
+    <!-- END PAGE SCRIPTS -->
+
+  </body>
+</html>

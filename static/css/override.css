@@ -1,0 +1,17 @@
+:root {
+    --tblr-primary: var(--tblr-azure);
+    /*--tblr-primary: #22b638;*/
+    --tblr-border-radius-scale: 2;
+    --tblr-font-sans-serif: "Inter";
+    --tblr-gray-50: #fafafa;
+    --tblr-gray-100: #f4f4f5;
+    --tblr-gray-200: #e4e4e7;
+    --tblr-gray-300: #d4d4d8;
+    --tblr-gray-400: #a1a1aa;
+    --tblr-gray-500: #71717a;
+    --tblr-gray-600: #52525b;
+    --tblr-gray-700: #3f3f46;
+    --tblr-gray-800: #27272a;
+    --tblr-gray-900: #18181b;
+    --tblr-gray-950: #09090b;
+}
