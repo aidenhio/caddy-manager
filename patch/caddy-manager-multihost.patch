@@ -1,0 +1,447 @@
+diff --git a/app.py b/app.py
+index 2cea33d..7a9a7a0 100644
+--- a/app.py
++++ b/app.py
+@@ -170,47 +170,76 @@ def join_target(scheme, host, port):
+     return target
+ 
+ 
++def normalize_hosts(raw_hosts):
++    """Clean, dedupe (first occurrence wins) and sort a list of hosts:
++    hosts starting with a letter sort before hosts starting with a digit,
++    alphabetically within each group -- e.g. api.example.com, app.example.com,
++    2.example.com."""
++    seen = set()
++    hosts = []
++    for h in raw_hosts:
++        h = (h or "").strip()
++        if h and h not in seen:
++            seen.add(h)
++            hosts.append(h)
++    hosts.sort(key=lambda h: (h[:1].isdigit(), h.lower()))
++    return hosts
++
++
++def hosts_from_textarea(text):
++    """Parse a one-host-per-line textarea into a normalized host list."""
++    return normalize_hosts((text or "").splitlines())
++
++
++def hosts_header(hosts):
++    """Caddyfile site-address line for one or more hosts."""
++    return ", ".join(hosts)
++
++
+ def extra_lines(extra_text):
+     return [line.strip() for line in (extra_text or "").splitlines() if line.strip()]
+ 
+ 
+-def render_domain_block(domain, body_lines):
+-    lines = [f"{domain} {{"]
++def render_domain_block(site_header, body_lines):
++    lines = [f"{site_header} {{"]
+     lines.extend(f"    {line}" for line in body_lines)
+     lines.append("}")
+     return "\n".join(lines) + "\n"
+ 
+ 
+-def render_reverse_proxy(domain, target, extra_text=""):
+-    return render_domain_block(domain, [f"reverse_proxy {target}"] + extra_lines(extra_text))
++def render_reverse_proxy(site_header, target, extra_text=""):
++    return render_domain_block(site_header, [f"reverse_proxy {target}"] + extra_lines(extra_text))
+ 
+ 
+-def render_redirect(domain, target, redirect_code=""):
++def render_redirect(site_header, target, redirect_code=""):
+     redirect_code = (redirect_code or "").strip()
+     directive = f"redir {target} {redirect_code}" if redirect_code else f"redir {target}"
+-    return render_domain_block(domain, [directive])
++    return render_domain_block(site_header, [directive])
+ 
+ 
+-def render_load_balancer(domain, upstreams, lb_policy="", extra_text=""):
++def render_load_balancer(site_header, upstreams, lb_policy="", extra_text=""):
+     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
+     inner += extra_lines(extra_text)
+     body = [f"reverse_proxy {' '.join(upstreams)} {{"]
+     body += [f"    {line}" for line in inner]
+     body += ["}"]
+-    return render_domain_block(domain, body)
++    return render_domain_block(site_header, body)
+ 
+ 
+ # ---------------------------------------------------------------------------
+ # Conf parsing & metadata
+ #
+ # Every block gets a small sidecar metadata file (same base name as the
+-# .conf, extension .json) holding its structured fields plus the .conf's
+-# mtime/size at the time it was written. Listing a directory is then just
+-# one JSON read per file -- the .conf itself is only re-parsed with regex
+-# when a sidecar is missing or its stamped mtime/size no longer matches
+-# the .conf on disk (i.e. it was created or hand-edited outside the app).
+-# Blocks created/edited through this app's forms never take that path at
+-# all: their metadata is written directly from the submitted fields.
++# .conf, extension .json) living in a hidden .metadata subdirectory of the
++# caddy.d directory -- kept out of the way of Caddy's own `import *.conf`
++# and out of the way of the sites list. It holds the block's structured
++# fields plus the .conf's mtime/size at the time it was written. Listing a
++# directory is then just one JSON read per file -- the .conf itself is
++# only re-parsed with regex when a sidecar is missing or its stamped
++# mtime/size no longer matches the .conf on disk (i.e. it was created or
++# hand-edited outside the app). Blocks created/edited through this app's
++# forms never take that path at all: their metadata is written directly
++# from the submitted fields.
+ # ---------------------------------------------------------------------------
+ 
+ REVERSE_PROXY_RE = re.compile(r"^\s*reverse_proxy\s+([^\n{]+?)\s*\{?\s*$", re.MULTILINE)
+@@ -218,12 +247,15 @@ LB_POLICY_RE = re.compile(r"^\s*lb_policy\s+(\S+)", re.MULTILINE)
+ REDIR_RE = re.compile(r"^\s*redir(?:ect)?\s+(\S+)(?:\s+(\d{3}))?", re.MULTILINE)
+ 
+ 
+-def extract_domain(content):
++def extract_hosts(content):
++    """Pull the site-address line out of a raw block ('host1, host2 {')
++    and return it as a normalized, sorted host list."""
+     for line in content.splitlines():
+         stripped = line.strip()
+         if stripped and "{" in stripped and not stripped.startswith("#"):
+-            return stripped.split("{")[0].strip()
+-    return ""
++            header = stripped.split("{")[0].strip()
++            return normalize_hosts(re.split(r"[,\s]+", header))
++    return []
+ 
+ 
+ def parse_conf_content(content):
+@@ -231,28 +263,28 @@ def parse_conf_content(content):
+     fallback for files this app didn't write itself (or that were
+     hand-edited since) -- app-created blocks skip this entirely because
+     their metadata is written straight from the form."""
+-    domain = extract_domain(content)
++    hosts = extract_hosts(content)
+     rp_match = REVERSE_PROXY_RE.search(content)
+     lb_match = LB_POLICY_RE.search(content)
+ 
+     if rp_match and lb_match:
+         upstreams = rp_match.group(1).split()
+-        return {"type": "load_balancer", "domain": domain, "upstreams": upstreams,
++        return {"type": "load_balancer", "hosts": hosts, "upstreams": upstreams,
+                 "lb_policy": lb_match.group(1), "extra": ""}
+ 
+     if rp_match:
+         tokens = rp_match.group(1).split()
+         target = tokens[0] if tokens else ""
+         scheme, host, port = split_target(target)
+-        return {"type": "reverse_proxy", "domain": domain, "target": target,
++        return {"type": "reverse_proxy", "hosts": hosts, "target": target,
+                 "scheme": scheme, "host": host, "port": port, "extra": ""}
+ 
+     redir_match = REDIR_RE.search(content)
+     if redir_match:
+-        return {"type": "redirect", "domain": domain, "target": redir_match.group(1),
++        return {"type": "redirect", "hosts": hosts, "target": redir_match.group(1),
+                 "redirect_code": redir_match.group(2) or ""}
+ 
+-    return {"type": "custom", "domain": domain}
++    return {"type": "custom", "hosts": hosts}
+ 
+ 
+ def meta_filename_for(conf_filename):
+@@ -262,8 +294,22 @@ def meta_filename_for(conf_filename):
+     return base + ".json"
+ 
+ 
++def metadata_dir():
++    return os.path.join(get_caddy_dir(), ".metadata")
++
++
++def safe_meta_path(filename):
++    """Resolve filename inside the hidden .metadata directory, preventing
++    path traversal."""
++    base = os.path.abspath(metadata_dir())
++    target = os.path.abspath(os.path.join(base, filename))
++    if target != base and not target.startswith(base + os.sep):
++        abort(400, "Invalid filename")
++    return target
++
++
+ def meta_path_for(conf_filename):
+-    return safe_path(meta_filename_for(conf_filename))
++    return safe_meta_path(meta_filename_for(conf_filename))
+ 
+ 
+ def write_metadata(conf_filename, conf_path, meta):
+@@ -275,6 +321,7 @@ def write_metadata(conf_filename, conf_path, meta):
+         return
+     meta = {**meta, "source_mtime": st.st_mtime, "source_size": st.st_size}
+     try:
++        os.makedirs(metadata_dir(), exist_ok=True)
+         with open(meta_path_for(conf_filename), "w") as f:
+             json.dump(meta, f, indent=2)
+     except OSError:
+@@ -288,7 +335,7 @@ def read_metadata(conf_filename, conf_path):
+     try:
+         st = os.stat(conf_path)
+     except OSError:
+-        return {"type": "custom", "domain": ""}
++        return {"type": "custom", "hosts": []}
+ 
+     meta_file = meta_path_for(conf_filename)
+     if os.path.isfile(meta_file):
+@@ -332,12 +379,13 @@ def list_blocks():
+         disabled = fname.endswith(".disabled")
+         fdate = datetime.fromtimestamp(os.path.getmtime(path))
+         meta = read_metadata(fname, path)
++        hosts = meta.get("hosts", [])
+ 
+         blocks.append({
+             "filename": fname,
+             "disabled": disabled,
+             "type": meta.get("type", "custom"),
+-            "domain": meta.get("domain", ""),
++            "hosts": hosts,
+             "scheme": meta.get("scheme", ""),
+             "host": meta.get("host", ""),
+             "port": meta.get("port", ""),
+@@ -416,9 +464,7 @@ def new_block(block_type):
+     meta = {}
+ 
+     if request.method == "POST":
+-        domain = request.form.get("domain", "").strip()
+-        filename_field = request.form.get("filename", "").strip()
+-        filename_base = slugify(filename_field or domain)
++        hosts = hosts_from_textarea(request.form.get("hosts", ""))
+         content = None
+ 
+         if block_type == "reverse_proxy":
+@@ -426,48 +472,54 @@ def new_block(block_type):
+             host = request.form.get("host", "").strip()
+             port = request.form.get("port", "").strip()
+             extra = request.form.get("extra", "").strip()
+-            meta = {"domain": domain, "scheme": scheme, "host": host, "port": port, "extra": extra}
+-            if not domain or not host:
+-                error = "Domain and host are required."
++            meta = {"hosts": hosts, "scheme": scheme, "host": host, "port": port, "extra": extra}
++            if not hosts:
++                error = "At least one host is required."
++            elif not host:
++                error = "Upstream host is required."
+             else:
+                 target = join_target(scheme, host, port)
+-                content = render_reverse_proxy(domain, target, extra)
++                content = render_reverse_proxy(hosts_header(hosts), target, extra)
+                 meta = {"type": "reverse_proxy", "target": target, **meta}
+ 
+         elif block_type == "load_balancer":
+             upstreams = [u.strip() for u in request.form.get("upstreams", "").splitlines() if u.strip()]
+             lb_policy = request.form.get("lb_policy", "").strip()
+             extra = request.form.get("extra", "").strip()
+-            meta = {"domain": domain, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
+-            if not domain or len(upstreams) < 2:
+-                error = "Domain and at least two upstreams are required."
++            meta = {"hosts": hosts, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
++            if not hosts:
++                error = "At least one host is required."
++            elif len(upstreams) < 2:
++                error = "At least two upstreams are required."
+             else:
+-                content = render_load_balancer(domain, upstreams, lb_policy, extra)
++                content = render_load_balancer(hosts_header(hosts), upstreams, lb_policy, extra)
+                 meta = {"type": "load_balancer", **meta}
+ 
+         elif block_type == "redirect":
+             target = request.form.get("target", "").strip()
+             redirect_code = request.form.get("redirect_code", "301").strip()
+-            meta = {"domain": domain, "target": target, "redirect_code": redirect_code}
+-            if not domain or not target:
+-                error = "Domain and redirect target are required."
++            meta = {"hosts": hosts, "target": target, "redirect_code": redirect_code}
++            if not hosts:
++                error = "At least one host is required."
++            elif not target:
++                error = "Redirect target is required."
+             else:
+-                content = render_redirect(domain, target, redirect_code)
++                content = render_redirect(hosts_header(hosts), target, redirect_code)
+                 meta = {"type": "redirect", **meta}
+ 
+         else:  # custom
+             raw = request.form.get("raw_content", "").strip()
+-            meta = {"domain": domain}
+-            if not raw:
++            meta = {"hosts": hosts}
++            if not hosts:
++                error = "At least one host is required."
++            elif not raw:
+                 error = "Block content is required."
+-            elif not filename_field and not domain:
+-                error = "Please provide a filename or label so the file can be named."
+             else:
+                 content = raw + "\n"
+                 meta = {"type": "custom", **meta}
+ 
+         if not error:
+-            filename = unique_filename(filename_base)
++            filename = unique_filename(slugify(hosts[0]))
+             os.makedirs(get_caddy_dir(), exist_ok=True)
+             path = safe_path(filename)
+             with open(path, "w") as f:
+@@ -477,9 +529,10 @@ def new_block(block_type):
+             return redirect(url_for("sites"))
+ 
+     upstreams_text = "\n".join(meta.get("upstreams") or [])
++    hosts_text = "\n".join(meta.get("hosts") or [])
+     return render_template(
+         "block_form.html", mode="new", block_type=block_type,
+-        meta=meta, upstreams_text=upstreams_text, error=error
++        meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text, error=error
+     )
+ 
+ 
+@@ -496,7 +549,7 @@ def edit_block(filename):
+     error = None
+ 
+     if request.method == "POST" and structured:
+-        domain = request.form.get("domain", "").strip()
++        hosts = hosts_from_textarea(request.form.get("hosts", ""))
+         content = None
+         new_meta = None
+ 
+@@ -505,36 +558,42 @@ def edit_block(filename):
+             host = request.form.get("host", "").strip()
+             port = request.form.get("port", "").strip()
+             extra = request.form.get("extra", "").strip()
+-            meta = {**meta, "domain": domain, "scheme": scheme, "host": host, "port": port, "extra": extra}
+-            if not domain or not host:
+-                error = "Domain and host are required."
++            meta = {**meta, "hosts": hosts, "scheme": scheme, "host": host, "port": port, "extra": extra}
++            if not hosts:
++                error = "At least one host is required."
++            elif not host:
++                error = "Upstream host is required."
+             else:
+                 target = join_target(scheme, host, port)
+-                content = render_reverse_proxy(domain, target, extra)
+-                new_meta = {"type": "reverse_proxy", "domain": domain, "scheme": scheme,
++                content = render_reverse_proxy(hosts_header(hosts), target, extra)
++                new_meta = {"type": "reverse_proxy", "hosts": hosts, "scheme": scheme,
+                             "host": host, "port": port, "target": target, "extra": extra}
+ 
+         elif block_type == "load_balancer":
+             upstreams = [u.strip() for u in request.form.get("upstreams", "").splitlines() if u.strip()]
+             lb_policy = request.form.get("lb_policy", "").strip()
+             extra = request.form.get("extra", "").strip()
+-            meta = {**meta, "domain": domain, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
+-            if not domain or len(upstreams) < 2:
+-                error = "Domain and at least two upstreams are required."
++            meta = {**meta, "hosts": hosts, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
++            if not hosts:
++                error = "At least one host is required."
++            elif len(upstreams) < 2:
++                error = "At least two upstreams are required."
+             else:
+-                content = render_load_balancer(domain, upstreams, lb_policy, extra)
+-                new_meta = {"type": "load_balancer", "domain": domain, "upstreams": upstreams,
++                content = render_load_balancer(hosts_header(hosts), upstreams, lb_policy, extra)
++                new_meta = {"type": "load_balancer", "hosts": hosts, "upstreams": upstreams,
+                             "lb_policy": lb_policy, "extra": extra}
+ 
+         else:  # redirect
+             target = request.form.get("target", "").strip()
+             redirect_code = request.form.get("redirect_code", "").strip()
+-            meta = {**meta, "domain": domain, "target": target, "redirect_code": redirect_code}
+-            if not domain or not target:
+-                error = "Domain and redirect target are required."
++            meta = {**meta, "hosts": hosts, "target": target, "redirect_code": redirect_code}
++            if not hosts:
++                error = "At least one host is required."
++            elif not target:
++                error = "Redirect target is required."
+             else:
+-                content = render_redirect(domain, target, redirect_code)
+-                new_meta = {"type": "redirect", "domain": domain, "target": target,
++                content = render_redirect(hosts_header(hosts), target, redirect_code)
++                new_meta = {"type": "redirect", "hosts": hosts, "target": target,
+                             "redirect_code": redirect_code}
+ 
+         if not error:
+@@ -548,15 +607,16 @@ def edit_block(filename):
+         content = request.form.get("content", "")
+         with open(path, "w") as f:
+             f.write(content)
+-        write_metadata(filename, path, {"type": "custom", "domain": extract_domain(content)})
++        write_metadata(filename, path, {"type": "custom", "hosts": extract_hosts(content)})
+         flash(f"Saved {filename}", "success")
+         return redirect(url_for("sites"))
+ 
+     if structured:
+         upstreams_text = "\n".join(meta.get("upstreams") or [])
++        hosts_text = "\n".join(meta.get("hosts") or [])
+         return render_template(
+             "block_form.html", mode="edit", block_type=block_type, filename=filename,
+-            meta=meta, upstreams_text=upstreams_text, error=error
++            meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text, error=error
+         )
+ 
+     with open(path, "r") as f:
+diff --git a/templates/block_form.html b/templates/block_form.html
+index 9e7a97c..ee46a00 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -37,19 +37,12 @@
+ 
+         <form method="post">
+ 
+-          <!-- BEGIN DOMAIN / LABEL FIELD -->
+-          {% if block_type == 'custom' %}
+-          <div class="mb-3">
+-            <label class="form-label">Label <span class="form-hint d-inline">(optional — used only to name the file)</span></label>
+-            <input type="text" name="domain" id="domain" class="form-control" value="{{ meta.domain or '' }}" placeholder="app.example.com">
+-          </div>
+-          {% else %}
++          <!-- BEGIN HOSTS FIELD -->
+           <div class="mb-3">
+-            <label class="form-label">Domain/host</label>
+-            <input type="text" name="domain" id="domain" class="form-control" value="{{ meta.domain or '' }}" placeholder="app.example.com" required>
++            <label class="form-label">Hosts <span class="form-hint d-inline">(one per line, at least one — the first, after sorting, names the file)</span></label>
++            <textarea name="hosts" id="hosts" class="form-control" rows="3" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="app.example.com&#10;www.app.example.com" required>{{ hosts_text }}</textarea>
+           </div>
+-          {% endif %}
+-          <!-- END DOMAIN / LABEL FIELD -->
++          <!-- END HOSTS FIELD -->
+ 
+           <!-- BEGIN REVERSE PROXY FIELDS -->
+           {% if block_type == 'reverse_proxy' %}
+@@ -63,7 +56,7 @@
+               </select>
+             </div>
+             <div class="col-md-6 mb-3">
+-              <label class="form-label">Host</label>
++              <label class="form-label">Upstream host</label>
+               <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1" required>
+             </div>
+             <div class="col-md-3 mb-3">
+diff --git a/templates/sites.html b/templates/sites.html
+index 8b7f375..c61367f 100644
+--- a/templates/sites.html
++++ b/templates/sites.html
+@@ -145,7 +145,18 @@
+               </span>
+             {% endif %}
+           </td>
+-          <td>{{ b.domain or '—' }}</td>
++          <!-- BEGIN HOST CELL -->
++          <td>
++            {% if b.hosts %}
++              {{ b.hosts[0] }}
++              {% if b.hosts | length > 1 %}
++                <span class="badge bg-muted-lt" title="{{ b.hosts[1:] | join(', ') }}">+{{ b.hosts | length - 1 }}</span>
++              {% endif %}
++            {% else %}
++              —
++            {% endif %}
++          </td>
++          <!-- END HOST CELL -->
+           <!-- BEGIN UPSTREAM/TARGET CELL -->
+           <td>
+             {% if b.type == 'reverse_proxy' %}

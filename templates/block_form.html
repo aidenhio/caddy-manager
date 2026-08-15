@@ -37,19 +37,12 @@
 
         <form method="post">
 
-          <!-- BEGIN DOMAIN / LABEL FIELD -->
-          {% if block_type == 'custom' %}
+          <!-- BEGIN HOSTS FIELD -->
           <div class="mb-3">
-            <label class="form-label">Label <span class="form-hint d-inline">(optional — used only to name the file)</span></label>
-            <input type="text" name="domain" id="domain" class="form-control" value="{{ meta.domain or '' }}" placeholder="app.example.com">
+            <label class="form-label">Hosts <span class="form-hint d-inline">(one per line, at least one — the first, after sorting, names the file)</span></label>
+            <textarea name="hosts" id="hosts" class="form-control" rows="3" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="app.example.com&#10;www.app.example.com" required>{{ hosts_text }}</textarea>
           </div>
-          {% else %}
-          <div class="mb-3">
-            <label class="form-label">Domain/host</label>
-            <input type="text" name="domain" id="domain" class="form-control" value="{{ meta.domain or '' }}" placeholder="app.example.com" required>
-          </div>
-          {% endif %}
-          <!-- END DOMAIN / LABEL FIELD -->
+          <!-- END HOSTS FIELD -->
 
           <!-- BEGIN REVERSE PROXY FIELDS -->
           {% if block_type == 'reverse_proxy' %}
@@ -63,7 +56,7 @@
               </select>
             </div>
             <div class="col-md-6 mb-3">
-              <label class="form-label">Host</label>
+              <label class="form-label">Upstream host</label>
               <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1" required>
             </div>
             <div class="col-md-3 mb-3">
