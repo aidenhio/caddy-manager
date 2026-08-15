@@ -145,7 +145,18 @@
               </span>
             {% endif %}
           </td>
-          <td>{{ b.domain or '—' }}</td>
+          <!-- BEGIN HOST CELL -->
+          <td>
+            {% if b.hosts %}
+              {{ b.hosts[0] }}
+              {% if b.hosts | length > 1 %}
+                <span class="badge bg-muted-lt" title="{{ b.hosts[1:] | join(', ') }}">+{{ b.hosts | length - 1 }}</span>
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <!-- END HOST CELL -->
           <!-- BEGIN UPSTREAM/TARGET CELL -->
           <td>
             {% if b.type == 'reverse_proxy' %}
