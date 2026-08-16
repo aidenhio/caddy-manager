@@ -207,8 +207,12 @@ def render_domain_block(site_header, body_lines):
     return "\n".join(lines) + "\n"
 
 
-def render_reverse_proxy(site_header, target, extra_text=""):
-    return render_domain_block(site_header, [f"reverse_proxy {target}"] + extra_lines(extra_text))
+def render_reverse_proxy(site_header, target, extra_text="", insecure_skip_verify=False):
+    body = [f"reverse_proxy {target}"]
+    if insecure_skip_verify:
+        body += ["transport http {", "    tls_insecure_skip_verify", "}"]
+    body += extra_lines(extra_text)
+    return render_domain_block(site_header, body)
 
 
 def render_redirect(site_header, target, redirect_code=""):
@@ -224,6 +228,26 @@ def render_load_balancer(site_header, upstreams, lb_policy="", extra_text=""):
     body += [f"    {line}" for line in inner]
     body += ["}"]
     return render_domain_block(site_header, body)
+
+
+def render_custom(site_header, body_text):
+    """Wrap a user-authored body (whatever's between the braces) with the
+    site header, which is always derived from the Hosts field -- the user
+    only ever writes/edits the inside of the block, never the host line."""
+    body = (body_text or "").rstrip("\n")
+    return f"{site_header} {{\n{body}\n}}\n" if body else f"{site_header} {{\n}}\n"
+
+
+def extract_body(content):
+    """Return the text between the first '{' and the matching last '}' of
+    a block -- i.e. the inverse of render_custom -- for prefilling the
+    custom-block edit form. Assumes one block per file, which matches how
+    this app writes .conf files."""
+    start = content.find("{")
+    end = content.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return content.strip()
+    return content[start + 1:end].strip("\n")
 
 
 # ---------------------------------------------------------------------------
@@ -424,6 +448,35 @@ def unique_filename(base):
     return candidate
 
 
+def rename_block_if_first_host_changed(filename, path, old_hosts, new_hosts):
+    """If the sorted, first (i.e. filename-defining) host changed, rename
+    the .conf (and its metadata sidecar) to match -- preserving the
+    .disabled suffix if the block is currently disabled. Returns the
+    filename/path to use from here on (unchanged if no rename happened)."""
+    old_first = old_hosts[0] if old_hosts else None
+    new_first = new_hosts[0] if new_hosts else None
+    if not new_first or (old_first and slugify(new_first) == slugify(old_first)):
+        return filename, path
+
+    disabled = filename.endswith(".disabled")
+    new_conf_name = unique_filename(slugify(new_first))
+    if disabled:
+        new_conf_name += ".disabled"
+
+    try:
+        new_path = safe_path(new_conf_name)
+        os.rename(path, new_path)
+        old_meta_path = meta_path_for(filename)
+        if os.path.isfile(old_meta_path):
+            os.rename(old_meta_path, meta_path_for(new_conf_name))
+        return new_conf_name, new_path
+    except OSError:
+        # Content/metadata are already saved under the old name -- if the
+        # rename itself fails, just keep the old filename rather than
+        # losing the edit.
+        return filename, path
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -468,18 +521,20 @@ def new_block(block_type):
         content = None
 
         if block_type == "reverse_proxy":
-            scheme = request.form.get("scheme", "").strip()
+            scheme = request.form.get("scheme", "http").strip() or "http"
             host = request.form.get("host", "").strip()
             port = request.form.get("port", "").strip()
             extra = request.form.get("extra", "").strip()
-            meta = {"hosts": hosts, "scheme": scheme, "host": host, "port": port, "extra": extra}
+            insecure_skip_verify = scheme == "https" and request.form.get("insecure_skip_verify") == "1"
+            meta = {"hosts": hosts, "scheme": scheme, "host": host, "port": port,
+                    "extra": extra, "insecure_skip_verify": insecure_skip_verify}
             if not hosts:
                 error = "At least one host is required."
             elif not host:
                 error = "Upstream host is required."
             else:
                 target = join_target(scheme, host, port)
-                content = render_reverse_proxy(hosts_header(hosts), target, extra)
+                content = render_reverse_proxy(hosts_header(hosts), target, extra, insecure_skip_verify)
                 meta = {"type": "reverse_proxy", "target": target, **meta}
 
         elif block_type == "load_balancer":
@@ -515,7 +570,7 @@ def new_block(block_type):
             elif not raw:
                 error = "Block content is required."
             else:
-                content = raw + "\n"
+                content = render_custom(hosts_header(hosts), raw)
                 meta = {"type": "custom", **meta}
 
         if not error:
@@ -530,9 +585,11 @@ def new_block(block_type):
 
     upstreams_text = "\n".join(meta.get("upstreams") or [])
     hosts_text = "\n".join(meta.get("hosts") or [])
+    raw_body_text = raw if block_type == "custom" and request.method == "POST" else ""
     return render_template(
         "block_form.html", mode="new", block_type=block_type,
-        meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text, error=error
+        meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text,
+        raw_body_text=raw_body_text, error=error
     )
 
 
@@ -545,8 +602,17 @@ def edit_block(filename):
 
     meta = read_metadata(filename, path)
     block_type = meta.get("type", "custom")
-    structured = block_type in ("reverse_proxy", "redirect", "load_balancer")
+    old_hosts = meta.get("hosts", [])
+    # Custom blocks are edited through the same host-aware form as the other
+    # types as long as we actually found a host line to key off of -- a file
+    # with no recognizable header at all falls back to the plain raw editor.
+    structured = block_type in ("reverse_proxy", "redirect", "load_balancer") or \
+        (block_type == "custom" and bool(old_hosts))
     error = None
+    raw_body_text = ""
+    if block_type == "custom" and request.method == "GET":
+        with open(path) as f:
+            raw_body_text = extract_body(f.read())
 
     if request.method == "POST" and structured:
         hosts = hosts_from_textarea(request.form.get("hosts", ""))
@@ -554,20 +620,23 @@ def edit_block(filename):
         new_meta = None
 
         if block_type == "reverse_proxy":
-            scheme = request.form.get("scheme", "").strip()
+            scheme = request.form.get("scheme", "http").strip() or "http"
             host = request.form.get("host", "").strip()
             port = request.form.get("port", "").strip()
             extra = request.form.get("extra", "").strip()
-            meta = {**meta, "hosts": hosts, "scheme": scheme, "host": host, "port": port, "extra": extra}
+            insecure_skip_verify = scheme == "https" and request.form.get("insecure_skip_verify") == "1"
+            meta = {**meta, "hosts": hosts, "scheme": scheme, "host": host, "port": port,
+                    "extra": extra, "insecure_skip_verify": insecure_skip_verify}
             if not hosts:
                 error = "At least one host is required."
             elif not host:
                 error = "Upstream host is required."
             else:
                 target = join_target(scheme, host, port)
-                content = render_reverse_proxy(hosts_header(hosts), target, extra)
-                new_meta = {"type": "reverse_proxy", "hosts": hosts, "scheme": scheme,
-                            "host": host, "port": port, "target": target, "extra": extra}
+                content = render_reverse_proxy(hosts_header(hosts), target, extra, insecure_skip_verify)
+                new_meta = {"type": "reverse_proxy", "hosts": hosts, "scheme": scheme, "host": host,
+                            "port": port, "target": target, "extra": extra,
+                            "insecure_skip_verify": insecure_skip_verify}
 
         elif block_type == "load_balancer":
             upstreams = [u.strip() for u in request.form.get("upstreams", "").splitlines() if u.strip()]
@@ -583,7 +652,7 @@ def edit_block(filename):
                 new_meta = {"type": "load_balancer", "hosts": hosts, "upstreams": upstreams,
                             "lb_policy": lb_policy, "extra": extra}
 
-        else:  # redirect
+        elif block_type == "redirect":
             target = request.form.get("target", "").strip()
             redirect_code = request.form.get("redirect_code", "").strip()
             meta = {**meta, "hosts": hosts, "target": target, "redirect_code": redirect_code}
@@ -596,14 +665,29 @@ def edit_block(filename):
                 new_meta = {"type": "redirect", "hosts": hosts, "target": target,
                             "redirect_code": redirect_code}
 
+        else:  # custom
+            raw = request.form.get("raw_content", "").strip()
+            meta = {**meta, "hosts": hosts}
+            raw_body_text = raw
+            if not hosts:
+                error = "At least one host is required."
+            elif not raw:
+                error = "Block content is required."
+            else:
+                content = render_custom(hosts_header(hosts), raw)
+                new_meta = {"type": "custom", "hosts": hosts}
+
         if not error:
             with open(path, "w") as f:
                 f.write(content)
             write_metadata(filename, path, new_meta)
+            # Rename the .conf/.metadata pair if the primary (first-after-
+            # sorting) host changed, so the filename keeps tracking it.
+            filename, path = rename_block_if_first_host_changed(filename, path, old_hosts, hosts)
             flash(f"Saved {filename}", "success")
             return redirect(url_for("sites"))
 
-    elif request.method == "POST":  # raw edit -- custom blocks, or an unparseable/foreign file
+    elif request.method == "POST":  # raw edit -- last resort for a genuinely unparseable file
         content = request.form.get("content", "")
         with open(path, "w") as f:
             f.write(content)
@@ -616,7 +700,8 @@ def edit_block(filename):
         hosts_text = "\n".join(meta.get("hosts") or [])
         return render_template(
             "block_form.html", mode="edit", block_type=block_type, filename=filename,
-            meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text, error=error
+            meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text,
+            raw_body_text=raw_body_text, error=error
         )
 
     with open(path, "r") as f:
