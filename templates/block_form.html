@@ -39,19 +39,133 @@
 
           <!-- BEGIN HOSTS FIELD -->
           <div class="mb-3">
-            <label class="form-label">Hosts <span class="form-hint d-inline">(one per line, at least one — the first, after sorting, names the file)</span></label>
-            <textarea name="hosts" id="hosts" class="form-control" rows="3" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="app.example.com&#10;www.app.example.com" required>{{ hosts_text }}</textarea>
+            <label class="form-label">Hosts <span class="form-hint d-inline">(type a host, press space or enter to add it — the first, after sorting, names the file)</span></label>
+            <div class="hosts-input form-control" id="hosts-input">
+              <input type="text" id="hosts-text-input" placeholder="app.example.com" autocomplete="off">
+            </div>
+            <textarea name="hosts" id="hosts" hidden>{{ hosts_text }}</textarea>
           </div>
           <!-- END HOSTS FIELD -->
+
+          <!-- BEGIN HOSTS TAG INPUT STYLES/SCRIPT -->
+          <style>
+            .hosts-input {
+              display: flex;
+              flex-wrap: wrap;
+              align-items: center;
+              gap: 0.25rem 0.375rem;
+              min-height: calc(2.25rem + 2px);
+              padding: 0.25rem 0.5rem;
+              cursor: text;
+            }
+            .hosts-input .host-chip {
+              display: inline-flex;
+              align-items: center;
+              gap: 0.375rem;
+              white-space: nowrap;
+            }
+            .hosts-input .host-chip button {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 1rem;
+              height: 1rem;
+              padding: 0;
+              border: none;
+              background: transparent;
+              color: inherit;
+              opacity: 0.7;
+              line-height: 1;
+              cursor: pointer;
+            }
+            .hosts-input .host-chip button:hover {
+              opacity: 1;
+            }
+            .hosts-input input[type="text"] {
+              flex: 1 0 140px;
+              min-width: 140px;
+              border: none;
+              outline: none;
+              background: transparent;
+              color: inherit;
+              padding: 0.25rem 0;
+            }
+          </style>
+          <script>
+            (function () {
+              const wrap = document.getElementById('hosts-input');
+              const textInput = document.getElementById('hosts-text-input');
+              const hidden = document.getElementById('hosts');
+
+              function currentHosts() {
+                return Array.from(wrap.querySelectorAll('.host-chip')).map((el) => el.dataset.host);
+              }
+
+              function syncHidden() {
+                hidden.value = currentHosts().join('\n');
+              }
+
+              function addChip(value) {
+                value = value.trim();
+                if (!value || currentHosts().includes(value)) return;
+                const chip = document.createElement('span');
+                chip.className = 'badge bg-lt host-chip';
+                chip.dataset.host = value;
+                const label = document.createElement('span');
+                label.textContent = value;
+                chip.appendChild(label);
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.setAttribute('aria-label', 'Remove host');
+                remove.textContent = '\u00d7';
+                remove.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  chip.remove();
+                  syncHidden();
+                });
+                chip.appendChild(remove);
+                wrap.insertBefore(chip, textInput);
+                syncHidden();
+              }
+
+              (hidden.value || '').split('\n').map((h) => h.trim()).filter(Boolean).forEach(addChip);
+
+              textInput.addEventListener('keydown', (e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                  e.preventDefault();
+                  addChip(textInput.value);
+                  textInput.value = '';
+                } else if (e.key === 'Backspace' && textInput.value === '') {
+                  const chips = wrap.querySelectorAll('.host-chip');
+                  if (chips.length) {
+                    chips[chips.length - 1].remove();
+                    syncHidden();
+                  }
+                }
+              });
+
+              textInput.addEventListener('blur', () => {
+                if (textInput.value.trim()) {
+                  addChip(textInput.value);
+                  textInput.value = '';
+                }
+              });
+
+              wrap.addEventListener('click', () => textInput.focus());
+              wrap.closest('form').addEventListener('submit', () => {
+                if (textInput.value.trim()) addChip(textInput.value);
+              });
+            })();
+          </script>
+          <!-- END HOSTS TAG INPUT STYLES/SCRIPT -->
 
           <!-- BEGIN REVERSE PROXY FIELDS -->
           {% if block_type == 'reverse_proxy' %}
           <div class="row">
             <div class="col-md-3 mb-3">
               <label class="form-label">Scheme</label>
-              <select name="scheme" class="form-select">
-                <option value="" {{ 'selected' if not meta.scheme }}>(default)</option>
-                <option value="http" {{ 'selected' if meta.scheme == 'http' }}>http</option>
+              <select name="scheme" id="scheme" class="form-select">
+                <option value="http" {{ 'selected' if (meta.scheme or 'http') == 'http' }}>http</option>
                 <option value="https" {{ 'selected' if meta.scheme == 'https' }}>https</option>
               </select>
             </div>
@@ -64,6 +178,25 @@
               <input type="text" name="port" class="form-control" value="{{ meta.port or '' }}" placeholder="8080">
             </div>
           </div>
+          <div class="mb-3" id="insecure-skip-verify-row" {{ 'hidden' if (meta.scheme or 'http') != 'https' }}>
+            <label class="form-check">
+              <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+              <span class="form-check-label">Skip TLS verification (insecure)</span>
+            </label>
+            <span class="form-hint">Adds <code>transport http { tls_insecure_skip_verify }</code> to the block — only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+          </div>
+          <script>
+            (function () {
+              const schemeSelect = document.getElementById('scheme');
+              const row = document.getElementById('insecure-skip-verify-row');
+              if (schemeSelect && row) {
+                schemeSelect.addEventListener('change', () => {
+                  row.hidden = schemeSelect.value !== 'https';
+                  if (row.hidden) row.querySelector('input[type="checkbox"]').checked = false;
+                });
+              }
+            })();
+          </script>
           <div class="mb-3">
             <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
             <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
@@ -112,8 +245,8 @@
           <!-- BEGIN CUSTOM FIELDS -->
           {% if block_type == 'custom' %}
           <div class="mb-3">
-            <label class="form-label">Full block content</label>
-            <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="app.example.com {&#10;    reverse_proxy 127.0.0.1:8080&#10;    encode gzip&#10;}" required></textarea>
+            <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the hosts above are wrapped around it automatically)</span></label>
+            <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
           </div>
           {% endif %}
           <!-- END CUSTOM FIELDS -->
