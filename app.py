@@ -404,11 +404,19 @@ def list_blocks():
         fdate = datetime.fromtimestamp(os.path.getmtime(path))
         meta = read_metadata(fname, path)
         hosts = meta.get("hosts", [])
+        block_type = meta.get("type", "custom")
+
+        if block_type in ("reverse_proxy", "redirect"):
+            upstream_sort = meta.get("target", "")
+        elif block_type == "load_balancer":
+            upstream_sort = f"{len(meta.get('upstreams', []))} upstreams"
+        else:
+            upstream_sort = "custom"
 
         blocks.append({
             "filename": fname,
             "disabled": disabled,
-            "type": meta.get("type", "custom"),
+            "type": block_type,
             "hosts": hosts,
             "scheme": meta.get("scheme", ""),
             "host": meta.get("host", ""),
@@ -418,6 +426,8 @@ def list_blocks():
             "upstreams": meta.get("upstreams", []),
             "lb_policy": meta.get("lb_policy", ""),
             "updated": fdate.strftime("%d/%m/%Y %I:%M%p"),
+            "updated_ts": os.path.getmtime(path),
+            "upstream_sort": upstream_sort,
         })
     blocks.sort(key=lambda b: b["filename"].lower())
     return blocks
