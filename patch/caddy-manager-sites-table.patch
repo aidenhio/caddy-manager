@@ -1,0 +1,311 @@
+diff --git a/app.py b/app.py
+index cc74032..fa72444 100644
+--- a/app.py
++++ b/app.py
+@@ -404,11 +404,19 @@ def list_blocks():
+         fdate = datetime.fromtimestamp(os.path.getmtime(path))
+         meta = read_metadata(fname, path)
+         hosts = meta.get("hosts", [])
++        block_type = meta.get("type", "custom")
++
++        if block_type in ("reverse_proxy", "redirect"):
++            upstream_sort = meta.get("target", "")
++        elif block_type == "load_balancer":
++            upstream_sort = f"{len(meta.get('upstreams', []))} upstreams"
++        else:
++            upstream_sort = "custom"
+ 
+         blocks.append({
+             "filename": fname,
+             "disabled": disabled,
+-            "type": meta.get("type", "custom"),
++            "type": block_type,
+             "hosts": hosts,
+             "scheme": meta.get("scheme", ""),
+             "host": meta.get("host", ""),
+@@ -418,6 +426,8 @@ def list_blocks():
+             "upstreams": meta.get("upstreams", []),
+             "lb_policy": meta.get("lb_policy", ""),
+             "updated": fdate.strftime("%d/%m/%Y %I:%M%p"),
++            "updated_ts": os.path.getmtime(path),
++            "upstream_sort": upstream_sort,
+         })
+     blocks.sort(key=lambda b: b["filename"].lower())
+     return blocks
+diff --git a/templates/sites.html b/templates/sites.html
+index c61367f..2906b23 100644
+--- a/templates/sites.html
++++ b/templates/sites.html
+@@ -63,21 +63,66 @@
+ 
+ <div class="card">
+   {% if blocks %}
++  <!-- BEGIN FILTER / PAGE-SIZE BAR -->
++  <div class="card-header d-flex flex-wrap align-items-center gap-3">
++    <div class="d-flex flex-wrap align-items-center gap-2">
++      <span class="text-secondary small">Filter by type:</span>
++      <span class="badge type-filter-chip bg-primary-lt" data-type="reverse_proxy" role="button" tabindex="0">Reverse Proxy</span>
++      <span class="badge type-filter-chip bg-purple-lt" data-type="redirect" role="button" tabindex="0">Redirect</span>
++      <span class="badge type-filter-chip bg-pink-lt" data-type="load_balancer" role="button" tabindex="0">Load Balancer</span>
++      <span class="badge type-filter-chip bg-yellow-lt" data-type="custom" role="button" tabindex="0">Custom</span>
++    </div>
++    <div class="ms-auto d-flex align-items-center gap-2">
++      <label for="sites-page-size" class="text-secondary small mb-0">Per page</label>
++      <select id="sites-page-size" class="form-select form-select-sm" style="width: auto">
++        <option value="10">10</option>
++        <option value="20" selected>20</option>
++        <option value="50">50</option>
++        <option value="100">100</option>
++      </select>
++    </div>
++  </div>
++  <!-- END FILTER / PAGE-SIZE BAR -->
+   <div class="table-responsive">
+-    <table class="table card-table table-vcenter">
++    <table class="table card-table table-vcenter" id="sites-table">
+       <thead>
+         <tr>
+-          <th class="w-1"></th>
+-          <th>Type</th>
+-          <th>Host</th>
+-          <th>Upstream</th>
+-          <th>Updated</th>
++          <th class="w-1">
++            <button type="button" class="table-sort-btn" data-sort-key="status" data-sort-type="text" aria-label="Sort by status">
++              <i class="ti ti-arrows-sort sort-icon"></i>
++            </button>
++          </th>
++          <th>
++            <button type="button" class="table-sort-btn" data-sort-key="type" data-sort-type="text">
++              Type <i class="ti ti-arrows-sort sort-icon"></i>
++            </button>
++          </th>
++          <th>
++            <button type="button" class="table-sort-btn" data-sort-key="host" data-sort-type="text">
++              Host <i class="ti ti-arrows-sort sort-icon"></i>
++            </button>
++          </th>
++          <th>
++            <button type="button" class="table-sort-btn" data-sort-key="upstream" data-sort-type="text">
++              Upstream <i class="ti ti-arrows-sort sort-icon"></i>
++            </button>
++          </th>
++          <th>
++            <button type="button" class="table-sort-btn" data-sort-key="updated" data-sort-type="number">
++              Updated <i class="ti ti-arrows-sort sort-icon"></i>
++            </button>
++          </th>
+           <th class="w-1"></th>
+         </tr>
+       </thead>
+       <tbody>
+       {% for b in blocks %}
+-        <tr class="{{ 'text-muted' if b.disabled else '' }}">
++        <tr class="{{ 'text-muted' if b.disabled else '' }}"
++            data-type="{{ b.type }}"
++            data-status="{{ 'disabled' if b.disabled else 'enabled' }}"
++            data-host="{{ (b.hosts[0] if b.hosts else '') | lower }}"
++            data-upstream="{{ b.upstream_sort | lower }}"
++            data-updated="{{ b.updated_ts }}">
+           <td>
+             {% if b.disabled %}
+               <span>
+@@ -258,10 +303,197 @@
+       </tbody>
+     </table>
+   </div>
++  <!-- BEGIN PAGINATION BAR -->
++  <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
++    <p class="m-0 text-secondary" id="sites-page-summary"></p>
++    <div class="d-flex align-items-center gap-2">
++      <button type="button" class="btn btn-outline-secondary btn-sm" id="sites-prev-page">
++        <i class="ti ti-chevron-left"></i> Prev
++      </button>
++      <span class="text-secondary" id="sites-page-indicator"></span>
++      <button type="button" class="btn btn-outline-secondary btn-sm" id="sites-next-page">
++        Next <i class="ti ti-chevron-right"></i>
++      </button>
++    </div>
++  </div>
++  <!-- END PAGINATION BAR -->
+   {% else %}
+   <div class="card-body text-secondary">
+     No blocks found in this directory yet. Create one above, or drop a <code>.conf</code> file into the directory directly — it'll show up here.
+   </div>
+   {% endif %}
+ </div>
++
++<!-- BEGIN SITES TABLE CONTROLS STYLES/SCRIPT -->
++<style>
++  .table-sort-btn {
++    display: inline-flex;
++    align-items: center;
++    gap: 0.25rem;
++    background: none;
++    border: none;
++    padding: 0;
++    margin: 0;
++    color: inherit;
++    font: inherit;
++    font-weight: inherit;
++    cursor: pointer;
++  }
++  .table-sort-btn .sort-icon {
++    font-size: 0.8rem;
++    opacity: 0.35;
++  }
++  .table-sort-btn.sort-active .sort-icon {
++    opacity: 1;
++    color: var(--tblr-primary);
++  }
++  .type-filter-chip {
++    cursor: pointer;
++    opacity: 0.45;
++    border: 1px solid transparent;
++    user-select: none;
++  }
++  .type-filter-chip.active {
++    opacity: 1;
++    border-color: currentColor;
++  }
++</style>
++<script>
++  (function () {
++    const table = document.getElementById('sites-table');
++    if (!table) return;
++
++    const tbody = table.querySelector('tbody');
++    const rows = Array.from(tbody.querySelectorAll('tr[data-type]'));
++    const pageSizeSelect = document.getElementById('sites-page-size');
++    const filterChips = Array.from(document.querySelectorAll('.type-filter-chip'));
++    const sortButtons = Array.from(document.querySelectorAll('.table-sort-btn'));
++    const summaryEl = document.getElementById('sites-page-summary');
++    const indicatorEl = document.getElementById('sites-page-indicator');
++    const prevBtn = document.getElementById('sites-prev-page');
++    const nextBtn = document.getElementById('sites-next-page');
++
++    const state = {
++      page: 1,
++      pageSize: parseInt(pageSizeSelect.value, 10) || 20,
++      sortKey: null,
++      sortType: 'text',
++      sortDir: 'asc',
++      activeTypes: new Set(),
++    };
++
++    function getFiltered() {
++      if (state.activeTypes.size === 0) return rows.slice();
++      return rows.filter((r) => state.activeTypes.has(r.dataset.type));
++    }
++
++    function compareRows(a, b) {
++      if (!state.sortKey) return 0;
++      let av = a.dataset[state.sortKey] || '';
++      let bv = b.dataset[state.sortKey] || '';
++      if (state.sortType === 'number') {
++        av = parseFloat(av) || 0;
++        bv = parseFloat(bv) || 0;
++        if (av === bv) return 0;
++        return state.sortDir === 'asc' ? av - bv : bv - av;
++      }
++      av = av.toLowerCase();
++      bv = bv.toLowerCase();
++      if (av === bv) return 0;
++      const cmp = av < bv ? -1 : 1;
++      return state.sortDir === 'asc' ? cmp : -cmp;
++    }
++
++    function updateSortIndicators() {
++      sortButtons.forEach((btn) => {
++        const icon = btn.querySelector('.sort-icon');
++        const active = btn.dataset.sortKey === state.sortKey;
++        btn.classList.toggle('sort-active', active);
++        icon.className = 'ti sort-icon ' + (
++          !active ? 'ti-arrows-sort' : state.sortDir === 'asc' ? 'ti-sort-ascending' : 'ti-sort-descending'
++        );
++      });
++    }
++
++    function render() {
++      const filtered = getFiltered().sort(compareRows);
++      const total = filtered.length;
++      const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
++      if (state.page > totalPages) state.page = totalPages;
++      if (state.page < 1) state.page = 1;
++
++      const start = total === 0 ? 0 : (state.page - 1) * state.pageSize;
++      const end = Math.min(start + state.pageSize, total);
++
++      // Reorder every filtered row into the sorted order, then show only
++      // the current page's slice; rows excluded by the filter just hide.
++      filtered.forEach((r) => tbody.appendChild(r));
++      rows.forEach((r) => { r.style.display = 'none'; });
++      filtered.slice(start, end).forEach((r) => { r.style.display = ''; });
++
++      summaryEl.textContent = total === 0
++        ? 'No sites match the current filter.'
++        : `Showing ${start + 1}\u2013${end} of ${total} site${total === 1 ? '' : 's'}`;
++      indicatorEl.textContent = `Page ${state.page} of ${totalPages}`;
++      prevBtn.disabled = state.page <= 1;
++      nextBtn.disabled = state.page >= totalPages;
++
++      updateSortIndicators();
++    }
++
++    filterChips.forEach((chip) => {
++      chip.addEventListener('click', () => {
++        const type = chip.dataset.type;
++        if (state.activeTypes.has(type)) {
++          state.activeTypes.delete(type);
++          chip.classList.remove('active');
++        } else {
++          state.activeTypes.add(type);
++          chip.classList.add('active');
++        }
++        state.page = 1;
++        render();
++      });
++      chip.addEventListener('keydown', (e) => {
++        if (e.key === 'Enter' || e.key === ' ') {
++          e.preventDefault();
++          chip.click();
++        }
++      });
++    });
++
++    sortButtons.forEach((btn) => {
++      btn.addEventListener('click', () => {
++        const key = btn.dataset.sortKey;
++        if (state.sortKey === key) {
++          state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
++        } else {
++          state.sortKey = key;
++          state.sortType = btn.dataset.sortType || 'text';
++          state.sortDir = 'asc';
++        }
++        render();
++      });
++    });
++
++    pageSizeSelect.addEventListener('change', () => {
++      state.pageSize = parseInt(pageSizeSelect.value, 10) || 20;
++      state.page = 1;
++      render();
++    });
++
++    prevBtn.addEventListener('click', () => {
++      state.page -= 1;
++      render();
++    });
++
++    nextBtn.addEventListener('click', () => {
++      state.page += 1;
++      render();
++    });
++
++    render();
++  })();
++</script>
++<!-- END SITES TABLE CONTROLS STYLES/SCRIPT -->
+ {% endblock %}
+ 
