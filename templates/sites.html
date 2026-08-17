@@ -94,17 +94,17 @@
           </svg>
           Filters
         </a>
-        <div class="dropdown-menu">
+        <div class="dropdown-menu" id="sites-filters-menu">
           <h6 class="dropdown-header">Status</h6>
-          <label class="dropdown-item" for="filter-status-enable"><input class="form-check-input m-0 me-2" id="filter-status-enable" type="checkbox"> Enabled</label>
-          <label class="dropdown-item" for="filter-status-disable"><input class="form-check-input m-0 me-2" id="filter-status-disable" type="checkbox"> Disabled</label>
+          <label class="dropdown-item" for="filter-status-enable"><input class="form-check-input m-0 me-2" id="filter-status-enable" type="checkbox" data-filter-group="status" value="enabled"> Enabled</label>
+          <label class="dropdown-item" for="filter-status-disable"><input class="form-check-input m-0 me-2" id="filter-status-disable" type="checkbox" data-filter-group="status" value="disabled"> Disabled</label>
           <h6 class="dropdown-header">Type</h6>
-          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Reverse Proxy</label>
-          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Redirect</label>
-          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Load Balancer</label>
-          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Custom</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="reverse_proxy"> Reverse Proxy</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="redirect"> Redirect</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="load_balancer"> Load Balancer</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="custom"> Custom</label>
           <div class="dropdown-divider"></div>
-          <a class="dropdown-item text-danger" href="#">
+          <a class="dropdown-item text-danger" href="#" data-dt-clear-filters>
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M18 6l-12 12" />
@@ -116,8 +116,8 @@
       </div>
       <div class="col col-auto">
         <select id="sites-page-size" class="form-select">
-          <option value="10">10</option>
-          <option value="20" selected>20</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
           <option value="50">50</option>
           <option value="100">100</option>
         </select>
@@ -128,7 +128,14 @@
 
   <!-- BEGIN HOSTS TABLE LIST -->
   <div class="table-responsive">
-    <table class="table card-table table-vcenter" id="sites-table">
+    <table class="table card-table table-vcenter" id="sites-table"
+           data-datatable
+           data-dt-search="#hosts-table-search"
+           data-dt-filters="#sites-filters-menu"
+           data-dt-page-size="#sites-page-size"
+           data-dt-page-size-default="10"
+           data-dt-summary="#sites-page-summary"
+           data-dt-pagination="#sites-pagination">
       <thead>
         <tr>
           <th>
@@ -351,15 +358,7 @@
   <!-- BEGIN PAGINATION BAR -->
   <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
     <p class="m-0 text-secondary" id="sites-page-summary"></p>
-    <div class="d-flex align-items-center gap-2">
-      <button type="button" class="btn btn-outline-secondary btn-sm" id="sites-prev-page">
-        <i class="ti ti-chevron-left"></i> Prev
-      </button>
-      <span class="text-secondary" id="sites-page-indicator"></span>
-      <button type="button" class="btn btn-outline-secondary btn-sm" id="sites-next-page">
-        Next <i class="ti ti-chevron-right"></i>
-      </button>
-    </div>
+    <ul class="pagination m-0" id="sites-pagination"></ul>
   </div>
   <!-- END PAGINATION BAR -->
   {% else %}
@@ -368,144 +367,4 @@
   </div>
   {% endif %}
 </div>
-
-<!-- BEGIN SITES TABLE CONTROLS SCRIPT -->
-<script>
-  (function () {
-    const table = document.getElementById('sites-table');
-    if (!table) return;
-
-    const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr[data-type]'));
-    const pageSizeSelect = document.getElementById('sites-page-size');
-    const filterChips = Array.from(document.querySelectorAll('.type-filter-chip'));
-    const sortButtons = Array.from(document.querySelectorAll('.table-sort-btn'));
-    const summaryEl = document.getElementById('sites-page-summary');
-    const indicatorEl = document.getElementById('sites-page-indicator');
-    const prevBtn = document.getElementById('sites-prev-page');
-    const nextBtn = document.getElementById('sites-next-page');
-
-    const state = {
-      page: 1,
-      pageSize: parseInt(pageSizeSelect.value, 10) || 20,
-      sortKey: null,
-      sortType: 'text',
-      sortDir: 'asc',
-      activeTypes: new Set(),
-    };
-
-    function getFiltered() {
-      if (state.activeTypes.size === 0) return rows.slice();
-      return rows.filter((r) => state.activeTypes.has(r.dataset.type));
-    }
-
-    function compareRows(a, b) {
-      if (!state.sortKey) return 0;
-      let av = a.dataset[state.sortKey] || '';
-      let bv = b.dataset[state.sortKey] || '';
-      if (state.sortType === 'number') {
-        av = parseFloat(av) || 0;
-        bv = parseFloat(bv) || 0;
-        if (av === bv) return 0;
-        return state.sortDir === 'asc' ? av - bv : bv - av;
-      }
-      av = av.toLowerCase();
-      bv = bv.toLowerCase();
-      if (av === bv) return 0;
-      const cmp = av < bv ? -1 : 1;
-      return state.sortDir === 'asc' ? cmp : -cmp;
-    }
-
-    function updateSortIndicators() {
-      sortButtons.forEach((btn) => {
-        const icon = btn.querySelector('.sort-icon');
-        const active = btn.dataset.sortKey === state.sortKey;
-        btn.classList.toggle('sort-active', active);
-        icon.className = 'ti sort-icon ' + (
-          !active ? 'ti-arrows-sort' : state.sortDir === 'asc' ? 'ti-sort-ascending' : 'ti-sort-descending'
-        );
-      });
-    }
-
-    function render() {
-      const filtered = getFiltered().sort(compareRows);
-      const total = filtered.length;
-      const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
-      if (state.page > totalPages) state.page = totalPages;
-      if (state.page < 1) state.page = 1;
-
-      const start = total === 0 ? 0 : (state.page - 1) * state.pageSize;
-      const end = Math.min(start + state.pageSize, total);
-
-      // Reorder every filtered row into the sorted order, then show only
-      // the current page's slice; rows excluded by the filter just hide.
-      filtered.forEach((r) => tbody.appendChild(r));
-      rows.forEach((r) => { r.style.display = 'none'; });
-      filtered.slice(start, end).forEach((r) => { r.style.display = ''; });
-
-      summaryEl.textContent = total === 0
-        ? 'No sites match the current filter.'
-        : `Showing ${start + 1} to ${end} of ${total} site${total === 1 ? '' : 's'}`;
-      indicatorEl.textContent = `Page ${state.page} of ${totalPages}`;
-      prevBtn.disabled = state.page <= 1;
-      nextBtn.disabled = state.page >= totalPages;
-
-      updateSortIndicators();
-    }
-
-    filterChips.forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const type = chip.dataset.type;
-        if (state.activeTypes.has(type)) {
-          state.activeTypes.delete(type);
-          chip.classList.remove('active');
-        } else {
-          state.activeTypes.add(type);
-          chip.classList.add('active');
-        }
-        state.page = 1;
-        render();
-      });
-      chip.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          chip.click();
-        }
-      });
-    });
-
-    sortButtons.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const key = btn.dataset.sortKey;
-        if (state.sortKey === key) {
-          state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
-        } else {
-          state.sortKey = key;
-          state.sortType = btn.dataset.sortType || 'text';
-          state.sortDir = 'asc';
-        }
-        render();
-      });
-    });
-
-    pageSizeSelect.addEventListener('change', () => {
-      state.pageSize = parseInt(pageSizeSelect.value, 10) || 20;
-      state.page = 1;
-      render();
-    });
-
-    prevBtn.addEventListener('click', () => {
-      state.page -= 1;
-      render();
-    });
-
-    nextBtn.addEventListener('click', () => {
-      state.page += 1;
-      render();
-    });
-
-    render();
-  })();
-</script>
-<!-- END SITES TABLE CONTROLS SCRIPT -->
 {% endblock %}
