@@ -7,7 +7,7 @@
 {% block header_actions %}
 <div class="btn-list">
   <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="btn btn-primary btn-5 d-none d-sm-inline-block">
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-2 icon-tabler-arrow-back-up">
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M9 14l-4 -4l4 -4" />
       <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
@@ -19,13 +19,13 @@
   </a>
   <div class="dropdown-menu">
     <a class="dropdown-item" href="{{ url_for('new_block', block_type='redirect') }}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-corner-up-right">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-2 icon-tabler-corner-up-right">
           <path stroke="none" d="M0 0h24v24H0z" fill="none" />
           <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
       </svg>
       Add Redirect</a>
     <a class="dropdown-item" href="{{ url_for('new_block', block_type='load_balancer') }}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-fork-triple">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-2 icon-tabler-arrow-fork-triple">
         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
         <path d="M12 3v18" />
         <path d="M16 7l-4 -4l-4 4" />
@@ -37,7 +37,7 @@
       Add Load Balancer</a>
     <div class="dropdown-divider"></div>
     <a class="dropdown-item" href="{{ url_for('new_block', block_type='custom') }}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-2 icon-tabler-code-asterisk">
         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
         <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
         <path d="M12 11.875l3 -1.687" />
@@ -63,53 +63,96 @@
 
 <div class="card">
   {% if blocks %}
-  <!-- BEGIN FILTER / PAGE-SIZE BAR -->
-  <div class="card-header d-flex flex-wrap align-items-center gap-3">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-      <span class="text-secondary small">Filter by type:</span>
-      <span class="badge type-filter-chip bg-primary-lt" data-type="reverse_proxy" role="button" tabindex="0">Reverse Proxy</span>
-      <span class="badge type-filter-chip bg-purple-lt" data-type="redirect" role="button" tabindex="0">Redirect</span>
-      <span class="badge type-filter-chip bg-pink-lt" data-type="load_balancer" role="button" tabindex="0">Load Balancer</span>
-      <span class="badge type-filter-chip bg-yellow-lt" data-type="custom" role="button" tabindex="0">Custom</span>
-    </div>
-    <div class="ms-auto d-flex align-items-center gap-2">
-      <label for="sites-page-size" class="text-secondary small mb-0">Per page</label>
-      <select id="sites-page-size" class="form-select form-select-sm" style="width: auto">
-        <option value="10">10</option>
-        <option value="20" selected>20</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-      </select>
+  <!-- BEGIN SEARCH / PAGE-SIZE BAR -->
+  <div class="card-header">
+    <div class="row w-full g-2">
+      <div class="col col-4">
+        <div class="input-group input-group-flat w-auto">
+            <span class="input-group-text">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
+                <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
+                <path d="M21 21l-6 -6"></path>
+              </svg>
+            </span>
+            <input id="hosts-table-search" type="text" class="form-control" autocomplete="off" placeholder="Search…">
+          </div>
+      </div>
+      <div class="ms-auto col-auto" data-bs-auto-close="outside">
+        <a href="#" class="btn dropdown-toggle d-none d-sm-inline-block" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-adjustments-horizontal">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+            <path d="M4 6l8 0" />
+            <path d="M16 6l4 0" />
+            <path d="M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+            <path d="M4 12l2 0" />
+            <path d="M10 12l10 0" />
+            <path d="M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+            <path d="M4 18l11 0" />
+            <path d="M19 18l1 0" />
+          </svg>
+          Filters
+        </a>
+        <div class="dropdown-menu">
+          <h6 class="dropdown-header">Status</h6>
+          <label class="dropdown-item" for="filter-status-enable"><input class="form-check-input m-0 me-2" id="filter-status-enable" type="checkbox"> Enabled</label>
+          <label class="dropdown-item" for="filter-status-disable"><input class="form-check-input m-0 me-2" id="filter-status-disable" type="checkbox"> Disabled</label>
+          <h6 class="dropdown-header">Type</h6>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Reverse Proxy</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Redirect</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Load Balancer</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox"> Custom</label>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item text-danger" href="#">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M18 6l-12 12" />
+              <path d="M6 6l12 12" />
+            </svg>
+            Clear filters
+          </a>
+        </div>
+      </div>
+      <div class="col col-auto">
+        <select id="sites-page-size" class="form-select">
+          <option value="10">10</option>
+          <option value="20" selected>20</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
     </div>
   </div>
-  <!-- END FILTER / PAGE-SIZE BAR -->
+  <!-- END SEARCH / PAGE-SIZE BAR -->
+
+  <!-- BEGIN HOSTS TABLE LIST -->
   <div class="table-responsive">
     <table class="table card-table table-vcenter" id="sites-table">
       <thead>
         <tr>
-          <th class="w-1">
-            <button type="button" class="table-sort-btn" data-sort-key="status" data-sort-type="text" aria-label="Sort by status">
-              <i class="ti ti-arrows-sort sort-icon"></i>
+          <th>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="status" data-sort-type="text">
             </button>
           </th>
           <th>
-            <button type="button" class="table-sort-btn" data-sort-key="type" data-sort-type="text">
-              Type <i class="ti ti-arrows-sort sort-icon"></i>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="type" data-sort-type="text">
+              Type
             </button>
           </th>
           <th>
-            <button type="button" class="table-sort-btn" data-sort-key="host" data-sort-type="text">
-              Host <i class="ti ti-arrows-sort sort-icon"></i>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="host" data-sort-type="text">
+              Host
             </button>
           </th>
           <th>
-            <button type="button" class="table-sort-btn" data-sort-key="upstream" data-sort-type="text">
-              Upstream <i class="ti ti-arrows-sort sort-icon"></i>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="upstream" data-sort-type="text">
+              Upstream
             </button>
           </th>
           <th>
-            <button type="button" class="table-sort-btn" data-sort-key="updated" data-sort-type="number">
-              Updated <i class="ti ti-arrows-sort sort-icon"></i>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="updated" data-sort-type="number">
+              Updated
             </button>
           </th>
           <th class="w-1"></th>
@@ -303,6 +346,8 @@
       </tbody>
     </table>
   </div>
+  <!-- BEGIN HOSTS TABLE LIST -->
+
   <!-- BEGIN PAGINATION BAR -->
   <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
     <p class="m-0 text-secondary" id="sites-page-summary"></p>
@@ -324,40 +369,7 @@
   {% endif %}
 </div>
 
-<!-- BEGIN SITES TABLE CONTROLS STYLES/SCRIPT -->
-<style>
-  .table-sort-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    color: inherit;
-    font: inherit;
-    font-weight: inherit;
-    cursor: pointer;
-  }
-  .table-sort-btn .sort-icon {
-    font-size: 0.8rem;
-    opacity: 0.35;
-  }
-  .table-sort-btn.sort-active .sort-icon {
-    opacity: 1;
-    color: var(--tblr-primary);
-  }
-  .type-filter-chip {
-    cursor: pointer;
-    opacity: 0.45;
-    border: 1px solid transparent;
-    user-select: none;
-  }
-  .type-filter-chip.active {
-    opacity: 1;
-    border-color: currentColor;
-  }
-</style>
+<!-- BEGIN SITES TABLE CONTROLS SCRIPT -->
 <script>
   (function () {
     const table = document.getElementById('sites-table');
@@ -433,7 +445,7 @@
 
       summaryEl.textContent = total === 0
         ? 'No sites match the current filter.'
-        : `Showing ${start + 1}\u2013${end} of ${total} site${total === 1 ? '' : 's'}`;
+        : `Showing ${start + 1} to ${end} of ${total} site${total === 1 ? '' : 's'}`;
       indicatorEl.textContent = `Page ${state.page} of ${totalPages}`;
       prevBtn.disabled = state.page <= 1;
       nextBtn.disabled = state.page >= totalPages;
@@ -495,5 +507,5 @@
     render();
   })();
 </script>
-<!-- END SITES TABLE CONTROLS STYLES/SCRIPT -->
+<!-- END SITES TABLE CONTROLS SCRIPT -->
 {% endblock %}
