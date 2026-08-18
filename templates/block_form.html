@@ -16,7 +16,17 @@
 <!-- BEGIN BLOCK FORM CARD -->
 <div class="row">
   <div class="col">
-    <div class="card">
+    <div class="card rounded-top-0">
+
+      {% if block_type == 'reverse_proxy' %}
+      <div class="card-status-top bg-primary"></div>
+      {% elif block_type == 'redirect' %}
+      <div class="card-status-top bg-purple"></div>
+      {% elif block_type == 'load_balancer' %}
+      <div class="card-status-top bg-pink"></div>
+      {% else %}
+      <div class="card-status-top bg-yellow"></div>
+      {% endif %}
 
       <!-- BEGIN CARD HEADER -->
       <div class="card-header">
@@ -109,7 +119,7 @@
                 value = value.trim();
                 if (!value || currentHosts().includes(value)) return;
                 const chip = document.createElement('span');
-                chip.className = 'badge bg-lt host-chip';
+                chip.className = 'badge bg-primary-lt';
                 chip.dataset.host = value;
                 const label = document.createElement('span');
                 label.textContent = value;
@@ -117,7 +127,37 @@
                 const remove = document.createElement('button');
                 remove.type = 'button';
                 remove.setAttribute('aria-label', 'Remove host');
-                remove.textContent = '\u00d7';
+                remove.setAttribute('class', 'btn btn-action btn-sm p-2');
+                //remove.textContent = '\u00d7';
+
+                const svgNS = 'http://www.w3.org/2000/svg';
+                const svg = document.createElementNS(svgNS, "svg");
+                svg.setAttribute("viewBox", "0 0 24 24");
+                svg.setAttribute("width", "24");
+                svg.setAttribute("height", "24");
+                svg.setAttribute("fill", "none");
+                svg.setAttribute("stroke", "currentColor");
+                svg.setAttribute("stroke-width", "2");
+                svg.setAttribute("stroke-linecap", "round");
+                svg.setAttribute("stroke-linejoin", "round");
+                svg.classList.add("icon", "icon-tabler", "icons-tabler-outline", "icon-tabler-x");
+                
+                const path1 = document.createElementNS(svgNS, "path");
+                path1.setAttribute("stroke", "none");
+                path1.setAttribute("d", "M0 0h24v24H0z");
+                path1.setAttribute("fill", "none");
+
+                const path2 = document.createElementNS(svgNS, "path");
+                path2.setAttribute("d", "M18 6l-12 12");
+
+                const path3 = document.createElementNS(svgNS, "path");
+                path3.setAttribute("d", "M6 6l12 12");
+            
+                svg.appendChild(path1);
+                svg.appendChild(path2);
+                svg.appendChild(path3);
+                remove.appendChild(svg);
+
                 remove.addEventListener('click', (e) => {
                   e.stopPropagation();
                   chip.remove();
