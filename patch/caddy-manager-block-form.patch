@@ -1,0 +1,238 @@
+diff --git a/templates/block_form.html b/templates/block_form.html
+index e45d50f..4b7648b 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -14,19 +14,12 @@
+ {% block content %}
+ 
+ <!-- BEGIN BLOCK FORM CARD -->
++{% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
+ <div class="row">
+   <div class="col">
+     <div class="card rounded-top-0">
+ 
+-      {% if block_type == 'reverse_proxy' %}
+-      <div class="card-status-top bg-primary"></div>
+-      {% elif block_type == 'redirect' %}
+-      <div class="card-status-top bg-purple"></div>
+-      {% elif block_type == 'load_balancer' %}
+-      <div class="card-status-top bg-pink"></div>
+-      {% else %}
+-      <div class="card-status-top bg-yellow"></div>
+-      {% endif %}
++      <div class="card-status-top bg-{{ type_color }}"></div>
+ 
+       <!-- BEGIN CARD HEADER -->
+       <div class="card-header">
+@@ -50,62 +43,20 @@
+           <!-- BEGIN HOSTS FIELD -->
+           <div class="mb-3">
+             <label class="form-label">Hosts <span class="form-hint d-inline">(type a host, press space or enter to add it — the first, after sorting, names the file)</span></label>
+-            <div class="hosts-input form-control" id="hosts-input">
+-              <input type="text" id="hosts-text-input" placeholder="app.example.com" autocomplete="off">
++            <div class="form-control d-flex flex-wrap align-items-center gap-2" id="hosts-input">
++              <input type="text" id="hosts-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
+             </div>
+             <textarea name="hosts" id="hosts" hidden>{{ hosts_text }}</textarea>
+           </div>
+           <!-- END HOSTS FIELD -->
+ 
+-          <!-- BEGIN HOSTS TAG INPUT STYLES/SCRIPT -->
+-          <style>
+-            .hosts-input {
+-              display: flex;
+-              flex-wrap: wrap;
+-              align-items: center;
+-              gap: 0.25rem 0.375rem;
+-              min-height: calc(2.25rem + 2px);
+-              padding: 0.25rem 0.5rem;
+-              cursor: text;
+-            }
+-            .hosts-input .host-chip {
+-              display: inline-flex;
+-              align-items: center;
+-              gap: 0.375rem;
+-              white-space: nowrap;
+-            }
+-            .hosts-input .host-chip button {
+-              display: inline-flex;
+-              align-items: center;
+-              justify-content: center;
+-              width: 1rem;
+-              height: 1rem;
+-              padding: 0;
+-              border: none;
+-              background: transparent;
+-              color: inherit;
+-              opacity: 0.7;
+-              line-height: 1;
+-              cursor: pointer;
+-            }
+-            .hosts-input .host-chip button:hover {
+-              opacity: 1;
+-            }
+-            .hosts-input input[type="text"] {
+-              flex: 1 0 140px;
+-              min-width: 140px;
+-              border: none;
+-              outline: none;
+-              background: transparent;
+-              color: inherit;
+-              padding: 0.25rem 0;
+-            }
+-          </style>
++          <!-- BEGIN HOSTS TAG INPUT SCRIPT -->
+           <script>
+             (function () {
+               const wrap = document.getElementById('hosts-input');
+               const textInput = document.getElementById('hosts-text-input');
+               const hidden = document.getElementById('hosts');
++              const typeColor = '{{ type_color }}';
+ 
+               function currentHosts() {
+                 return Array.from(wrap.querySelectorAll('.host-chip')).map((el) => el.dataset.host);
+@@ -118,52 +69,27 @@
+               function addChip(value) {
+                 value = value.trim();
+                 if (!value || currentHosts().includes(value)) return;
++
+                 const chip = document.createElement('span');
+-                chip.className = 'badge bg-primary-lt';
++                chip.className = 'host-chip badge bg-' + typeColor + '-lt d-inline-flex align-items-center gap-1';
+                 chip.dataset.host = value;
++
+                 const label = document.createElement('span');
+                 label.textContent = value;
+                 chip.appendChild(label);
++
+                 const remove = document.createElement('button');
+                 remove.type = 'button';
++                remove.className = 'btn btn-icon btn-ghost-secondary btn-sm p-0 lh-1';
+                 remove.setAttribute('aria-label', 'Remove host');
+-                remove.setAttribute('class', 'btn btn-action btn-sm p-2');
+-                //remove.textContent = '\u00d7';
+-
+-                const svgNS = 'http://www.w3.org/2000/svg';
+-                const svg = document.createElementNS(svgNS, "svg");
+-                svg.setAttribute("viewBox", "0 0 24 24");
+-                svg.setAttribute("width", "24");
+-                svg.setAttribute("height", "24");
+-                svg.setAttribute("fill", "none");
+-                svg.setAttribute("stroke", "currentColor");
+-                svg.setAttribute("stroke-width", "2");
+-                svg.setAttribute("stroke-linecap", "round");
+-                svg.setAttribute("stroke-linejoin", "round");
+-                svg.classList.add("icon", "icon-tabler", "icons-tabler-outline", "icon-tabler-x");
+-                
+-                const path1 = document.createElementNS(svgNS, "path");
+-                path1.setAttribute("stroke", "none");
+-                path1.setAttribute("d", "M0 0h24v24H0z");
+-                path1.setAttribute("fill", "none");
+-
+-                const path2 = document.createElementNS(svgNS, "path");
+-                path2.setAttribute("d", "M18 6l-12 12");
+-
+-                const path3 = document.createElementNS(svgNS, "path");
+-                path3.setAttribute("d", "M6 6l12 12");
+-            
+-                svg.appendChild(path1);
+-                svg.appendChild(path2);
+-                svg.appendChild(path3);
+-                remove.appendChild(svg);
+-
++                remove.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>';
+                 remove.addEventListener('click', (e) => {
+                   e.stopPropagation();
+                   chip.remove();
+                   syncHidden();
+                 });
+                 chip.appendChild(remove);
++
+                 wrap.insertBefore(chip, textInput);
+                 syncHidden();
+               }
+@@ -197,7 +123,7 @@
+               });
+             })();
+           </script>
+-          <!-- END HOSTS TAG INPUT STYLES/SCRIPT -->
++          <!-- END HOSTS TAG INPUT SCRIPT -->
+ 
+           <!-- BEGIN REVERSE PROXY FIELDS -->
+           {% if block_type == 'reverse_proxy' %}
+@@ -237,10 +163,29 @@
+               }
+             })();
+           </script>
+-          <div class="mb-3">
+-            <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
+-            <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
++          <!-- BEGIN ADVANCED OPTIONS -->
++          <div class="accordion mb-3" id="advanced-options">
++            <div class="accordion-item">
++              <h2 class="accordion-header">
++                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
++                  Advanced options
++                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
++                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                    <path d="M6 9l6 6l6 -6" />
++                  </svg>
++                </button>
++              </h2>
++              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
++                <div class="accordion-body">
++                  <div class="mb-3 mb-md-0">
++                    <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
++                    <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
++                  </div>
++                </div>
++              </div>
++            </div>
+           </div>
++          <!-- END ADVANCED OPTIONS -->
+           {% endif %}
+           <!-- END REVERSE PROXY FIELDS -->
+ 
+@@ -258,10 +203,29 @@
+               {% endfor %}
+             </select>
+           </div>
+-          <div class="mb-3">
+-            <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the reverse_proxy block)</span></label>
+-            <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
++          <!-- BEGIN ADVANCED OPTIONS -->
++          <div class="accordion mb-3" id="advanced-options">
++            <div class="accordion-item">
++              <h2 class="accordion-header">
++                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
++                  Advanced options
++                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
++                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                    <path d="M6 9l6 6l6 -6" />
++                  </svg>
++                </button>
++              </h2>
++              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
++                <div class="accordion-body">
++                  <div class="mb-3 mb-md-0">
++                    <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the reverse_proxy block)</span></label>
++                    <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
++                  </div>
++                </div>
++              </div>
++            </div>
+           </div>
++          <!-- END ADVANCED OPTIONS -->
+           {% endif %}
+           <!-- END LOAD BALANCER FIELDS -->
+ 
+@@ -293,7 +257,7 @@
+ 
+           <!-- BEGIN FORM ACTIONS -->
+           <div class="form-footer d-flex gap-2">
+-            <button type="submit" class="btn btn-primary">{{ 'Save Changes' if mode == 'edit' else 'Create Block' }}</button>
++            <button type="submit" class="btn btn-{{ type_color }}">{{ 'Save Changes' if mode == 'edit' else 'Create Block' }}</button>
+             <a href="{{ url_for('sites') }}" class="btn">Cancel</a>
+           </div>
+           <!-- END FORM ACTIONS -->
+-- 
