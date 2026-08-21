@@ -613,18 +613,13 @@ def edit_block(filename):
     meta = read_metadata(filename, path)
     block_type = meta.get("type", "custom")
     old_hosts = meta.get("hosts", [])
-    # Custom blocks are edited through the same host-aware form as the other
-    # types as long as we actually found a host line to key off of -- a file
-    # with no recognizable header at all falls back to the plain raw editor.
-    structured = block_type in ("reverse_proxy", "redirect", "load_balancer") or \
-        (block_type == "custom" and bool(old_hosts))
     error = None
     raw_body_text = ""
     if block_type == "custom" and request.method == "GET":
         with open(path) as f:
             raw_body_text = extract_body(f.read())
 
-    if request.method == "POST" and structured:
+    if request.method == "POST":
         hosts = hosts_from_textarea(request.form.get("hosts", ""))
         content = None
         new_meta = None
@@ -697,26 +692,13 @@ def edit_block(filename):
             flash(f"Saved {filename}", "success")
             return redirect(url_for("sites"))
 
-    elif request.method == "POST":  # raw edit -- last resort for a genuinely unparseable file
-        content = request.form.get("content", "")
-        with open(path, "w") as f:
-            f.write(content)
-        write_metadata(filename, path, {"type": "custom", "hosts": extract_hosts(content)})
-        flash(f"Saved {filename}", "success")
-        return redirect(url_for("sites"))
-
-    if structured:
-        upstreams_text = "\n".join(meta.get("upstreams") or [])
-        hosts_text = "\n".join(meta.get("hosts") or [])
-        return render_template(
-            "block_form.html", mode="edit", block_type=block_type, filename=filename,
-            meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text,
-            raw_body_text=raw_body_text, error=error
-        )
-
-    with open(path, "r") as f:
-        content = f.read()
-    return render_template("edit.html", filename=filename, content=content)
+    upstreams_text = "\n".join(meta.get("upstreams") or [])
+    hosts_text = "\n".join(meta.get("hosts") or [])
+    return render_template(
+        "block_form.html", mode="edit", block_type=block_type, filename=filename,
+        meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text,
+        raw_body_text=raw_body_text, error=error
+    )
 
 
 @app.route("/toggle/<path:filename>", methods=["POST"])
