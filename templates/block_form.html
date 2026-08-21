@@ -46,6 +46,7 @@
             <div class="form-control d-flex flex-wrap align-items-center gap-2" id="hosts-input">
               <input type="text" id="hosts-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
             </div>
+            <div class="invalid-feedback">At least one host is required.</div>
             <textarea name="hosts" id="hosts" hidden>{{ hosts_text }}</textarea>
           </div>
           <!-- END HOSTS FIELD -->
@@ -69,6 +70,8 @@
               function addChip(value) {
                 value = value.trim();
                 if (!value || currentHosts().includes(value)) return;
+
+                wrap.classList.remove('is-invalid');
 
                 const chip = document.createElement('span');
                 chip.className = 'host-chip badge bg-' + typeColor + '-lt d-inline-flex align-items-center gap-1';
@@ -118,8 +121,15 @@
               });
 
               wrap.addEventListener('click', () => textInput.focus());
-              wrap.closest('form').addEventListener('submit', () => {
+              wrap.closest('form').addEventListener('submit', (e) => {
                 if (textInput.value.trim()) addChip(textInput.value);
+                if (currentHosts().length === 0) {
+                  e.preventDefault();
+                  wrap.classList.add('is-invalid');
+                  textInput.focus();
+                } else {
+                  wrap.classList.remove('is-invalid');
+                }
               });
             })();
           </script>
