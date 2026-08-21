@@ -191,10 +191,100 @@
 
           <!-- BEGIN LOAD BALANCER FIELDS -->
           {% if block_type == 'load_balancer' %}
-          <div class="mb-3">
-            <label class="form-label">Upstreams <span class="form-hint d-inline">(one per line, at least two — e.g. 10.0.0.1:8080)</span></label>
-            <textarea name="upstreams" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="10.0.0.1:8080&#10;10.0.0.2:8080" required>{{ upstreams_text }}</textarea>
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label class="form-label">Scheme <span class="form-hint d-inline">(shared by every upstream below)</span></label>
+              <select id="lb-scheme" class="form-select">
+                <option value="http">http</option>
+                <option value="https">https</option>
+              </select>
+            </div>
           </div>
+
+          <div class="mb-3">
+            <label class="form-label">Upstreams <span class="form-hint d-inline">(at least two)</span></label>
+            <div id="upstream-rows"></div>
+            <button type="button" id="add-upstream-btn" class="btn btn-outline-{{ type_color }} btn-sm mt-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M12 5l0 14" />
+                <path d="M5 12l14 0" />
+              </svg>
+              Add upstream
+            </button>
+          </div>
+          <textarea name="upstreams" id="upstreams" hidden>{{ upstreams_text }}</textarea>
+
+          <script>
+            (function () {
+              const schemeSelect = document.getElementById('lb-scheme');
+              const rowsWrap = document.getElementById('upstream-rows');
+              const addBtn = document.getElementById('add-upstream-btn');
+              const hidden = document.getElementById('upstreams');
+
+              function splitUpstream(value) {
+                value = (value || '').trim();
+                const [scheme, rest] = value.includes('://') ? value.split('://', 2) : ['', value];
+                const [host, port] = rest.split(':');
+                return { scheme, host: host || '', port: port || '' };
+              }
+
+              function addRow(host, port) {
+                const row = document.createElement('div');
+                row.className = 'row g-2 mb-2 align-items-center upstream-row';
+                row.innerHTML =
+                  '<div class="col">' +
+                  '  <input type="text" class="form-control upstream-host" placeholder="10.0.0.1" required>' +
+                  '</div>' +
+                  '<div class="col-3">' +
+                  '  <input type="text" class="form-control upstream-port" placeholder="8080">' +
+                  '</div>' +
+                  '<div class="col-auto">' +
+                  '  <button type="button" class="btn btn-icon btn-ghost-secondary upstream-remove" aria-label="Remove upstream">' +
+                  '    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>' +
+                  '  </button>' +
+                  '</div>';
+                row.querySelector('.upstream-host').value = host || '';
+                row.querySelector('.upstream-port').value = port || '';
+                row.querySelector('.upstream-remove').addEventListener('click', () => {
+                  row.remove();
+                  refreshRemoveState();
+                });
+                rowsWrap.appendChild(row);
+                refreshRemoveState();
+              }
+
+              function refreshRemoveState() {
+                const rows = rowsWrap.querySelectorAll('.upstream-row');
+                rows.forEach((row) => {
+                  row.querySelector('.upstream-remove').disabled = rows.length <= 2;
+                });
+              }
+
+              function syncHidden() {
+                const values = Array.from(rowsWrap.querySelectorAll('.upstream-row')).map((row) => {
+                  const host = row.querySelector('.upstream-host').value.trim();
+                  const port = row.querySelector('.upstream-port').value.trim();
+                  if (!host) return '';
+                  return `${schemeSelect.value}://${host}${port ? ':' + port : ''}`;
+                }).filter(Boolean);
+                hidden.value = values.join('\n');
+              }
+
+              const existing = (hidden.value || '').split('\n').map((u) => u.trim()).filter(Boolean).map(splitUpstream);
+              schemeSelect.value = (existing.find((u) => u.scheme) || {}).scheme || 'http';
+              if (existing.length) {
+                existing.forEach((u) => addRow(u.host, u.port));
+              } else {
+                addRow('', '');
+                addRow('', '');
+              }
+
+              addBtn.addEventListener('click', () => addRow('', ''));
+              rowsWrap.closest('form').addEventListener('submit', syncHidden);
+            })();
+          </script>
+
           <div class="mb-3">
             <label class="form-label">Load balancing policy</label>
             <select name="lb_policy" class="form-select">
