@@ -1,0 +1,241 @@
+diff --git a/static/js/form-validate.js b/static/js/form-validate.js
+new file mode 100644
+index 0000000..363f6d6
+--- /dev/null
++++ b/static/js/form-validate.js
+@@ -0,0 +1,32 @@
++// Shared client-side form validation, used by every form in the app (login,
++// settings, block_form) so they all behave and look the same: native HTML5
++// `required`/`minlength` attributes drive Bootstrap's `.was-validated` /
++// `:invalid` styling, with `.invalid-feedback` text shown underneath each
++// field. Fields that can't use a native `required` attribute (e.g. the hosts
++// chip widget in block_form.html) plug in via the optional extraValidator
++// callback so they still block submission and get the same is-invalid look.
++
++function initFormValidation(form, extraValidator) {
++  if (!form) return;
++  form.setAttribute("novalidate", "novalidate");
++  form.addEventListener("submit", (event) => {
++    const nativeValid = form.checkValidity();
++    const extraValid = typeof extraValidator === "function" ? extraValidator() : true;
++    if (!nativeValid || !extraValid) {
++      event.preventDefault();
++      event.stopPropagation();
++    }
++    form.classList.add("was-validated");
++  });
++}
++
++// Keeps two password-style fields in sync via the Constraint Validation API:
++// `field` is marked invalid (with `message`) whenever it and `otherField`
++// are both filled in but don't match.
++function wireMatchingFields(field, otherField, message) {
++  function check() {
++    field.setCustomValidity(field.value && otherField.value && field.value !== otherField.value ? message : "");
++  }
++  field.addEventListener("input", check);
++  otherField.addEventListener("input", check);
++}
+diff --git a/templates/auth.html b/templates/auth.html
+index 14a6631..d62f3be 100644
+--- a/templates/auth.html
++++ b/templates/auth.html
+@@ -20,6 +20,7 @@
+     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/caddy-favicon.png') }}" />
+ 
+     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
++    <script src="{{ url_for('static', filename='js/form-validate.js') }}"></script>
+ 
+     {% block extra_head %}{% endblock %}
+ 
+diff --git a/templates/base.html b/templates/base.html
+index 4eef7c7..106d1aa 100644
+--- a/templates/base.html
++++ b/templates/base.html
+@@ -20,6 +20,7 @@
+     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/caddy-favicon.png') }}" />
+ 
+     <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
++    <script src="{{ url_for('static', filename='js/form-validate.js') }}"></script>
+ 
+     {% block extra_head %}{% endblock %}
+     
+diff --git a/templates/block_form.html b/templates/block_form.html
+index f2d104b..8faf3c8 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -38,7 +38,7 @@
+       <div class="card-body">
+         {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+ 
+-        <form method="post">
++        <form method="post" id="block-form">
+ 
+           <!-- BEGIN HOSTS FIELD -->
+           <div class="mb-3">
+@@ -121,16 +121,15 @@
+               });
+ 
+               wrap.addEventListener('click', () => textInput.focus());
+-              wrap.closest('form').addEventListener('submit', (e) => {
++              wrap.closest('form').addEventListener('submit', () => {
+                 if (textInput.value.trim()) addChip(textInput.value);
+-                if (currentHosts().length === 0) {
+-                  e.preventDefault();
+-                  wrap.classList.add('is-invalid');
+-                  textInput.focus();
+-                } else {
+-                  wrap.classList.remove('is-invalid');
+-                }
+               });
++
++              window.__validateHosts = function () {
++                const valid = currentHosts().length > 0;
++                wrap.classList.toggle('is-invalid', !valid);
++                return valid;
++              };
+             })();
+           </script>
+           <!-- END HOSTS TAG INPUT SCRIPT -->
+@@ -148,6 +147,7 @@
+             <div class="col-md-6 mb-3">
+               <label class="form-label">Upstream host</label>
+               <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1" required>
++              <div class="invalid-feedback">Upstream host is required.</div>
+             </div>
+             <div class="col-md-3 mb-3">
+               <label class="form-label">Port</label>
+@@ -245,6 +245,7 @@
+                 row.innerHTML =
+                   '<div class="col">' +
+                   '  <input type="text" class="form-control upstream-host" placeholder="10.0.0.1" required>' +
++                  '  <div class="invalid-feedback">Host is required.</div>' +
+                   '</div>' +
+                   '<div class="col-3">' +
+                   '  <input type="text" class="form-control upstream-port" placeholder="8080">' +
+@@ -334,6 +335,7 @@
+           <div class="mb-3">
+             <label class="form-label">Redirect target</label>
+             <input type="text" name="target" class="form-control" value="{{ meta.target or '' }}" placeholder="https://new.example.com{uri}" required>
++            <div class="invalid-feedback">Redirect target is required.</div>
+           </div>
+           <div class="mb-3">
+             <label class="form-label">Redirect code</label>
+@@ -351,6 +353,7 @@
+           <div class="mb-3">
+             <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the hosts above are wrapped around it automatically)</span></label>
+             <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
++            <div class="invalid-feedback">Block content is required.</div>
+           </div>
+           {% endif %}
+           <!-- END CUSTOM FIELDS -->
+@@ -363,6 +366,12 @@
+           <!-- END FORM ACTIONS -->
+ 
+         </form>
++
++        <script>
++          initFormValidation(document.getElementById('block-form'), function () {
++            return window.__validateHosts ? window.__validateHosts() : true;
++          });
++        </script>
+       </div>
+       <!-- END CARD BODY -->
+     </div>
+diff --git a/templates/login.html b/templates/login.html
+index b5014f9..d1960bb 100644
+--- a/templates/login.html
++++ b/templates/login.html
+@@ -9,14 +9,16 @@
+   <div class="card-body">
+     <h2 class="h2 text-center mb-4">Log in</h2>
+     {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+-    <form method="post" autocomplete="off">
++    <form method="post" autocomplete="off" id="login-form">
+       <div class="mb-3">
+         <label class="form-label">Username</label>
+         <input type="text" name="username" class="form-control" required autofocus>
++        <div class="invalid-feedback">Username is required.</div>
+       </div>
+       <div class="mb-2">
+         <label class="form-label">Password</label>
+         <input type="password" name="password" class="form-control" required>
++        <div class="invalid-feedback">Password is required.</div>
+       </div>
+       <div class="form-footer">
+         <button type="submit" class="btn btn-primary w-100">Log in</button>
+@@ -24,4 +26,8 @@
+     </form>
+   </div>
+ </div>
++
++<script>
++  initFormValidation(document.getElementById('login-form'));
++</script>
+ {% endblock %}
+diff --git a/templates/settings.html b/templates/settings.html
+index 42008b4..56f4c20 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -73,22 +73,33 @@
+           <div class="card-body">
+             <h2 class="mb-4">Password Settings</h2>
+             <h3 class="card-title">Change Password</h3>
+-            <form method="post" autocomplete="off">
++            <form method="post" autocomplete="off" id="password-form">
+               <input type="hidden" name="action" value="change_password">
+               <div class="mb-3">
+                 <label class="form-label">Current password</label>
+                 <input type="password" name="current_password" class="form-control" required>
++                <div class="invalid-feedback">Current password is required.</div>
+               </div>
+               <div class="mb-3">
+                 <label class="form-label">New password</label>
+-                <input type="password" name="new_password" class="form-control" required minlength="6">
++                <input type="password" name="new_password" id="new_password" class="form-control" required minlength="6">
++                <div class="invalid-feedback">New password must be at least 6 characters.</div>
+               </div>
+               <div class="mb-3">
+                 <label class="form-label">Confirm new password</label>
+-                <input type="password" name="new_password2" class="form-control" required minlength="6">
++                <input type="password" name="new_password2" id="new_password2" class="form-control" required minlength="6">
++                <div class="invalid-feedback">Passwords do not match.</div>
+               </div>
+               <button type="submit" class="btn btn-primary">Change password</button>
+             </form>
++            <script>
++              wireMatchingFields(
++                document.getElementById('new_password2'),
++                document.getElementById('new_password'),
++                'Passwords do not match.'
++              );
++              initFormValidation(document.getElementById('password-form'));
++            </script>
+           </div>
+         </div>
+         
+@@ -100,11 +111,12 @@
+             <p class="text-secondary">
+               Ensure all directories exist and have correct permissions.
+             </p>
+-            <form method="post">
++            <form method="post" id="directory-form">
+               <input type="hidden" name="action" value="update_dir">
+               <div class="mb-3">
+                 <label class="form-label">Conf directory path</label>
+                 <input type="text" name="caddy_dir" class="form-control" value="{{ cfg.caddy_dir }}" required>
++                <div class="invalid-feedback">Conf directory path is required.</div>
+               </div>
+               <div class="mb-3">
+                 <label class="form-label">Certifcate directory path</label>
+@@ -116,6 +128,9 @@
+               </div>
+               <button type="submit" class="btn btn-primary">Update directories</button>
+             </form>
++            <script>
++              initFormValidation(document.getElementById('directory-form'));
++            </script>
+           </div>
+         </div>
+ 
+-- 

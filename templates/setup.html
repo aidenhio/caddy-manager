@@ -11,22 +11,26 @@
     <h2 class="h2 text-center mb-4">Initial Setup</h2>
     <p class="text-secondary text-center mb-4">Create your admin account and set the directory where Caddy <code>.conf</code> files will be stored.</p>
     {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-    <form method="post" autocomplete="off">
+    <form method="post" autocomplete="off" id="setup-form">
       <div class="mb-3">
         <label class="form-label">Admin username</label>
         <input type="text" name="username" class="form-control" required autofocus>
+        <div class="invalid-feedback">Username is required.</div>
       </div>
       <div class="mb-3">
         <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-control" required minlength="6">
+        <input type="password" name="password" id="password" class="form-control" required minlength="6">
+        <div class="invalid-feedback">Password must be at least 6 characters.</div>
       </div>
       <div class="mb-3">
         <label class="form-label">Confirm password</label>
-        <input type="password" name="password2" class="form-control" required minlength="6">
+        <input type="password" name="password2" id="password2" class="form-control" required minlength="6">
+        <div class="invalid-feedback">Passwords do not match.</div>
       </div>
       <div class="mb-3">
         <label class="form-label">Caddy conf directory (caddy.d)</label>
         <input type="text" name="caddy_dir" class="form-control" placeholder="/etc/caddy/caddy.d" required>
+        <div class="invalid-feedback">Caddy conf directory is required.</div>
         <small class="form-hint">Should match what your Caddyfile imports, e.g. <code>import caddy.d/*.conf</code>. Created automatically if it doesn't exist.</small>
       </div>
       <div class="form-footer">
@@ -35,4 +39,13 @@
     </form>
   </div>
 </div>
+
+<script>
+  wireMatchingFields(
+    document.getElementById('password2'),
+    document.getElementById('password'),
+    'Passwords do not match.'
+  );
+  initFormValidation(document.getElementById('setup-form'));
+</script>
 {% endblock %}

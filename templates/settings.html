@@ -73,22 +73,33 @@
           <div class="card-body">
             <h2 class="mb-4">Password Settings</h2>
             <h3 class="card-title">Change Password</h3>
-            <form method="post" autocomplete="off">
+            <form method="post" autocomplete="off" id="password-form">
               <input type="hidden" name="action" value="change_password">
               <div class="mb-3">
                 <label class="form-label">Current password</label>
                 <input type="password" name="current_password" class="form-control" required>
+                <div class="invalid-feedback">Current password is required.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">New password</label>
-                <input type="password" name="new_password" class="form-control" required minlength="6">
+                <input type="password" name="new_password" id="new_password" class="form-control" required minlength="6">
+                <div class="invalid-feedback">New password must be at least 6 characters.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">Confirm new password</label>
-                <input type="password" name="new_password2" class="form-control" required minlength="6">
+                <input type="password" name="new_password2" id="new_password2" class="form-control" required minlength="6">
+                <div class="invalid-feedback">Passwords do not match.</div>
               </div>
               <button type="submit" class="btn btn-primary">Change password</button>
             </form>
+            <script>
+              wireMatchingFields(
+                document.getElementById('new_password2'),
+                document.getElementById('new_password'),
+                'Passwords do not match.'
+              );
+              initFormValidation(document.getElementById('password-form'));
+            </script>
           </div>
         </div>
         
@@ -100,11 +111,12 @@
             <p class="text-secondary">
               Ensure all directories exist and have correct permissions.
             </p>
-            <form method="post">
+            <form method="post" id="directory-form">
               <input type="hidden" name="action" value="update_dir">
               <div class="mb-3">
                 <label class="form-label">Conf directory path</label>
                 <input type="text" name="caddy_dir" class="form-control" value="{{ cfg.caddy_dir }}" required>
+                <div class="invalid-feedback">Conf directory path is required.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">Certifcate directory path</label>
@@ -116,6 +128,9 @@
               </div>
               <button type="submit" class="btn btn-primary">Update directories</button>
             </form>
+            <script>
+              initFormValidation(document.getElementById('directory-form'));
+            </script>
           </div>
         </div>
 
