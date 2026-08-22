@@ -15,6 +15,13 @@
  *   data-dt-page-size-default="10"    fallback page size if no <select>
  *   data-dt-summary="#selector"       element to receive "Showing X to Y of Z"
  *   data-dt-pagination="#selector"    <ul> to receive Tabler pagination markup
+ *   data-dt-default-sort="key"        sort column applied on a first-ever
+ *                                     visit, before anything is persisted
+ *   data-dt-default-sort-dir="asc"    direction for the above (default "asc")
+ *   data-dt-storage-key="name"        persist search/sort/filters to
+ *                                     sessionStorage under this key, and
+ *                                     restore them on the next visit within
+ *                                     the same browser session
  *
  * Sortable columns: any button with class "table-sort" inside the
  * table's <thead>, with data-sort-key (matched against the row's
@@ -30,7 +37,9 @@
  * group's checked values equals the row's data-<group> attribute (a
  * group with nothing checked imposes no constraint). An element with
  * [data-dt-clear-filters] inside the same container clears every
- * checkbox in it, plus the search box, when clicked.
+ * checkbox in it, plus the search box, when clicked -- it (and its
+ * preceding .dropdown-divider, if any) is hidden automatically whenever
+ * no filter checkbox is checked, and shown again as soon as one is.
  *
  * Search: matches if every whitespace-separated term in the query is a
  * substring of the row's full text content -- a simple, dependency-free
@@ -60,12 +69,17 @@
     const pageSizeEl = table.dataset.dtPageSize ? document.querySelector(table.dataset.dtPageSize) : null;
     const summaryEl = table.dataset.dtSummary ? document.querySelector(table.dataset.dtSummary) : null;
     const paginationEl = table.dataset.dtPagination ? document.querySelector(table.dataset.dtPagination) : null;
+    const storageKey = table.dataset.dtStorageKey || null;
 
     const sortButtons = Array.from(table.querySelectorAll('thead .table-sort'));
     const filterChecks = filtersEl
       ? Array.from(filtersEl.querySelectorAll('input[type="checkbox"][data-filter-group]'))
       : [];
     const clearFiltersEl = filtersEl ? filtersEl.querySelector('[data-dt-clear-filters]') : null;
+    const clearFiltersDivider = clearFiltersEl && clearFiltersEl.previousElementSibling &&
+      clearFiltersEl.previousElementSibling.classList.contains('dropdown-divider')
+      ? clearFiltersEl.previousElementSibling
+      : null;
 
     const defaultPageSize = parseInt(
       (pageSizeEl && pageSizeEl.value) || table.dataset.dtPageSizeDefault || '10',
@@ -80,6 +94,54 @@
       sortDir: 'asc',
       search: '',
     };
+
+    function loadPersistedState() {
+      if (!storageKey) return null;
+      try {
+        const raw = sessionStorage.getItem('datatable:' + storageKey);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function savePersistedState() {
+      if (!storageKey) return;
+      try {
+        sessionStorage.setItem('datatable:' + storageKey, JSON.stringify({
+          sortKey: state.sortKey,
+          sortType: state.sortType,
+          sortDir: state.sortDir,
+          search: state.search,
+          filters: activeFilterGroups(),
+        }));
+      } catch (e) {
+        // sessionStorage unavailable (private browsing quota, etc) -- degrade
+        // to a non-persistent table rather than erroring out.
+      }
+    }
+
+    // Establish starting sort/search/filters: a persisted session takes
+    // priority (so returning to the page keeps whatever was last chosen),
+    // falling back to data-dt-default-sort on a first-ever visit.
+    const persisted = loadPersistedState();
+    if (persisted) {
+      state.sortKey = persisted.sortKey || null;
+      state.sortType = persisted.sortType || 'text';
+      state.sortDir = persisted.sortDir || 'asc';
+      state.search = persisted.search || '';
+      if (searchInput) searchInput.value = state.search;
+      const persistedFilters = persisted.filters || {};
+      filterChecks.forEach((cb) => {
+        const values = persistedFilters[cb.dataset.filterGroup];
+        cb.checked = !!(values && values.includes(cb.value));
+      });
+    } else if (table.dataset.dtDefaultSort) {
+      state.sortKey = table.dataset.dtDefaultSort;
+      const defaultBtn = sortButtons.find((b) => b.dataset.sortKey === state.sortKey);
+      state.sortType = (defaultBtn && defaultBtn.dataset.sortType) || 'text';
+      state.sortDir = table.dataset.dtDefaultSortDir || 'asc';
+    }
 
     function activeFilterGroups() {
       const groups = {};
@@ -120,6 +182,13 @@
         btn.classList.remove('asc', 'desc');
         if (btn.dataset.sortKey === state.sortKey) btn.classList.add(state.sortDir);
       });
+    }
+
+    function updateClearFiltersVisibility() {
+      if (!clearFiltersEl) return;
+      const anyChecked = filterChecks.some((cb) => cb.checked);
+      clearFiltersEl.classList.toggle('d-none', !anyChecked);
+      if (clearFiltersDivider) clearFiltersDivider.classList.toggle('d-none', !anyChecked);
     }
 
     function pageItem(label, page, opts) {
@@ -192,6 +261,8 @@
 
       renderPagination(totalPages);
       updateSortIndicators();
+      updateClearFiltersVisibility();
+      savePersistedState();
     }
 
     sortButtons.forEach((btn) => {
