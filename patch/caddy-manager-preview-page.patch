@@ -1,0 +1,278 @@
+diff --git a/app.py b/app.py
+index f141f08..88c4d26 100644
+--- a/app.py
++++ b/app.py
+@@ -338,15 +338,35 @@ def meta_path_for(conf_filename):
+ 
+ def write_metadata(conf_filename, conf_path, meta):
+     """Persist metadata for a block, stamped with the .conf's current
+-    mtime/size so future reads know whether the cache is still valid."""
++    mtime/size so future reads know whether the cache is still valid.
++    Also stamps/preserves a created_ts: the first time a sidecar is ever
++    written for a filename it's set from the .conf's own ctime (a close
++    enough proxy for creation time, and exactly right for a block just
++    created through the app, since this always runs immediately after
++    the .conf itself is written) -- every write after that just carries
++    the existing sidecar's created_ts forward untouched, so editing a
++    block never resets when it was "created"."""
+     try:
+         st = os.stat(conf_path)
+     except OSError:
+         return
+-    meta = {**meta, "source_mtime": st.st_mtime, "source_size": st.st_size}
++    existing_created = None
++    meta_file = meta_path_for(conf_filename)
++    if os.path.isfile(meta_file):
++        try:
++            with open(meta_file) as f:
++                existing_created = json.load(f).get("created_ts")
++        except (OSError, ValueError):
++            pass
++    meta = {
++        **meta,
++        "source_mtime": st.st_mtime,
++        "source_size": st.st_size,
++        "created_ts": meta.get("created_ts") or existing_created or st.st_ctime,
++    }
+     try:
+         os.makedirs(metadata_dir(), exist_ok=True)
+-        with open(meta_path_for(conf_filename), "w") as f:
++        with open(meta_file, "w") as f:
+             json.dump(meta, f, indent=2)
+     except OSError:
+         pass
+@@ -725,6 +745,45 @@ def edit_block(filename):
+     )
+ 
+ 
++@app.route("/preview/<path:filename>")
++@login_required
++def preview_block(filename):
++    path = safe_path(filename)
++    if not os.path.isfile(path):
++        abort(404)
++
++    # read_metadata may self-heal (rewrite) a stale/missing sidecar, so call
++    # it before reading the raw metadata file below -- the preview should
++    # always show the same sidecar content the rest of the app is using.
++    meta = read_metadata(filename, path)
++    block_type = meta.get("type", "custom")
++
++    with open(path) as f:
++        conf_content = f.read()
++
++    meta_file = meta_path_for(filename)
++    if os.path.isfile(meta_file):
++        with open(meta_file) as f:
++            metadata_content = f.read()
++    else:
++        metadata_content = "(no metadata file found)"
++
++    created_ts = meta.get("created_ts")
++    return render_template(
++        "preview.html",
++        filename=filename,
++        block_type=block_type,
++        meta=meta,
++        hosts=meta.get("hosts", []),
++        disabled=filename.endswith(".disabled"),
++        conf_path=path,
++        conf_content=conf_content,
++        metadata_content=metadata_content,
++        created=datetime.fromtimestamp(created_ts).strftime("%d/%m/%Y %I:%M%p") if created_ts else "Unknown",
++        updated=datetime.fromtimestamp(os.path.getmtime(path)).strftime("%d/%m/%Y %I:%M%p"),
++    )
++
++
+ @app.route("/toggle/<path:filename>", methods=["POST"])
+ @login_required
+ def toggle_block(filename):
+diff --git a/templates/preview.html b/templates/preview.html
+new file mode 100644
+index 0000000..972cc5f
+--- /dev/null
++++ b/templates/preview.html
+@@ -0,0 +1,169 @@
++{% extends "base.html" %}
++
++{% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
++{% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else 'Custom')) %}
++
++{% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}
++{% block page_pretitle %}Caddy{% endblock %}
++{% block page_title %}{{ hosts[0] if hosts else filename }}{% endblock %}
++
++{% block header_actions %}
++<div class="btn-list">
++  <a href="{{ url_for('sites') }}" class="btn btn-1">
++    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-arrow-left">
++      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++      <path d="M5 12l14 0" />
++      <path d="M5 12l6 6" />
++      <path d="M5 12l6 -6" />
++    </svg>
++    Back
++  </a>
++  <a href="{{ url_for('edit_block', filename=filename) }}" class="btn btn-{{ type_color }} btn-5 d-none d-sm-inline-block">
++    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-pencil">
++      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
++      <path d="M13.5 6.5l4 4" />
++    </svg>
++    Edit
++  </a>
++</div>
++{% endblock %}
++
++<!---->
++
++{% block content %}
++
++<div class="row row-cards">
++
++  <!-- BEGIN PREVIEW TABS CARD -->
++  <div class="col-12 col-lg-8">
++    <div class="card">
++      <div class="card-status-top bg-{{ type_color }}"></div>
++      <div class="card-header card-tabs">
++        <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
++          <li class="nav-item">
++            <a href="#tab-conf" class="nav-link active" data-bs-toggle="tab">
++              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon me-1 icon-tabler-file-text">
++                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
++                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2" />
++                <path d="M9 9l1 0" />
++                <path d="M9 13l6 0" />
++                <path d="M9 17l6 0" />
++              </svg>
++              Conf file
++            </a>
++          </li>
++          <li class="nav-item">
++            <a href="#tab-metadata" class="nav-link" data-bs-toggle="tab">
++              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon me-1 icon-tabler-braces">
++                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                <path d="M7 4a2 2 0 0 0 -2 2v3a2 3 0 0 1 -2 3a2 3 0 0 1 2 3v3a2 2 0 0 0 2 2" />
++                <path d="M17 4a2 2 0 0 1 2 2v3a2 3 0 0 0 2 3a2 3 0 0 0 -2 3v3a2 2 0 0 1 -2 2" />
++              </svg>
++              Metadata
++            </a>
++          </li>
++        </ul>
++      </div>
++      <div class="card-body card-code p-0">
++        <div class="tab-content">
++          <div class="tab-pane active show" id="tab-conf">
++            <pre class="caddy-preview p-3 mb-0"><code>{{ conf_content }}</code></pre>
++          </div>
++          <div class="tab-pane" id="tab-metadata">
++            <pre class="caddy-preview p-3 mb-0"><code>{{ metadata_content }}</code></pre>
++          </div>
++        </div>
++      </div>
++    </div>
++  </div>
++  <!-- END PREVIEW TABS CARD -->
++
++  <!-- BEGIN METADATA SIDEBAR -->
++  <div class="col-12 col-lg-4">
++    <div class="card">
++      <div class="card-header">
++        <h3 class="card-title">Details</h3>
++      </div>
++      <div class="list-group list-group-flush">
++
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Status</div>
++          {% if disabled %}
++            <span class="text-secondary d-inline-flex align-items-center gap-1">
++              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-minus">
++                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
++                <path d="M9 12l6 0" />
++              </svg>
++              Disabled
++            </span>
++          {% else %}
++            <span class="text-success d-inline-flex align-items-center gap-1">
++              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-check">
++                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
++                <path d="M9 12l2 2l4 -4" />
++              </svg>
++              Enabled
++            </span>
++          {% endif %}
++        </div>
++
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Type</div>
++          <span class="badge bg-{{ type_color }}-lt">{{ type_label }}</span>
++        </div>
++
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Host{{ 's' if hosts | length > 1 else '' }}</div>
++          {% if hosts %}
++            {% for h in hosts %}<div class="font-monospace">{{ h }}</div>{% endfor %}
++          {% else %}
++            <span class="text-danger">No host configured</span>
++          {% endif %}
++        </div>
++
++        {% if block_type == 'reverse_proxy' %}
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Upstream</div>
++          <div class="font-monospace">{{ meta.target or '—' }}</div>
++          {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
++        </div>
++        {% elif block_type == 'redirect' %}
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Redirect target</div>
++          <div class="font-monospace">{{ meta.target or '—' }}</div>
++          {% if meta.redirect_code %}<div class="text-secondary small mt-1">HTTP {{ meta.redirect_code }}</div>{% endif %}
++        </div>
++        {% elif block_type == 'load_balancer' %}
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Upstreams</div>
++          {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
++          {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
++        </div>
++        {% endif %}
++
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Conf file path</div>
++          <div class="font-monospace small text-break">{{ conf_path }}</div>
++        </div>
++
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Created</div>
++          <div>{{ created }}</div>
++        </div>
++
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">Last updated</div>
++          <div>{{ updated }}</div>
++        </div>
++
++      </div>
++    </div>
++  </div>
++  <!-- END METADATA SIDEBAR -->
++
++</div>
++{% endblock %}
+diff --git a/templates/sites.html b/templates/sites.html
+index c538f2d..399679a 100644
+--- a/templates/sites.html
++++ b/templates/sites.html
+@@ -302,7 +302,7 @@
+                     </svg>Edit
+                   </a>
+ 
+-                  <a class="dropdown-item" href="#">
++                  <a class="dropdown-item" href="{{ url_for('preview_block', filename=b.filename) }}">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon  icons-tabler-outline icon-tabler-eye">
+                       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                       <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+-- 

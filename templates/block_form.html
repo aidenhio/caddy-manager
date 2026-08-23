@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}
-  {% if mode == 'edit' %}Edit {{ filename }}{% else %}New Site{% endif %} - Caddy Manager
-{% endblock %}
-{% block page_pretitle %}Caddy{% endblock %}
-{% block page_title %}{% if mode == 'edit' %}Edit Site{% else %}New Site{% endif %}{% endblock %}
+{% block title %}{% if mode == 'edit' %}Edit {{ hosts[0] if hosts else filename }}{% else %}Add Site{% endif %} - Caddy Manager{% endblock %}
+{% block page_pretitle %}{% if mode == 'edit' %}Edit{% else %}New{% endif %}{% endblock %}
+{% block page_title %}{% if mode == 'edit' %}{{ hosts[0] if hosts else filename }}{% else %}Add Site{% endif %}{% endblock %}
 
 {% block header_actions %}
+<div class="btn-list">
+  {% if mode == 'edit' %}
+  <a href="{{ url_for('preview_block', filename=filename) }}" class="btn btn-{{ type_color }} btn-5 d-none d-sm-inline-block">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-pencil">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+    Disable
+  </a>
+  {% endif %}
+</div>
 {% endblock %}
 
 <!---->
@@ -25,10 +35,10 @@
       <div class="card-header">
         <h3 class="card-title">
           {% if mode == 'edit' %}
-            Editing <span class="badge bg-lt font-monospace">{{ filename }}</span>
-          {% elif block_type == 'reverse_proxy' %}New Reverse Proxy Block
-          {% elif block_type == 'redirect' %}New Redirect Block
-          {% elif block_type == 'load_balancer' %}New Load Balancer Block
+            Editing <span class="badge bg-lt font-monospace">{{ conf_path }}</span>
+          {% elif block_type == 'reverse_proxy' %}New Reverse Proxy
+          {% elif block_type == 'redirect' %}New Redirect
+          {% elif block_type == 'load_balancer' %}New Load Balancer
           {% else %}New Custom Block{% endif %}
         </h3>
       </div>
@@ -360,7 +370,14 @@
 
           <!-- BEGIN FORM ACTIONS -->
           <div class="form-footer d-flex gap-2">
-            <button type="submit" class="btn btn-{{ type_color }}">{{ 'Save Changes' if mode == 'edit' else 'Create Block' }}</button>
+            <button type="submit" class="btn btn-{{ type_color }}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler dropdown-item-icon icons-tabler-outline icon-tabler-device-floppy">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" />
+                <path d="M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                <path d="M14 4l0 4l-6 0l0 -4" />
+              </svg>
+              Save</button>
             <a href="{{ url_for('sites') }}" class="btn">Cancel</a>
           </div>
           <!-- END FORM ACTIONS -->

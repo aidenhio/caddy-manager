@@ -338,15 +338,35 @@ def meta_path_for(conf_filename):
 
 def write_metadata(conf_filename, conf_path, meta):
     """Persist metadata for a block, stamped with the .conf's current
-    mtime/size so future reads know whether the cache is still valid."""
+    mtime/size so future reads know whether the cache is still valid.
+    Also stamps/preserves a created_ts: the first time a sidecar is ever
+    written for a filename it's set from the .conf's own ctime (a close
+    enough proxy for creation time, and exactly right for a block just
+    created through the app, since this always runs immediately after
+    the .conf itself is written) -- every write after that just carries
+    the existing sidecar's created_ts forward untouched, so editing a
+    block never resets when it was "created"."""
     try:
         st = os.stat(conf_path)
     except OSError:
         return
-    meta = {**meta, "source_mtime": st.st_mtime, "source_size": st.st_size}
+    existing_created = None
+    meta_file = meta_path_for(conf_filename)
+    if os.path.isfile(meta_file):
+        try:
+            with open(meta_file) as f:
+                existing_created = json.load(f).get("created_ts")
+        except (OSError, ValueError):
+            pass
+    meta = {
+        **meta,
+        "source_mtime": st.st_mtime,
+        "source_size": st.st_size,
+        "created_ts": meta.get("created_ts") or existing_created or st.st_ctime,
+    }
     try:
         os.makedirs(metadata_dir(), exist_ok=True)
-        with open(meta_path_for(conf_filename), "w") as f:
+        with open(meta_file, "w") as f:
             json.dump(meta, f, indent=2)
     except OSError:
         pass
@@ -718,10 +738,52 @@ def edit_block(filename):
 
     upstreams_text = "\n".join(meta.get("upstreams") or [])
     hosts_text = "\n".join(meta.get("hosts") or [])
+    path = safe_path(filename)
+
     return render_template(
         "block_form.html", mode="edit", block_type=block_type, filename=filename,
-        meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text,
-        raw_body_text=raw_body_text, error=error
+        meta=meta, upstreams_text=upstreams_text, hosts=meta.get("hosts", []),
+        hosts_text=hosts_text, conf_path=path, raw_body_text=raw_body_text, 
+        error=error
+    )
+
+
+@app.route("/preview/<path:filename>")
+@login_required
+def preview_block(filename):
+    path = safe_path(filename)
+    if not os.path.isfile(path):
+        abort(404)
+
+    # read_metadata may self-heal (rewrite) a stale/missing sidecar, so call
+    # it before reading the raw metadata file below -- the preview should
+    # always show the same sidecar content the rest of the app is using.
+    meta = read_metadata(filename, path)
+    block_type = meta.get("type", "custom")
+
+    with open(path) as f:
+        conf_content = f.read()
+
+    meta_file = meta_path_for(filename)
+    if os.path.isfile(meta_file):
+        with open(meta_file) as f:
+            metadata_content = f.read()
+    else:
+        metadata_content = "(no metadata file found)"
+
+    created_ts = meta.get("created_ts")
+    return render_template(
+        "preview.html",
+        filename=filename,
+        block_type=block_type,
+        meta=meta,
+        hosts=meta.get("hosts", []),
+        disabled=filename.endswith(".disabled"),
+        conf_path=path,
+        conf_content=conf_content,
+        metadata_content=metadata_content,
+        created=datetime.fromtimestamp(created_ts).strftime("%d/%m/%Y %I:%M%p") if created_ts else "Unknown",
+        updated=datetime.fromtimestamp(os.path.getmtime(path)).strftime("%d/%m/%Y %I:%M%p"),
     )
 
 

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
+{% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else 'Custom')) %}
+
+{% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}
+{% block page_pretitle %}Preview{% endblock %}
+{% block page_title %}{{ hosts[0] if hosts else filename }}{% endblock %}
+
+{% block header_actions %}
+<div class="btn-list">
+  <a href="{{ url_for('sites') }}" class="btn btn-1">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-arrow-left">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M5 12l14 0" />
+      <path d="M5 12l6 6" />
+      <path d="M5 12l6 -6" />
+    </svg>
+    Back
+  </a>
+  <a href="{{ url_for('edit_block', filename=filename) }}" class="btn btn-{{ type_color }} btn-5 d-none d-sm-inline-block">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-pencil">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+    Edit
+  </a>
+</div>
+{% endblock %}
+
+<!---->
+
+{% block content %}
+
+<div class="row row-cards">
+
+  <!-- BEGIN METADATA SIDEBAR -->
+  <div class="col-12 col-lg-4">
+    <div class="card rounded-top-0">
+      <div class="card-status-top bg-{{ type_color }}"></div>
+      <div class="card-header">
+        <h3 class="card-title">Details</h3>
+      </div>
+      <div class="list-group list-group-flush">
+
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Status</div>
+          {% if disabled %}
+            <span class="text-secondary d-inline-flex align-items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-minus">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                <path d="M9 12l6 0" />
+              </svg>
+              Disabled
+            </span>
+          {% else %}
+            <span class="text-success d-inline-flex align-items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-check">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                <path d="M9 12l2 2l4 -4" />
+              </svg>
+              Enabled
+            </span>
+          {% endif %}
+        </div>
+
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Type</div>
+
+          {% if block_type == 'reverse_proxy' %}
+          <span class="badge bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M9 14l-4 -4l4 -4" />
+              <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+            </svg>
+            {{ type_label }}
+          </span>
+          {% elif block_type == 'redirect' %}
+          <span class="badge bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-corner-up-right">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
+            </svg>
+            {{ type_label }}
+          </span>
+          {% elif block_type == 'load_balancer' %}
+          <span class="badge bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-fork-triple">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M12 3v18" />
+              <path d="M16 7l-4 -4l-4 4" />
+              <path d="M16 11h5v5" />
+              <path d="M8 11h-5v5" />
+              <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
+              <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
+            </svg>
+            {{ type_label }}
+          </span>
+          {% else %}
+          <span class="badge bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
+              <path d="M12 11.875l3 -1.687" />
+              <path d="M12 11.875v3.375" />
+              <path d="M12 11.875l-3 -1.687" />
+              <path d="M12 11.875l3 1.688" />
+              <path d="M12 8.5v3.375" />
+              <path d="M12 11.875l-3 1.688" />
+              <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
+            </svg>
+            {{ type_label }}
+          </span>
+          {% endif %}
+        </div>
+
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Host{{ 's' if hosts | length > 1 else '' }}</div>
+          {% if hosts %}
+            {% for h in hosts %}<div class="font-monospace">{{ h }}</div>{% endfor %}
+          {% else %}
+            <span class="text-danger">No host configured</span>
+          {% endif %}
+        </div>
+
+        {% if block_type == 'reverse_proxy' %}
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Upstream</div>
+          <div class="font-monospace">{{ meta.target or '—' }}</div>
+          {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
+        </div>
+        {% elif block_type == 'redirect' %}
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Redirect target</div>
+          <div class="font-monospace">{{ meta.target or '—' }}</div>
+          {% if meta.redirect_code %}<div class="text-secondary small mt-1">HTTP {{ meta.redirect_code }}</div>{% endif %}
+        </div>
+        {% elif block_type == 'load_balancer' %}
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Upstreams</div>
+          {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
+          {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Conf file path</div>
+          <div class="font-monospace text-break">{{ conf_path }}</div>
+        </div>
+        
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Created</div>
+          <div>{{ created }}</div>
+        </div>
+
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Last updated</div>
+          <div>{{ updated }}</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <!-- END METADATA SIDEBAR -->
+
+  <!-- BEGIN FILE CARDS -->
+  <div class="col-12 col-lg-8">
+    
+
+    <!-- BEGIN CONF CARD -->
+    <div class="card rounded-top-0">
+      <div class="card-status-top bg-{{ type_color }}"></div>
+      <div class="card-header">
+        <h3 class="card-title">Caddy Config</h3>
+      </div>
+      <div class="card-body card-code p-0">
+        <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ conf_content }}</code></pre>
+      </div>
+    </div>
+    <!-- END CONF CARD -->
+
+    <!-- BEGIN METADATA CARD -->
+    <div class="card rounded-top-0 mt-2">
+      <div class="card-status-top bg-{{ type_color }}"></div>
+      <div class="card-header">
+        <h3 class="card-title">Metadata</h3>
+      </div>
+      <div class="card-body card-code p-0">
+        <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ metadata_content }}</code></pre>
+      </div>
+    </div>
+    <!-- END METADATA CARD --> 
+
+  </div>
+  <!-- END FILE CARDS -->
+
+</div>
+{% endblock %}

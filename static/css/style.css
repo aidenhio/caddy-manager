@@ -1,21 +1,58 @@
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.badge-type {
-    font-size: 0.7rem;
-}
-
-pre.caddy-preview {
-    background: #1e293b;
+.card-code pre {
     border-radius: 0 0 var(--tblr-card-border-radius) var(--tblr-card-border-radius);
     font-size: var(--tblr-body-font-size);
+    color: var(--tblr-code-color);
     tab-size: 2;
 }
 
-.table thead th {
-    border-radius: var(--tblr-card-border-radius);
+.code-primary-lt{
+    background-color: var(--tblr-primary-lt);
+}
+
+.code-blue-lt{
+    background-color: var(--tblr-blue-lt);
+}
+
+.code-azure-lt{
+    background-color: var(--tblr-azure-lt);
+}
+
+.code-indigo-lt{
+    background-color: var(--tblr-indigo-lt);
+}
+
+.code-purple-lt{
+    background-color: var(--tblr-purple-lt);
+}
+
+.code-pink-lt{
+    background-color: var(--tblr-pink-lt);
+}
+
+.code-red-lt{
+    background-color: var(--tblr-red-lt);
+}
+
+.code-orange-lt{
+    background-color: var(--tblr-orange-lt);
+}
+
+.code-yellow-lt{
+    background-color: var(--tblr-yellow-lt);
+}
+
+.code-lime-lt{
+    background-color: var(--tblr-lime-lt);
+}
+
+.code-green-lt{
+    background-color: var(--tblr-green-lt);
+}
+
+.code-teal-lt{
+    background-color: var(--tblr-teal-lt);
+}
+
+.code-cyan-lt{
+    background-color: var(--tblr-cyan-lt);
 }
