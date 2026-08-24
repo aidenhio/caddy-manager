@@ -628,13 +628,16 @@ def new_block(block_type):
                 meta = {"type": "custom", **meta}
 
         if not error:
+            create_disabled = request.form.get("create_disabled") == "1"
             filename = unique_filename(slugify(hosts[0]))
+            if create_disabled:
+                filename += ".disabled"
             os.makedirs(get_caddy_dir(), exist_ok=True)
             path = safe_path(filename)
             with open(path, "w") as f:
                 f.write(content)
             write_metadata(filename, path, meta)
-            flash(f"Created {filename}", "success")
+            flash(f"Created {filename}" + (" (disabled)" if create_disabled else ""), "success")
             return redirect(url_for("sites"))
 
     upstreams_text = "\n".join(meta.get("upstreams") or [])
@@ -643,7 +646,7 @@ def new_block(block_type):
     return render_template(
         "block_form.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text,
-        raw_body_text=raw_body_text, error=error
+        raw_body_text=raw_body_text, error=error, caddy_dir=get_caddy_dir()
     )
 
 
@@ -744,7 +747,7 @@ def edit_block(filename):
         "block_form.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, hosts=meta.get("hosts", []),
         hosts_text=hosts_text, conf_path=path, raw_body_text=raw_body_text, 
-        error=error
+        error=error, caddy_dir=get_caddy_dir()
     )
 
 

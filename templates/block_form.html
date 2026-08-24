@@ -62,23 +62,13 @@
 
       <!-- BEGIN CARD HEADER -->
       <div class="card-header">
-        <!--<h3 class="card-title">
-          {% if mode == 'edit' %}
-            Editing <span class="badge bg-lt font-monospace">{{ conf_path }}</span>
-          {% elif block_type == 'reverse_proxy' %}New Reverse Proxy
-          {% elif block_type == 'redirect' %}New Redirect
-          {% elif block_type == 'load_balancer' %}New Load Balancer
-          {% else %}New Custom Block{% endif %}
-        </h3>-->
-
         <h3 class="card-title">
           {% if mode == 'edit' %}
-            Editing <span class="badge bg-lt font-monospace">{{ conf_path }}</span>
+            Editing <span class="badge bg-lt font-monospace" id="conf-path-badge">{{ conf_path }}</span>
           {% else %}
-            Creating <span class="badge bg-lt font-monospace"></span> 
+            Creating <span class="badge bg-lt font-monospace" id="conf-path-badge"></span>
           {% endif %}
         </h3>
-
       </div>
       <!-- END CARD HEADER -->
 
@@ -106,13 +96,59 @@
               const textInput = document.getElementById('hosts-text-input');
               const hidden = document.getElementById('hosts');
               const typeColor = '{{ type_color }}';
+              const caddyDir = {{ (caddy_dir or '')|tojson }};
+              const confPathBadge = document.getElementById('conf-path-badge');
+              const originallyDisabled = {{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }};
 
               function currentHosts() {
                 return Array.from(wrap.querySelectorAll('.host-chip')).map((el) => el.dataset.host);
               }
 
+              function sortedFirstHost() {
+                // Mirrors the backend's normalize_hosts(): hosts starting with a
+                // letter sort before hosts starting with a digit, alphabetically
+                // (case-insensitively) within each group.
+                const hosts = currentHosts().slice();
+                hosts.sort((a, b) => {
+                  const aDigit = /^[0-9]/.test(a) ? 1 : 0;
+                  const bDigit = /^[0-9]/.test(b) ? 1 : 0;
+                  if (aDigit !== bDigit) return aDigit - bDigit;
+                  const aLower = a.toLowerCase();
+                  const bLower = b.toLowerCase();
+                  if (aLower < bLower) return -1;
+                  if (aLower > bLower) return 1;
+                  return 0;
+                });
+                return hosts[0];
+              }
+
+              function slugify(value) {
+                value = (value || '').trim().toLowerCase();
+                let out = '';
+                for (const ch of value) {
+                  out += (/[a-z0-9.]/.test(ch)) ? ch : '-';
+                }
+                let slug = out.replace(/^-+|-+$/g, '');
+                while (slug.includes('--')) slug = slug.replace(/--/g, '-');
+                return slug || 'block';
+              }
+
+              function updateConfPathBadge() {
+                if (!confPathBadge) return;
+                const dirPrefix = caddyDir.replace(/\/$/, '') + '/';
+                const first = sortedFirstHost();
+                if (!first) {
+                  confPathBadge.textContent = dirPrefix + '...';
+                  return;
+                }
+                const createDisabledInput = document.getElementById('create-disabled-input');
+                const isDisabled = createDisabledInput ? createDisabledInput.checked : originallyDisabled;
+                confPathBadge.textContent = dirPrefix + slugify(first) + '.conf' + (isDisabled ? '.disabled' : '');
+              }
+
               function syncHidden() {
                 hidden.value = currentHosts().join('\n');
+                updateConfPathBadge();
               }
 
               function addChip(value) {
@@ -146,6 +182,7 @@
               }
 
               (hidden.value || '').split('\n').map((h) => h.trim()).filter(Boolean).forEach(addChip);
+              updateConfPathBadge();
 
               textInput.addEventListener('keydown', (e) => {
                 if (e.key === ' ' || e.key === 'Enter') {
@@ -178,6 +215,7 @@
                 wrap.classList.toggle('is-invalid', !valid);
                 return valid;
               };
+              window.__updateConfPathBadge = updateConfPathBadge;
             })();
           </script>
           <!-- END HOSTS TAG INPUT SCRIPT -->
@@ -235,10 +273,19 @@
               </div>
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
-                  <div class="mb-3 mb-md-0">
+                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
                     <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
                     <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
                   </div>
+                  {% if mode == 'new' %}
+                  <div class="mb-0">
+                    <label class="form-check">
+                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+                      <span class="form-check-label">Create disabled</span>
+                    </label>
+                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
+                  </div>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -366,10 +413,19 @@
               </div>
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
-                  <div class="mb-3 mb-md-0">
+                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
                     <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the reverse_proxy block)</span></label>
                     <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
                   </div>
+                  {% if mode == 'new' %}
+                  <div class="mb-0">
+                    <label class="form-check">
+                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+                      <span class="form-check-label">Create disabled</span>
+                    </label>
+                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
+                  </div>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -393,6 +449,36 @@
               {% endfor %}
             </select>
           </div>
+          <!-- BEGIN ADVANCED OPTIONS -->
+          <div class="accordion mb-3" id="advanced-options">
+            <div class="accordion-item">
+              <div class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+                  Advanced options
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M6 9l6 6l6 -6" />
+                  </svg>
+                </button>
+              </div>
+              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+                <div class="accordion-body">
+                  {% if mode == 'new' %}
+                  <div class="mb-0">
+                    <label class="form-check">
+                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+                      <span class="form-check-label">Create disabled</span>
+                    </label>
+                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
+                  </div>
+                  {% else %}
+                  <p class="text-secondary mb-0">No advanced options for this block type yet.</p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END ADVANCED OPTIONS -->
           {% endif %}
           <!-- END REDIRECT FIELDS -->
 
@@ -403,6 +489,36 @@
             <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
             <div class="invalid-feedback">Block content is required.</div>
           </div>
+          <!-- BEGIN ADVANCED OPTIONS -->
+          <div class="accordion mb-3" id="advanced-options">
+            <div class="accordion-item">
+              <div class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+                  Advanced options
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M6 9l6 6l6 -6" />
+                  </svg>
+                </button>
+              </div>
+              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+                <div class="accordion-body">
+                  {% if mode == 'new' %}
+                  <div class="mb-0">
+                    <label class="form-check">
+                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+                      <span class="form-check-label">Create disabled</span>
+                    </label>
+                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
+                  </div>
+                  {% else %}
+                  <p class="text-secondary mb-0">No advanced options for this block type yet.</p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END ADVANCED OPTIONS -->
           {% endif %}
           <!-- END CUSTOM FIELDS -->
 

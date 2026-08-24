@@ -1,6 +1,6 @@
 <!-- BEGIN NEW BLOCK TYPE MODAL -->
 <div class="modal modal-blur fade" id="modal-blocks" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
+  <div class="modal-dialog modal-lg modal-dialog-centered p-3">
     <div class="modal-content">
       <!-- BEGIN MODAL HEADER -->
       <div class="modal-header">
@@ -10,10 +10,11 @@
       <!-- END MODAL HEADER -->
       <!-- BEGIN MODAL BODY -->
       <div class="modal-body">
-        <div class="row row-cards">
+        <div class="row row-cards justify-content-center">
           <!-- BEGIN REVERSE PROXY CARD -->
-          <div class="col-12 col-sm-6">
-            <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="card card-link h-100 text-decoration-none">
+          <div class="col">
+            <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+              <div class="card-status-top bg-primary"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-primary-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
@@ -29,8 +30,9 @@
           </div>
           <!-- END REVERSE PROXY CARD -->
           <!-- BEGIN REDIRECT CARD -->
-          <div class="col-12 col-sm-6">
-            <a href="{{ url_for('new_block', block_type='redirect') }}" class="card card-link h-100 text-decoration-none">
+          <div class="col-12 col-sm-4">
+            <a href="{{ url_for('new_block', block_type='redirect') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+              <div class="card-status-top bg-purple"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-purple-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
@@ -45,8 +47,9 @@
           </div>
           <!-- END REDIRECT CARD -->
           <!-- BEGIN LOAD BALANCER CARD -->
-          <div class="col-12 col-sm-6">
-            <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link h-100 text-decoration-none">
+          <div class="col-12 col-sm-4">
+            <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+              <div class="card-status-top bg-pink"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-pink-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
@@ -65,9 +68,32 @@
             </a>
           </div>
           <!-- END LOAD BALANCER CARD -->
+          <!-- BEGIN STATIC SITE CARD -->
+          <div class="col-12 col-sm-4">
+            <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+              <div class="card-status-top bg-lime"></div>
+              <div class="card-body text-center py-4">
+                <span class="avatar avatar-xl bg-lime-lt mb-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M12 3v18" />
+                    <path d="M16 7l-4 -4l-4 4" />
+                    <path d="M16 11h5v5" />
+                    <path d="M8 11h-5v5" />
+                    <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
+                    <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
+                  </svg>
+                </span>
+                <div class="h4 mb-1">Static Site</div>
+                <div class="text-secondary">Distribute traffic across multiple upstream hosts</div>
+              </div>
+            </a>
+          </div>
+          <!-- END STATIC SITE CARD --> 
           <!-- BEGIN CUSTOM BLOCK CARD -->
-          <div class="col-12 col-sm-6">
-            <a href="{{ url_for('new_block', block_type='custom') }}" class="card card-link h-100 text-decoration-none">
+          <div class="col-12 col-sm-4">
+            <a href="{{ url_for('new_block', block_type='custom') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+              <div class="card-status-top bg-yellow"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-yellow-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
