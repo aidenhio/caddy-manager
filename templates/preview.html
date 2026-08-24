@@ -152,10 +152,12 @@
           <div class="font-monospace text-break">{{ conf_path }}</div>
         </div>
         
+        {% if created != 'Unknown' %}
         <div class="list-group-item">
           <div class="text-secondary small mb-1">Created</div>
           <div>{{ created }}</div>
         </div>
+        {% endif %}
 
         <div class="list-group-item">
           <div class="text-secondary small mb-1">Last updated</div>
