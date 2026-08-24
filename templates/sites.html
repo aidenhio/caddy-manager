@@ -12,7 +12,7 @@
       <path d="M12 5l0 14"></path>
       <path d="M5 12l14 0"></path>
     </svg>
-    Add New Site Block
+    New Site Block
   </button>
   <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="btn btn-primary btn-5 d-none d-sm-inline-block">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-arrow-back-up">
@@ -61,41 +61,7 @@
 {% endblock %}
 
 {% block page_modal %}
-<div class="modal modal-blur fade" id="modal-blocks" tabindex="-1">
-     <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Add Site Block</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"
-          aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row row-cards">
-          <div class="col-6">
-            <div class="card bg-primary-lt">
-              <div class="card-body">Reverse Proxy</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="card bg-purple-lt">
-              <div class="card-body">Redirect</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="card bg-pink-lt">
-              <div class="card-body">Load Balancer</div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="card bg-yellow-lt">
-              <div class="card-body">Custom Block</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+{% include 'partials/new_block_modal.html' %}
 {% endblock %}
 
 <!---->

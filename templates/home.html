@@ -7,17 +7,21 @@
 {% block header_actions %}
 <div class="btn-list">
   <span class="d-none d-sm-inline">
-    <a href="{{ url_for('sites') }}" class="btn btn-1">All Sites</a>
+    <a href="{{ url_for('sites') }}" class="btn btn-1">Settings</a>
   </span>
-  <a href="#" class="btn btn-primary btn-5 d-none d-sm-inline-block">
+  <button type="button" class="btn btn-primary btn-5 d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
       <path d="M12 5l0 14"></path>
       <path d="M5 12l14 0"></path>
     </svg>
-    Add a new site
-  </a>
+    New Site Block
+  </button>
 </div>
+{% endblock %}
+
+{% block page_modal %}
+{% include 'partials/new_block_modal.html' %}
 {% endblock %}
 
 <!---->

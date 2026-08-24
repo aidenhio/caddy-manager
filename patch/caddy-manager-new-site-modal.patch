@@ -1,0 +1,179 @@
+diff --git a/templates/home.html b/templates/home.html
+index 1e8b85e..8ccd31e 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -9,17 +9,21 @@
+   <span class="d-none d-sm-inline">
+     <a href="{{ url_for('sites') }}" class="btn btn-1">All Sites</a>
+   </span>
+-  <a href="#" class="btn btn-primary btn-5 d-none d-sm-inline-block">
++  <button type="button" class="btn btn-primary btn-5 d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
+     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
+       <path d="M12 5l0 14"></path>
+       <path d="M5 12l14 0"></path>
+     </svg>
+     Add a new site
+-  </a>
++  </button>
+ </div>
+ {% endblock %}
+ 
++{% block page_modal %}
++{% include 'partials/new_block_modal.html' %}
++{% endblock %}
++
+ <!---->
+ 
+ <!-- BEGIN CONTENT BLOCK -->
+diff --git a/templates/partials/new_block_modal.html b/templates/partials/new_block_modal.html
+new file mode 100644
+index 0000000..a628587
+--- /dev/null
++++ b/templates/partials/new_block_modal.html
+@@ -0,0 +1,97 @@
++<!-- BEGIN NEW BLOCK TYPE MODAL -->
++<div class="modal modal-blur fade" id="modal-blocks" tabindex="-1">
++  <div class="modal-dialog modal-lg modal-dialog-centered">
++    <div class="modal-content">
++      <!-- BEGIN MODAL HEADER -->
++      <div class="modal-header">
++        <h5 class="modal-title">Add Site Block</h5>
++        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
++      </div>
++      <!-- END MODAL HEADER -->
++      <!-- BEGIN MODAL BODY -->
++      <div class="modal-body">
++        <div class="row row-cards">
++          <!-- BEGIN REVERSE PROXY CARD -->
++          <div class="col-12 col-sm-6">
++            <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="card card-link h-100 text-decoration-none">
++              <div class="card-body text-center py-4">
++                <span class="avatar avatar-xl bg-primary-lt mb-3">
++                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
++                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                    <path d="M9 14l-4 -4l4 -4" />
++                    <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
++                  </svg>
++                </span>
++                <div class="h4 mb-1">Reverse Proxy</div>
++                <div class="text-secondary">Forward requests to a single backend service</div>
++              </div>
++            </a>
++          </div>
++          <!-- END REVERSE PROXY CARD -->
++          <!-- BEGIN REDIRECT CARD -->
++          <div class="col-12 col-sm-6">
++            <a href="{{ url_for('new_block', block_type='redirect') }}" class="card card-link h-100 text-decoration-none">
++              <div class="card-body text-center py-4">
++                <span class="avatar avatar-xl bg-purple-lt mb-3">
++                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
++                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                    <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
++                  </svg>
++                </span>
++                <div class="h4 mb-1">Redirect</div>
++                <div class="text-secondary">Send visitors from one URL to another</div>
++              </div>
++            </a>
++          </div>
++          <!-- END REDIRECT CARD -->
++          <!-- BEGIN LOAD BALANCER CARD -->
++          <div class="col-12 col-sm-6">
++            <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link h-100 text-decoration-none">
++              <div class="card-body text-center py-4">
++                <span class="avatar avatar-xl bg-pink-lt mb-3">
++                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
++                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                    <path d="M12 3v18" />
++                    <path d="M16 7l-4 -4l-4 4" />
++                    <path d="M16 11h5v5" />
++                    <path d="M8 11h-5v5" />
++                    <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
++                    <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
++                  </svg>
++                </span>
++                <div class="h4 mb-1">Load Balancer</div>
++                <div class="text-secondary">Distribute traffic across multiple upstream hosts</div>
++              </div>
++            </a>
++          </div>
++          <!-- END LOAD BALANCER CARD -->
++          <!-- BEGIN CUSTOM BLOCK CARD -->
++          <div class="col-12 col-sm-6">
++            <a href="{{ url_for('new_block', block_type='custom') }}" class="card card-link h-100 text-decoration-none">
++              <div class="card-body text-center py-4">
++                <span class="avatar avatar-xl bg-yellow-lt mb-3">
++                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
++                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                    <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
++                    <path d="M12 11.875l3 -1.687" />
++                    <path d="M12 11.875v3.375" />
++                    <path d="M12 11.875l-3 -1.687" />
++                    <path d="M12 11.875l3 1.688" />
++                    <path d="M12 8.5v3.375" />
++                    <path d="M12 11.875l-3 1.688" />
++                    <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
++                  </svg>
++                </span>
++                <div class="h4 mb-1">Custom Block</div>
++                <div class="text-secondary">Write raw Caddyfile directives yourself</div>
++              </div>
++            </a>
++          </div>
++          <!-- END CUSTOM BLOCK CARD -->
++        </div>
++      </div>
++      <!-- END MODAL BODY -->
++    </div>
++  </div>
++</div>
++<!-- END NEW BLOCK TYPE MODAL -->
+diff --git a/templates/sites.html b/templates/sites.html
+index bc9ac27..965a0c0 100644
+--- a/templates/sites.html
++++ b/templates/sites.html
+@@ -61,41 +61,7 @@
+ {% endblock %}
+ 
+ {% block page_modal %}
+-<div class="modal modal-blur fade" id="modal-blocks" tabindex="-1">
+-     <div class="modal-dialog modal-lg modal-dialog-centered">
+-    <div class="modal-content">
+-      <div class="modal-header">
+-        <h5 class="modal-title">Add Site Block</h5>
+-        <button type="button" class="btn-close" data-bs-dismiss="modal"
+-          aria-label="Close"></button>
+-      </div>
+-      <div class="modal-body">
+-        <div class="row row-cards">
+-          <div class="col-6">
+-            <div class="card bg-primary-lt">
+-              <div class="card-body">Reverse Proxy</div>
+-            </div>
+-          </div>
+-          <div class="col-6">
+-            <div class="card bg-purple-lt">
+-              <div class="card-body">Redirect</div>
+-            </div>
+-          </div>
+-          <div class="col-6">
+-            <div class="card bg-pink-lt">
+-              <div class="card-body">Load Balancer</div>
+-            </div>
+-          </div>
+-          <div class="col-6">
+-            <div class="card bg-yellow-lt">
+-              <div class="card-body">Custom Block</div>
+-            </div>
+-          </div>
+-        </div>
+-      </div>
+-    </div>
+-  </div>
+-</div>
++{% include 'partials/new_block_modal.html' %}
+ {% endblock %}
+ 
+ <!---->
+-- 

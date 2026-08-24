@@ -2,9 +2,25 @@
 
 {% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
 
-{% block title %}{% if mode == 'edit' %}Edit {{ hosts[0] if hosts else filename }}{% else %}Add Site{% endif %} - Caddy Manager{% endblock %}
+{% block title %}{% if mode == 'edit' %}Edit {{ hosts[0] if hosts else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
+
 {% block page_pretitle %}{% if mode == 'edit' %}Edit{% else %}New{% endif %}{% endblock %}
-{% block page_title %}{% if mode == 'edit' %}{{ hosts[0] if hosts else filename }}{% else %}Add Site{% endif %}{% endblock %}
+
+{% block page_title %}
+  {% if mode == 'edit' %}
+    {{ hosts[0] if hosts else filename }}
+  {% else %}
+    {% if block_type == 'reverse_proxy' %}
+      Reverse Proxy
+    {% elif block_type == 'redirect' %}
+      Redirect
+    {% elif block_type == 'load_balancer' %}
+      Load Balancer
+    {% else %}
+      Custom Block
+    {% endif %}
+  {% endif %}
+{% endblock %}
 
 {% block header_actions %}
 <div class="btn-list">
@@ -46,14 +62,23 @@
 
       <!-- BEGIN CARD HEADER -->
       <div class="card-header">
-        <h3 class="card-title">
+        <!--<h3 class="card-title">
           {% if mode == 'edit' %}
             Editing <span class="badge bg-lt font-monospace">{{ conf_path }}</span>
           {% elif block_type == 'reverse_proxy' %}New Reverse Proxy
           {% elif block_type == 'redirect' %}New Redirect
           {% elif block_type == 'load_balancer' %}New Load Balancer
           {% else %}New Custom Block{% endif %}
+        </h3>-->
+
+        <h3 class="card-title">
+          {% if mode == 'edit' %}
+            Editing <span class="badge bg-lt font-monospace">{{ conf_path }}</span>
+          {% else %}
+            Creating <span class="badge bg-lt font-monospace"></span> 
+          {% endif %}
         </h3>
+
       </div>
       <!-- END CARD HEADER -->
 
