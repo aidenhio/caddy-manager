@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
+{% set type_color = type_color(block_type) %}
 {% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else 'Custom')) %}
 
 {% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}

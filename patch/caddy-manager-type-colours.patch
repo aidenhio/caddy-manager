@@ -1,0 +1,187 @@
+diff --git a/app.py b/app.py
+index 7112a68..0cc7c79 100644
+--- a/app.py
++++ b/app.py
+@@ -18,6 +18,31 @@ CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
+ app = Flask(__name__)
+ 
+ 
++# ---------------------------------------------------------------------------
++# Block type colors — the single place block-type -> Tabler color is defined.
++# Templates get this as the `type_color(block_type)` Jinja global below, so
++# every page/badge/button stays in sync if a color ever changes here.
++# `primary` is reserved for generic UI elements (nav, page buttons, etc.) and
++# is never used to represent a block type.
++# ---------------------------------------------------------------------------
++TYPE_COLORS = {
++    "reverse_proxy": "azure",
++    "redirect": "purple",
++    "load_balancer": "pink",
++    "custom": "yellow",
++}
++DEFAULT_TYPE_COLOR = TYPE_COLORS["custom"]
++
++
++def type_color(block_type):
++    return TYPE_COLORS.get(block_type, DEFAULT_TYPE_COLOR)
++
++
++@app.context_processor
++def inject_type_color():
++    return dict(type_color=type_color)
++
++
+ # ---------------------------------------------------------------------------
+ # Config helpers (a JSON file stands in for a database — there's very little
+ # to store: the admin credentials, the caddy.d directory, and a session key)
+diff --git a/templates/block_form.html b/templates/block_form.html
+index 1a1a299..16c7991 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -1,6 +1,6 @@
+ {% extends "base.html" %}
+ 
+-{% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
++{% set type_color = type_color(block_type) %}
+ 
+ {% block title %}{% if mode == 'edit' %}Edit {{ hosts[0] if hosts else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
+ 
+diff --git a/templates/partials/new_block_modal.html b/templates/partials/new_block_modal.html
+index d588e3c..2da4ef5 100644
+--- a/templates/partials/new_block_modal.html
++++ b/templates/partials/new_block_modal.html
+@@ -14,9 +14,9 @@
+           <!-- BEGIN REVERSE PROXY CARD -->
+           <div class="col">
+             <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+-              <div class="card-status-top bg-primary"></div>
++              <div class="card-status-top bg-{{ type_color('reverse_proxy') }}"></div>
+               <div class="card-body text-center py-4">
+-                <span class="avatar avatar-xl bg-primary-lt mb-3">
++                <span class="avatar avatar-xl bg-{{ type_color('reverse_proxy') }}-lt mb-3">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                     <path d="M9 14l-4 -4l4 -4" />
+@@ -32,9 +32,9 @@
+           <!-- BEGIN REDIRECT CARD -->
+           <div class="col-12 col-sm-4">
+             <a href="{{ url_for('new_block', block_type='redirect') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+-              <div class="card-status-top bg-purple"></div>
++              <div class="card-status-top bg-{{ type_color('redirect') }}"></div>
+               <div class="card-body text-center py-4">
+-                <span class="avatar avatar-xl bg-purple-lt mb-3">
++                <span class="avatar avatar-xl bg-{{ type_color('redirect') }}-lt mb-3">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                     <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
+@@ -49,9 +49,9 @@
+           <!-- BEGIN LOAD BALANCER CARD -->
+           <div class="col-12 col-sm-4">
+             <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+-              <div class="card-status-top bg-pink"></div>
++              <div class="card-status-top bg-{{ type_color('load_balancer') }}"></div>
+               <div class="card-body text-center py-4">
+-                <span class="avatar avatar-xl bg-pink-lt mb-3">
++                <span class="avatar avatar-xl bg-{{ type_color('load_balancer') }}-lt mb-3">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                     <path d="M12 3v18" />
+@@ -93,9 +93,9 @@
+           <!-- BEGIN CUSTOM BLOCK CARD -->
+           <div class="col-12 col-sm-4">
+             <a href="{{ url_for('new_block', block_type='custom') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+-              <div class="card-status-top bg-yellow"></div>
++              <div class="card-status-top bg-{{ type_color('custom') }}"></div>
+               <div class="card-body text-center py-4">
+-                <span class="avatar avatar-xl bg-yellow-lt mb-3">
++                <span class="avatar avatar-xl bg-{{ type_color('custom') }}-lt mb-3">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                     <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
+diff --git a/templates/preview.html b/templates/preview.html
+index 3476878..6a60784 100644
+--- a/templates/preview.html
++++ b/templates/preview.html
+@@ -1,6 +1,6 @@
+ {% extends "base.html" %}
+ 
+-{% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
++{% set type_color = type_color(block_type) %}
+ {% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else 'Custom')) %}
+ 
+ {% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}
+diff --git a/templates/sites.html b/templates/sites.html
+index b9ee605..9ec2eb6 100644
+--- a/templates/sites.html
++++ b/templates/sites.html
+@@ -14,7 +14,7 @@
+     </svg>
+     New Site Block
+   </button>
+-  <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="btn btn-primary btn-5 d-none d-sm-inline-block">
++  <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="btn btn-{{ type_color('reverse_proxy') }} btn-5 d-none d-sm-inline-block">
+     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-arrow-back-up">
+       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+       <path d="M9 14l-4 -4l4 -4" />
+@@ -187,6 +187,7 @@
+             data-host="{{ (b.hosts[0] if b.hosts else '') | lower }}"
+             data-upstream="{{ b.upstream_sort | lower }}"
+             data-updated="{{ b.updated_ts }}">
++          {% set row_color = type_color(b.type) %}
+           <td>
+             {% if b.disabled %}
+               <span>
+@@ -208,7 +209,7 @@
+           </td>
+           <td>
+             {% if b.type == 'reverse_proxy' %}
+-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-primary-lt' }}">
++              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                   <path d="M9 14l-4 -4l4 -4" />
+@@ -217,7 +218,7 @@
+                 Reverse Proxy
+               </span>
+             {% elif b.type == 'redirect' %}
+-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-purple-lt' }}">
++              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-corner-up-right">
+                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                   <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
+@@ -225,7 +226,7 @@
+                 Redirect
+               </span>
+             {% elif b.type == 'load_balancer' %}
+-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-pink-lt' }}">
++              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-fork-triple">
+                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                   <path d="M12 3v18" />
+@@ -238,7 +239,7 @@
+                 Load Balancer
+               </span>  
+             {% else %}
+-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-yellow-lt' }}">
++              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                   <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
+@@ -278,13 +279,13 @@
+           <td>
+             {% if b.type == 'reverse_proxy' %}
+               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.host or '—' }}</span>
+-               {% if b.port %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-primary-lt' }} font-monospace">{{ b.port }}</span>{% endif %}
++               {% if b.port %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.port }}</span>{% endif %}
+             {% elif b.type == 'redirect' %}
+               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.target or '—' }}</span>
+-              {% if b.redirect_code %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-purple-lt' }} font-monospace">{{ b.redirect_code }}</span>{% endif %}
++              {% if b.redirect_code %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.redirect_code }}</span>{% endif %}
+             {% elif b.type == 'load_balancer' %}
+               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.upstreams | length }} upstreams</span>
+-              {% if b.lb_policy %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-pink-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
++              {% if b.lb_policy %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
+             {% else %}
+               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">custom</span>
+             {% endif %}
+-- 

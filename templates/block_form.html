@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% set type_color = 'primary' if block_type == 'reverse_proxy' else ('purple' if block_type == 'redirect' else ('pink' if block_type == 'load_balancer' else 'yellow')) %}
+{% set type_color = type_color(block_type) %}
 
 {% block title %}{% if mode == 'edit' %}Edit {{ hosts[0] if hosts else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
 

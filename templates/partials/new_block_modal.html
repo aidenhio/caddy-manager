@@ -14,9 +14,9 @@
           <!-- BEGIN REVERSE PROXY CARD -->
           <div class="col">
             <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
-              <div class="card-status-top bg-primary"></div>
+              <div class="card-status-top bg-{{ type_color('reverse_proxy') }}"></div>
               <div class="card-body text-center py-4">
-                <span class="avatar avatar-xl bg-primary-lt mb-3">
+                <span class="avatar avatar-xl bg-{{ type_color('reverse_proxy') }}-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M9 14l-4 -4l4 -4" />
@@ -32,9 +32,9 @@
           <!-- BEGIN REDIRECT CARD -->
           <div class="col-12 col-sm-4">
             <a href="{{ url_for('new_block', block_type='redirect') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
-              <div class="card-status-top bg-purple"></div>
+              <div class="card-status-top bg-{{ type_color('redirect') }}"></div>
               <div class="card-body text-center py-4">
-                <span class="avatar avatar-xl bg-purple-lt mb-3">
+                <span class="avatar avatar-xl bg-{{ type_color('redirect') }}-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
@@ -49,9 +49,9 @@
           <!-- BEGIN LOAD BALANCER CARD -->
           <div class="col-12 col-sm-4">
             <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
-              <div class="card-status-top bg-pink"></div>
+              <div class="card-status-top bg-{{ type_color('load_balancer') }}"></div>
               <div class="card-body text-center py-4">
-                <span class="avatar avatar-xl bg-pink-lt mb-3">
+                <span class="avatar avatar-xl bg-{{ type_color('load_balancer') }}-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M12 3v18" />
@@ -93,9 +93,9 @@
           <!-- BEGIN CUSTOM BLOCK CARD -->
           <div class="col-12 col-sm-4">
             <a href="{{ url_for('new_block', block_type='custom') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
-              <div class="card-status-top bg-yellow"></div>
+              <div class="card-status-top bg-{{ type_color('custom') }}"></div>
               <div class="card-body text-center py-4">
-                <span class="avatar avatar-xl bg-yellow-lt mb-3">
+                <span class="avatar avatar-xl bg-{{ type_color('custom') }}-lt mb-3">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
