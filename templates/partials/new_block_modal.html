@@ -13,7 +13,7 @@
         <div class="row row-cards justify-content-center">
           <!-- BEGIN REVERSE PROXY CARD -->
           <div class="col">
-            <a href="{{ url_for('new_block', block_type='reverse_proxy') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+            <a href="{{ url_for('main.new_block', block_type='reverse_proxy') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
               <div class="card-status-top bg-{{ type_color('reverse_proxy') }}"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-{{ type_color('reverse_proxy') }}-lt mb-3">
@@ -31,7 +31,7 @@
           <!-- END REVERSE PROXY CARD -->
           <!-- BEGIN REDIRECT CARD -->
           <div class="col-12 col-sm-4">
-            <a href="{{ url_for('new_block', block_type='redirect') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+            <a href="{{ url_for('main.new_block', block_type='redirect') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
               <div class="card-status-top bg-{{ type_color('redirect') }}"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-{{ type_color('redirect') }}-lt mb-3">
@@ -48,7 +48,7 @@
           <!-- END REDIRECT CARD -->
           <!-- BEGIN LOAD BALANCER CARD -->
           <div class="col-12 col-sm-4">
-            <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+            <a href="{{ url_for('main.new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
               <div class="card-status-top bg-{{ type_color('load_balancer') }}"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-{{ type_color('load_balancer') }}-lt mb-3">
@@ -70,7 +70,7 @@
           <!-- END LOAD BALANCER CARD -->
           <!-- BEGIN STATIC SITE CARD -->
           <div class="col-12 col-sm-4">
-            <a href="{{ url_for('new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+            <a href="{{ url_for('main.new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
               <div class="card-status-top bg-lime"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-lime-lt mb-3">
@@ -92,7 +92,7 @@
           <!-- END STATIC SITE CARD --> 
           <!-- BEGIN CUSTOM BLOCK CARD -->
           <div class="col-12 col-sm-4">
-            <a href="{{ url_for('new_block', block_type='custom') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+            <a href="{{ url_for('main.new_block', block_type='custom') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
               <div class="card-status-top bg-{{ type_color('custom') }}"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-xl bg-{{ type_color('custom') }}-lt mb-3">
