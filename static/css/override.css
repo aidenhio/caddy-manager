@@ -1,6 +1,5 @@
 :root {
     --tblr-primary: var(--tblr-azure);
-    /*--tblr-primary: #22b638;*/
     --tblr-border-radius-scale: 2;
     --tblr-font-sans-serif: "Inter";
     --tblr-gray-50: #fafafa;
