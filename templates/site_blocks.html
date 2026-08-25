@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}Sites - Caddy Manager{% endblock %}
+{% block title %}Site Blocks - Caddy Manager{% endblock %}
 {% block page_pretitle %}Caddy{% endblock %}
-{% block page_title %}All Sites{% endblock %}
+{% block page_title %}All Site Blocks{% endblock %}
 
 {% block header_actions %}
 <div class="btn-list">
@@ -43,7 +43,7 @@
                 <path d="M21 21l-6 -6"></path>
               </svg>
             </span>
-            <input id="hosts-table-search" type="text" class="form-control" autocomplete="off" placeholder="Search…">
+            <input id="site-blocks-search" type="text" class="form-control" autocomplete="off" placeholder="Search…">
           </div>
       </div>
       <div class="ms-auto col-auto" data-bs-auto-close="outside">
@@ -62,7 +62,7 @@
           </svg>
           Filters
         </a>
-        <div class="dropdown-menu" id="sites-filters-menu">
+        <div class="dropdown-menu" id="site-blocks-filters-menu">
           <h6 class="dropdown-header">Status</h6>
           <label class="dropdown-item" for="filter-status-enable"><input class="form-check-input m-0 me-2" id="filter-status-enable" type="checkbox" data-filter-group="status" value="enabled"> Enabled</label>
           <label class="dropdown-item" for="filter-status-disable"><input class="form-check-input m-0 me-2" id="filter-status-disable" type="checkbox" data-filter-group="status" value="disabled"> Disabled</label>
@@ -83,7 +83,7 @@
         </div>
       </div>
       <div class="col col-auto">
-        <select id="sites-page-size" class="form-select">
+        <select id="site-blocks-page-size" class="form-select">
           <option value="10" selected>10</option>
           <option value="20">20</option>
           <option value="50">50</option>
@@ -94,19 +94,19 @@
   </div>
   <!-- END SEARCH / PAGE-SIZE BAR -->
 
-  <!-- BEGIN HOSTS TABLE LIST -->
+  <!-- BEGIN SITE BLOCKS TABLE LIST -->
   <div class="table-responsive" style="min-height: 24rem;">
-    <table class="table card-table table-vcenter" id="sites-table"
+    <table class="table card-table table-vcenter" id="site-blocks-table"
            data-datatable
-           data-dt-search="#hosts-table-search"
-           data-dt-filters="#sites-filters-menu"
-           data-dt-page-size="#sites-page-size"
+           data-dt-search="#site-blocks-search"
+           data-dt-filters="#site-blocks-filters-menu"
+           data-dt-page-size="#site-blocks-page-size"
            data-dt-page-size-default="10"
-           data-dt-summary="#sites-page-summary"
-           data-dt-pagination="#sites-pagination"
-           data-dt-default-sort="host"
+           data-dt-summary="#site-blocks-page-summary"
+           data-dt-pagination="#site-blocks-pagination"
+           data-dt-default-sort="address"
            data-dt-default-sort-dir="asc"
-           data-dt-storage-key="sites-table">
+           data-dt-storage-key="site-blocks-table">
       <thead>
         <tr>
           <th>
@@ -119,8 +119,8 @@
             </button>
           </th>
           <th>
-            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="host" data-sort-type="text">
-              Host
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="address" data-sort-type="text">
+              Site Address
             </button>
           </th>
           <th>
@@ -141,7 +141,7 @@
         <tr class="{{ 'text-muted' if b.disabled else '' }}"
             data-type="{{ b.type }}"
             data-status="{{ 'disabled' if b.disabled else 'enabled' }}"
-            data-host="{{ (b.hosts[0] if b.hosts else '') | lower }}"
+            data-address="{{ (b.site_addresses[0] if b.site_addresses else '') | lower }}"
             data-upstream="{{ b.upstream_sort | lower }}"
             data-updated="{{ b.updated_ts }}">
           {% set row_color = type_color(b.type) %}
@@ -212,26 +212,26 @@
               </span>
             {% endif %}
           </td>
-          <!-- BEGIN HOST CELL -->
+          <!-- BEGIN SITE ADDRESS CELL -->
           <td>
-            {% if b.hosts %}
-              {{ b.hosts[0] }}
-              {% if b.hosts | length > 1 %}
-                <span class="badge bg-{{ row_color }}-lt" title="{{ b.hosts[1:] | join(', ') }}">+{{ b.hosts | length - 1 }}</span>
+            {% if b.site_addresses %}
+              {{ b.site_addresses[0] }}
+              {% if b.site_addresses | length > 1 %}
+                <span class="badge bg-{{ row_color }}-lt" title="{{ b.site_addresses[1:] | join(', ') }}">+{{ b.site_addresses | length - 1 }}</span>
               {% endif %}
             {% else %}
-              <span class="badge bg-danger-lt" title="No host configured">
+              <span class="badge bg-danger-lt" title="No site address configured">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icons-tabler-outline icon-tabler-alert-triangle">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M12 9v4" />
                   <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />
                   <path d="M12 16h.01" />
                 </svg>
-                No host
+                No site address
               </span>
             {% endif %}
           </td>
-          <!-- END HOST CELL -->
+          <!-- END SITE ADDRESS CELL -->
           <!-- BEGIN UPSTREAM/TARGET CELL -->
           <td>
             {% if b.type == 'reverse_proxy' %}
@@ -328,12 +328,12 @@
       </tbody>
     </table>
   </div>
-  <!-- BEGIN HOSTS TABLE LIST -->
+  <!-- BEGIN SITE BLOCKS TABLE LIST -->
 
   <!-- BEGIN PAGINATION BAR -->
   <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <p class="m-0 text-secondary" id="sites-page-summary"></p>
-    <ul class="pagination m-0" id="sites-pagination"></ul>
+    <p class="m-0 text-secondary" id="site-blocks-page-summary"></p>
+    <ul class="pagination m-0" id="site-blocks-pagination"></ul>
   </div>
   <!-- END PAGINATION BAR -->
   {% else %}

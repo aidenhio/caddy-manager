@@ -195,30 +195,30 @@ def join_target(scheme, host, port):
     return target
 
 
-def normalize_hosts(raw_hosts):
-    """Clean, dedupe (first occurrence wins) and sort a list of hosts:
-    hosts starting with a letter sort before hosts starting with a digit,
-    alphabetically within each group -- e.g. api.example.com, app.example.com,
-    2.example.com."""
+def normalize_site_addresses(raw_site_addresses):
+    """Clean, dedupe (first occurrence wins) and sort a list of site
+    addresses: addresses starting with a letter sort before addresses
+    starting with a digit, alphabetically within each group -- e.g.
+    api.example.com, app.example.com, 2.example.com."""
     seen = set()
-    hosts = []
-    for h in raw_hosts:
+    site_addresses = []
+    for h in raw_site_addresses:
         h = (h or "").strip()
         if h and h not in seen:
             seen.add(h)
-            hosts.append(h)
-    hosts.sort(key=lambda h: (h[:1].isdigit(), h.lower()))
-    return hosts
+            site_addresses.append(h)
+    site_addresses.sort(key=lambda h: (h[:1].isdigit(), h.lower()))
+    return site_addresses
 
 
-def hosts_from_textarea(text):
-    """Parse a one-host-per-line textarea into a normalized host list."""
-    return normalize_hosts((text or "").splitlines())
+def site_addresses_from_textarea(text):
+    """Parse a one-site-address-per-line textarea into a normalized list."""
+    return normalize_site_addresses((text or "").splitlines())
 
 
-def hosts_header(hosts):
-    """Caddyfile site-address line for one or more hosts."""
-    return ", ".join(hosts)
+def site_address_header(site_addresses):
+    """Caddyfile site-address line for one or more site addresses."""
+    return ", ".join(site_addresses)
 
 
 def extra_lines(extra_text):
@@ -257,8 +257,9 @@ def render_load_balancer(site_header, upstreams, lb_policy="", extra_text=""):
 
 def render_custom(site_header, body_text):
     """Wrap a user-authored body (whatever's between the braces) with the
-    site header, which is always derived from the Hosts field -- the user
-    only ever writes/edits the inside of the block, never the host line."""
+    site header, which is always derived from the Site Address field -- the
+    user only ever writes/edits the inside of the block, never the site
+    address line."""
     body = (body_text or "").rstrip("\n")
     return f"{site_header} {{\n{body}\n}}\n" if body else f"{site_header} {{\n}}\n"
 
@@ -281,7 +282,7 @@ def extract_body(content):
 # Every block gets a small sidecar metadata file (same base name as the
 # .conf, extension .json) living in a hidden .metadata subdirectory of the
 # caddy.d directory -- kept out of the way of Caddy's own `import *.conf`
-# and out of the way of the sites list. It holds the block's structured
+# and out of the way of the site blocks list. It holds the block's structured
 # fields plus the .conf's mtime/size at the time it was written. Listing a
 # directory is then just one JSON read per file -- the .conf itself is
 # only re-parsed with regex when a sidecar is missing or its stamped
@@ -296,14 +297,14 @@ LB_POLICY_RE = re.compile(r"^\s*lb_policy\s+(\S+)", re.MULTILINE)
 REDIR_RE = re.compile(r"^\s*redir(?:ect)?\s+(\S+)(?:\s+(\d{3}))?", re.MULTILINE)
 
 
-def extract_hosts(content):
-    """Pull the site-address line out of a raw block ('host1, host2 {')
-    and return it as a normalized, sorted host list."""
+def extract_site_addresses(content):
+    """Pull the site-address line out of a raw block ('addr1, addr2 {')
+    and return it as a normalized, sorted site-address list."""
     for line in content.splitlines():
         stripped = line.strip()
         if stripped and "{" in stripped and not stripped.startswith("#"):
             header = stripped.split("{")[0].strip()
-            return normalize_hosts(re.split(r"[,\s]+", header))
+            return normalize_site_addresses(re.split(r"[,\s]+", header))
     return []
 
 
@@ -312,28 +313,28 @@ def parse_conf_content(content):
     fallback for files this app didn't write itself (or that were
     hand-edited since) -- app-created blocks skip this entirely because
     their metadata is written straight from the form."""
-    hosts = extract_hosts(content)
+    site_addresses = extract_site_addresses(content)
     rp_match = REVERSE_PROXY_RE.search(content)
     lb_match = LB_POLICY_RE.search(content)
 
     if rp_match and lb_match:
         upstreams = rp_match.group(1).split()
-        return {"type": "load_balancer", "hosts": hosts, "upstreams": upstreams,
+        return {"type": "load_balancer", "site_addresses": site_addresses, "upstreams": upstreams,
                 "lb_policy": lb_match.group(1), "extra": ""}
 
     if rp_match:
         tokens = rp_match.group(1).split()
         target = tokens[0] if tokens else ""
         scheme, host, port = split_target(target)
-        return {"type": "reverse_proxy", "hosts": hosts, "target": target,
+        return {"type": "reverse_proxy", "site_addresses": site_addresses, "target": target,
                 "scheme": scheme, "host": host, "port": port, "extra": ""}
 
     redir_match = REDIR_RE.search(content)
     if redir_match:
-        return {"type": "redirect", "hosts": hosts, "target": redir_match.group(1),
+        return {"type": "redirect", "site_addresses": site_addresses, "target": redir_match.group(1),
                 "redirect_code": redir_match.group(2) or ""}
 
-    return {"type": "custom", "hosts": hosts}
+    return {"type": "custom", "site_addresses": site_addresses}
 
 
 def meta_filename_for(conf_filename):
@@ -404,7 +405,7 @@ def read_metadata(conf_filename, conf_path):
     try:
         st = os.stat(conf_path)
     except OSError:
-        return {"type": "custom", "hosts": []}
+        return {"type": "custom", "site_addresses": []}
 
     meta_file = meta_path_for(conf_filename)
     if os.path.isfile(meta_file):
@@ -412,6 +413,10 @@ def read_metadata(conf_filename, conf_path):
             with open(meta_file) as f:
                 cached = json.load(f)
             if cached.get("source_mtime") == st.st_mtime and cached.get("source_size") == st.st_size:
+                # Migrate sidecars written before the hosts -> site_addresses
+                # rename, so pre-existing installs upgrade transparently.
+                if "site_addresses" not in cached and "hosts" in cached:
+                    cached["site_addresses"] = cached.pop("hosts")
                 return cached
         except (OSError, ValueError):
             pass
@@ -438,8 +443,8 @@ def delete_metadata(conf_filename):
 def cleanup_orphaned_metadata():
     """Remove metadata sidecars that no longer have a matching .conf file.
     Renames/deletes made through the app already keep the sidecar in sync
-    (see rename_block_if_first_host_changed / delete_block), but a .conf
-    renamed or deleted directly on disk -- which this app is explicitly
+    (see rename_block_if_first_site_address_changed / delete_block), but a
+    .conf renamed or deleted directly on disk -- which this app is explicitly
     designed to allow -- leaves its .json behind with nothing to key off
     of. Runs as part of list_blocks() so it self-heals on every page load,
     the same way read_metadata already self-heals stale caches."""
@@ -472,7 +477,7 @@ def list_blocks():
         disabled = fname.endswith(".disabled")
         fdate = datetime.fromtimestamp(os.path.getmtime(path))
         meta = read_metadata(fname, path)
-        hosts = meta.get("hosts", [])
+        site_addresses = meta.get("site_addresses", [])
         block_type = meta.get("type", "custom")
 
         if block_type in ("reverse_proxy", "redirect"):
@@ -486,7 +491,7 @@ def list_blocks():
             "filename": fname,
             "disabled": disabled,
             "type": block_type,
-            "hosts": hosts,
+            "site_addresses": site_addresses,
             "scheme": meta.get("scheme", ""),
             "host": meta.get("host", ""),
             "port": meta.get("port", ""),
@@ -527,13 +532,13 @@ def unique_filename(base):
     return candidate
 
 
-def rename_block_if_first_host_changed(filename, path, old_hosts, new_hosts):
-    """If the sorted, first (i.e. filename-defining) host changed, rename
-    the .conf (and its metadata sidecar) to match -- preserving the
+def rename_block_if_first_site_address_changed(filename, path, old_site_addresses, new_site_addresses):
+    """If the sorted, first (i.e. filename-defining) site address changed,
+    rename the .conf (and its metadata sidecar) to match -- preserving the
     .disabled suffix if the block is currently disabled. Returns the
     filename/path to use from here on (unchanged if no rename happened)."""
-    old_first = old_hosts[0] if old_hosts else None
-    new_first = new_hosts[0] if new_hosts else None
+    old_first = old_site_addresses[0] if old_site_addresses else None
+    new_first = new_site_addresses[0] if new_site_addresses else None
     if not new_first or (old_first and slugify(new_first) == slugify(old_first)):
         return filename, path
 
@@ -576,14 +581,14 @@ def dashboard():
     )
 
 
-@app.route("/sites")
+@app.route("/site-blocks")
 @login_required
-def sites():
+def site_blocks():
     caddy_dir = get_caddy_dir()
     dir_exists = os.path.isdir(caddy_dir)
     blocks = list_blocks() if dir_exists else []
     return render_template(
-        "sites.html", blocks=blocks, caddy_dir=caddy_dir, dir_exists=dir_exists
+        "site_blocks.html", blocks=blocks, caddy_dir=caddy_dir, dir_exists=dir_exists
     )
 
 
@@ -596,7 +601,7 @@ def new_block(block_type):
     meta = {}
 
     if request.method == "POST":
-        hosts = hosts_from_textarea(request.form.get("hosts", ""))
+        site_addresses = site_addresses_from_textarea(request.form.get("site_addresses", ""))
         content = None
 
         if block_type == "reverse_proxy":
@@ -605,56 +610,56 @@ def new_block(block_type):
             port = request.form.get("port", "").strip()
             extra = request.form.get("extra", "").strip()
             insecure_skip_verify = scheme == "https" and request.form.get("insecure_skip_verify") == "1"
-            meta = {"hosts": hosts, "scheme": scheme, "host": host, "port": port,
+            meta = {"site_addresses": site_addresses, "scheme": scheme, "host": host, "port": port,
                     "extra": extra, "insecure_skip_verify": insecure_skip_verify}
-            if not hosts:
-                error = "At least one host is required."
+            if not site_addresses:
+                error = "At least one site address is required."
             elif not host:
                 error = "Upstream host is required."
             else:
                 target = join_target(scheme, host, port)
-                content = render_reverse_proxy(hosts_header(hosts), target, extra, insecure_skip_verify)
+                content = render_reverse_proxy(site_address_header(site_addresses), target, extra, insecure_skip_verify)
                 meta = {"type": "reverse_proxy", "target": target, **meta}
 
         elif block_type == "load_balancer":
             upstreams = [u.strip() for u in request.form.get("upstreams", "").splitlines() if u.strip()]
             lb_policy = request.form.get("lb_policy", "").strip()
             extra = request.form.get("extra", "").strip()
-            meta = {"hosts": hosts, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
-            if not hosts:
-                error = "At least one host is required."
+            meta = {"site_addresses": site_addresses, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
+            if not site_addresses:
+                error = "At least one site address is required."
             elif len(upstreams) < 2:
                 error = "At least two upstreams are required."
             else:
-                content = render_load_balancer(hosts_header(hosts), upstreams, lb_policy, extra)
+                content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra)
                 meta = {"type": "load_balancer", **meta}
 
         elif block_type == "redirect":
             target = request.form.get("target", "").strip()
             redirect_code = request.form.get("redirect_code", "301").strip()
-            meta = {"hosts": hosts, "target": target, "redirect_code": redirect_code}
-            if not hosts:
-                error = "At least one host is required."
+            meta = {"site_addresses": site_addresses, "target": target, "redirect_code": redirect_code}
+            if not site_addresses:
+                error = "At least one site address is required."
             elif not target:
                 error = "Redirect target is required."
             else:
-                content = render_redirect(hosts_header(hosts), target, redirect_code)
+                content = render_redirect(site_address_header(site_addresses), target, redirect_code)
                 meta = {"type": "redirect", **meta}
 
         else:  # custom
             raw = request.form.get("raw_content", "").strip()
-            meta = {"hosts": hosts}
-            if not hosts:
-                error = "At least one host is required."
+            meta = {"site_addresses": site_addresses}
+            if not site_addresses:
+                error = "At least one site address is required."
             elif not raw:
                 error = "Block content is required."
             else:
-                content = render_custom(hosts_header(hosts), raw)
+                content = render_custom(site_address_header(site_addresses), raw)
                 meta = {"type": "custom", **meta}
 
         if not error:
             create_disabled = request.form.get("create_disabled") == "1"
-            filename = unique_filename(slugify(hosts[0]))
+            filename = unique_filename(slugify(site_addresses[0]))
             if create_disabled:
                 filename += ".disabled"
             os.makedirs(get_caddy_dir(), exist_ok=True)
@@ -663,14 +668,14 @@ def new_block(block_type):
                 f.write(content)
             write_metadata(filename, path, meta)
             flash(f"Created {filename}" + (" (disabled)" if create_disabled else ""), "success")
-            return redirect(url_for("sites"))
+            return redirect(url_for("site_blocks"))
 
     upstreams_text = "\n".join(meta.get("upstreams") or [])
-    hosts_text = "\n".join(meta.get("hosts") or [])
+    site_addresses_text = "\n".join(meta.get("site_addresses") or [])
     raw_body_text = raw if block_type == "custom" and request.method == "POST" else ""
     return render_template(
         "block_form.html", mode="new", block_type=block_type,
-        meta=meta, upstreams_text=upstreams_text, hosts_text=hosts_text,
+        meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
         raw_body_text=raw_body_text, error=error, caddy_dir=get_caddy_dir()
     )
 
@@ -684,7 +689,7 @@ def edit_block(filename):
 
     meta = read_metadata(filename, path)
     block_type = meta.get("type", "custom")
-    old_hosts = meta.get("hosts", [])
+    old_site_addresses = meta.get("site_addresses", [])
     error = None
     raw_body_text = ""
     if block_type == "custom" and request.method == "GET":
@@ -692,7 +697,7 @@ def edit_block(filename):
             raw_body_text = extract_body(f.read())
 
     if request.method == "POST":
-        hosts = hosts_from_textarea(request.form.get("hosts", ""))
+        site_addresses = site_addresses_from_textarea(request.form.get("site_addresses", ""))
         content = None
         new_meta = None
 
@@ -702,16 +707,16 @@ def edit_block(filename):
             port = request.form.get("port", "").strip()
             extra = request.form.get("extra", "").strip()
             insecure_skip_verify = scheme == "https" and request.form.get("insecure_skip_verify") == "1"
-            meta = {**meta, "hosts": hosts, "scheme": scheme, "host": host, "port": port,
+            meta = {**meta, "site_addresses": site_addresses, "scheme": scheme, "host": host, "port": port,
                     "extra": extra, "insecure_skip_verify": insecure_skip_verify}
-            if not hosts:
-                error = "At least one host is required."
+            if not site_addresses:
+                error = "At least one site address is required."
             elif not host:
                 error = "Upstream host is required."
             else:
                 target = join_target(scheme, host, port)
-                content = render_reverse_proxy(hosts_header(hosts), target, extra, insecure_skip_verify)
-                new_meta = {"type": "reverse_proxy", "hosts": hosts, "scheme": scheme, "host": host,
+                content = render_reverse_proxy(site_address_header(site_addresses), target, extra, insecure_skip_verify)
+                new_meta = {"type": "reverse_proxy", "site_addresses": site_addresses, "scheme": scheme, "host": host,
                             "port": port, "target": target, "extra": extra,
                             "insecure_skip_verify": insecure_skip_verify}
 
@@ -719,59 +724,59 @@ def edit_block(filename):
             upstreams = [u.strip() for u in request.form.get("upstreams", "").splitlines() if u.strip()]
             lb_policy = request.form.get("lb_policy", "").strip()
             extra = request.form.get("extra", "").strip()
-            meta = {**meta, "hosts": hosts, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
-            if not hosts:
-                error = "At least one host is required."
+            meta = {**meta, "site_addresses": site_addresses, "upstreams": upstreams, "lb_policy": lb_policy, "extra": extra}
+            if not site_addresses:
+                error = "At least one site address is required."
             elif len(upstreams) < 2:
                 error = "At least two upstreams are required."
             else:
-                content = render_load_balancer(hosts_header(hosts), upstreams, lb_policy, extra)
-                new_meta = {"type": "load_balancer", "hosts": hosts, "upstreams": upstreams,
+                content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra)
+                new_meta = {"type": "load_balancer", "site_addresses": site_addresses, "upstreams": upstreams,
                             "lb_policy": lb_policy, "extra": extra}
 
         elif block_type == "redirect":
             target = request.form.get("target", "").strip()
             redirect_code = request.form.get("redirect_code", "").strip()
-            meta = {**meta, "hosts": hosts, "target": target, "redirect_code": redirect_code}
-            if not hosts:
-                error = "At least one host is required."
+            meta = {**meta, "site_addresses": site_addresses, "target": target, "redirect_code": redirect_code}
+            if not site_addresses:
+                error = "At least one site address is required."
             elif not target:
                 error = "Redirect target is required."
             else:
-                content = render_redirect(hosts_header(hosts), target, redirect_code)
-                new_meta = {"type": "redirect", "hosts": hosts, "target": target,
+                content = render_redirect(site_address_header(site_addresses), target, redirect_code)
+                new_meta = {"type": "redirect", "site_addresses": site_addresses, "target": target,
                             "redirect_code": redirect_code}
 
         else:  # custom
             raw = request.form.get("raw_content", "").strip()
-            meta = {**meta, "hosts": hosts}
+            meta = {**meta, "site_addresses": site_addresses}
             raw_body_text = raw
-            if not hosts:
-                error = "At least one host is required."
+            if not site_addresses:
+                error = "At least one site address is required."
             elif not raw:
                 error = "Block content is required."
             else:
-                content = render_custom(hosts_header(hosts), raw)
-                new_meta = {"type": "custom", "hosts": hosts}
+                content = render_custom(site_address_header(site_addresses), raw)
+                new_meta = {"type": "custom", "site_addresses": site_addresses}
 
         if not error:
             with open(path, "w") as f:
                 f.write(content)
             write_metadata(filename, path, new_meta)
             # Rename the .conf/.metadata pair if the primary (first-after-
-            # sorting) host changed, so the filename keeps tracking it.
-            filename, path = rename_block_if_first_host_changed(filename, path, old_hosts, hosts)
+            # sorting) site address changed, so the filename keeps tracking it.
+            filename, path = rename_block_if_first_site_address_changed(filename, path, old_site_addresses, site_addresses)
             flash(f"Saved {filename}", "success")
-            return redirect(url_for("sites"))
+            return redirect(url_for("site_blocks"))
 
     upstreams_text = "\n".join(meta.get("upstreams") or [])
-    hosts_text = "\n".join(meta.get("hosts") or [])
+    site_addresses_text = "\n".join(meta.get("site_addresses") or [])
     path = safe_path(filename)
 
     return render_template(
         "block_form.html", mode="edit", block_type=block_type, filename=filename,
-        meta=meta, upstreams_text=upstreams_text, hosts=meta.get("hosts", []),
-        hosts_text=hosts_text, conf_path=path, raw_body_text=raw_body_text, 
+        meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
+        site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text, 
         error=error, caddy_dir=get_caddy_dir()
     )
 
@@ -805,7 +810,7 @@ def preview_block(filename):
         filename=filename,
         block_type=block_type,
         meta=meta,
-        hosts=meta.get("hosts", []),
+        site_addresses=meta.get("site_addresses", []),
         disabled=filename.endswith(".disabled"),
         conf_path=path,
         conf_content=conf_content,
@@ -830,7 +835,7 @@ def toggle_block(filename):
     os.rename(path, safe_path(new_name))
     state = "Disabled" if new_name.endswith(".disabled") else "Enabled"
     flash(f"{state} {new_name}", "success")
-    return redirect(url_for("sites"))
+    return redirect(url_for("site_blocks"))
 
 
 @app.route("/delete/<path:filename>", methods=["POST"])
@@ -841,7 +846,7 @@ def delete_block(filename):
         os.remove(path)
         delete_metadata(filename)
         flash(f"Deleted {filename}", "success")
-    return redirect(url_for("sites"))
+    return redirect(url_for("site_blocks"))
 
 
 @app.route("/settings", methods=["GET", "POST"])

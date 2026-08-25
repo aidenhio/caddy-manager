@@ -2,8 +2,8 @@
 // settings, block_form) so they all behave and look the same: native HTML5
 // `required`/`minlength` attributes drive Bootstrap's `.was-validated` /
 // `:invalid` styling, with `.invalid-feedback` text shown underneath each
-// field. Fields that can't use a native `required` attribute (e.g. the hosts
-// chip widget in block_form.html) plug in via the optional extraValidator
+// field. Fields that can't use a native `required` attribute (e.g. the site
+// address chip widget in block_form.html) plug in via the optional extraValidator
 // callback so they still block submission and get the same is-invalid look.
 
 function initFormValidation(form, extraValidator) {

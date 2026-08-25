@@ -2,13 +2,13 @@
 
 {% set type_color = type_color(block_type) %}
 
-{% block title %}{% if mode == 'edit' %}Edit {{ hosts[0] if hosts else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
+{% block title %}{% if mode == 'edit' %}Edit {{ site_addresses[0] if site_addresses else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
 
 {% block page_pretitle %}{% if mode == 'edit' %}Edit{% else %}New{% endif %}{% endblock %}
 
 {% block page_title %}
   {% if mode == 'edit' %}
-    {{ hosts[0] if hosts else filename }}
+    {{ site_addresses[0] if site_addresses else filename }}
   {% else %}
     {% if block_type == 'reverse_proxy' %}
       Reverse Proxy
@@ -78,16 +78,16 @@
 
         <form method="post" id="block-form" data-type-color="{{ type_color }}" data-caddy-dir="{{ caddy_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
 
-          <!-- BEGIN HOSTS FIELD -->
+          <!-- BEGIN SITE ADDRESS FIELD -->
           <div class="mb-3">
-            <label class="form-label">Hosts <span class="form-hint d-inline">(type a host, press space or enter to add it — the first, after sorting, names the file)</span></label>
-            <div class="form-control d-flex flex-wrap align-items-center gap-2" id="hosts-input">
-              <input type="text" id="hosts-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
+            <label class="form-label">Site Addresses <span class="form-hint d-inline">(type a site address, press space or enter to add it — the first, after sorting, names the file)</span></label>
+            <div class="form-control d-flex flex-wrap align-items-center gap-2" id="site-address-input">
+              <input type="text" id="site-address-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
             </div>
-            <div class="invalid-feedback">At least one host is required.</div>
-            <textarea name="hosts" id="hosts" hidden>{{ hosts_text }}</textarea>
+            <div class="invalid-feedback">At least one site address is required.</div>
+            <textarea name="site_addresses" id="site-addresses" hidden>{{ site_addresses_text }}</textarea>
           </div>
-          <!-- END HOSTS FIELD -->
+          <!-- END SITE ADDRESS FIELD -->
 
           <!-- BEGIN REVERSE PROXY FIELDS -->
           {% if block_type == 'reverse_proxy' %}
@@ -271,7 +271,7 @@
           <!-- BEGIN CUSTOM FIELDS -->
           {% if block_type == 'custom' %}
           <div class="mb-3">
-            <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the hosts above are wrapped around it automatically)</span></label>
+            <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the site addresses above are wrapped around it automatically)</span></label>
             <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
             <div class="invalid-feedback">Block content is required.</div>
           </div>
@@ -318,7 +318,7 @@
                 <path d="M14 4l0 4l-6 0l0 -4" />
               </svg>
               Save</button>
-            <a href="{{ url_for('sites') }}" class="btn">Cancel</a>
+            <a href="{{ url_for('site_blocks') }}" class="btn">Cancel</a>
           </div>
           <!-- END FORM ACTIONS -->
 

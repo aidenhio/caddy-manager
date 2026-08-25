@@ -1,8 +1,8 @@
-// BEGIN HOSTS TAG INPUT + LIVE CONF-PATH PREVIEW
+// BEGIN SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
 (function () {
-  const wrap = document.getElementById('hosts-input');
-  const textInput = document.getElementById('hosts-text-input');
-  const hidden = document.getElementById('hosts');
+  const wrap = document.getElementById('site-address-input');
+  const textInput = document.getElementById('site-address-text-input');
+  const hidden = document.getElementById('site-addresses');
   const form = document.getElementById('block-form');
   if (!wrap || !textInput || !hidden || !form) return;
 
@@ -11,16 +11,16 @@
   const confPathBadge = document.getElementById('conf-path-badge');
   const originallyDisabled = form.dataset.originallyDisabled === 'true';
 
-  function currentHosts() {
-    return Array.from(wrap.querySelectorAll('.host-chip')).map((el) => el.dataset.host);
+  function currentSiteAddresses() {
+    return Array.from(wrap.querySelectorAll('.site-address-chip')).map((el) => el.dataset.siteAddress);
   }
 
-  function sortedFirstHost() {
-    // Mirrors the backend's normalize_hosts(): hosts starting with a
-    // letter sort before hosts starting with a digit, alphabetically
-    // (case-insensitively) within each group.
-    const hosts = currentHosts().slice();
-    hosts.sort((a, b) => {
+  function sortedFirstSiteAddress() {
+    // Mirrors the backend's normalize_site_addresses(): addresses starting
+    // with a letter sort before addresses starting with a digit,
+    // alphabetically (case-insensitively) within each group.
+    const siteAddresses = currentSiteAddresses().slice();
+    siteAddresses.sort((a, b) => {
       const aDigit = /^[0-9]/.test(a) ? 1 : 0;
       const bDigit = /^[0-9]/.test(b) ? 1 : 0;
       if (aDigit !== bDigit) return aDigit - bDigit;
@@ -30,7 +30,7 @@
       if (aLower > bLower) return 1;
       return 0;
     });
-    return hosts[0];
+    return siteAddresses[0];
   }
 
   function slugify(value) {
@@ -47,7 +47,7 @@
   function updateConfPathBadge() {
     if (!confPathBadge) return;
     const dirPrefix = caddyDir.replace(/\/$/, '') + '/';
-    const first = sortedFirstHost();
+    const first = sortedFirstSiteAddress();
     if (!first) {
       confPathBadge.textContent = dirPrefix + '...';
       return;
@@ -58,19 +58,19 @@
   }
 
   function syncHidden() {
-    hidden.value = currentHosts().join('\n');
+    hidden.value = currentSiteAddresses().join('\n');
     updateConfPathBadge();
   }
 
   function addChip(value) {
     value = value.trim();
-    if (!value || currentHosts().includes(value)) return;
+    if (!value || currentSiteAddresses().includes(value)) return;
 
     wrap.classList.remove('is-invalid');
 
     const chip = document.createElement('span');
-    chip.className = 'host-chip badge bg-' + typeColor + '-lt d-inline-flex align-items-center gap-1';
-    chip.dataset.host = value;
+    chip.className = 'site-address-chip badge bg-' + typeColor + '-lt d-inline-flex align-items-center gap-1';
+    chip.dataset.siteAddress = value;
 
     const label = document.createElement('span');
     label.textContent = value;
@@ -79,7 +79,7 @@
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'btn btn-icon btn-action btn-sm btn-animate-icon btn-animate-icon-rotate p-0 mx-2 lh-1';
-    remove.setAttribute('aria-label', 'Remove host');
+    remove.setAttribute('aria-label', 'Remove site address');
     remove.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>';
     remove.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -101,7 +101,7 @@
       addChip(textInput.value);
       textInput.value = '';
     } else if (e.key === 'Backspace' && textInput.value === '') {
-      const chips = wrap.querySelectorAll('.host-chip');
+      const chips = wrap.querySelectorAll('.site-address-chip');
       if (chips.length) {
         chips[chips.length - 1].remove();
         syncHidden();
@@ -121,14 +121,14 @@
     if (textInput.value.trim()) addChip(textInput.value);
   });
 
-  window.__validateHosts = function () {
-    const valid = currentHosts().length > 0;
+  window.__validateSiteAddresses = function () {
+    const valid = currentSiteAddresses().length > 0;
     wrap.classList.toggle('is-invalid', !valid);
     return valid;
   };
   window.__updateConfPathBadge = updateConfPathBadge;
 })();
-// END HOSTS TAG INPUT + LIVE CONF-PATH PREVIEW
+// END SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
 
 // BEGIN REVERSE PROXY SCHEME -> INSECURE SKIP VERIFY TOGGLE
 (function () {
@@ -221,7 +221,7 @@
   if (!form || typeof initFormValidation !== 'function') return;
 
   initFormValidation(form, function () {
-    return window.__validateHosts ? window.__validateHosts() : true;
+    return window.__validateSiteAddresses ? window.__validateSiteAddresses() : true;
   });
 })();
 // END FORM VALIDATION WIRING

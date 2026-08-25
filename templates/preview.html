@@ -5,11 +5,11 @@
 
 {% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}
 {% block page_pretitle %}Preview{% endblock %}
-{% block page_title %}{{ hosts[0] if hosts else filename }}{% endblock %}
+{% block page_title %}{{ site_addresses[0] if site_addresses else filename }}{% endblock %}
 
 {% block header_actions %}
 <div class="btn-list">
-  <a href="{{ url_for('sites') }}" class="btn btn-1">
+  <a href="{{ url_for('site_blocks') }}" class="btn btn-1">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-arrow-left">
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M5 12l14 0" />
@@ -119,11 +119,11 @@
         </div>
 
         <div class="list-group-item">
-          <div class="text-secondary small mb-1">Host{{ 's' if hosts | length > 1 else '' }}</div>
-          {% if hosts %}
-            {% for h in hosts %}<div class="font-monospace">{{ h }}</div>{% endfor %}
+          <div class="text-secondary small mb-1">{{ 'Site Addresses' if site_addresses | length > 1 else 'Site Address' }}</div>
+          {% if site_addresses %}
+            {% for h in site_addresses %}<div class="font-monospace">{{ h }}</div>{% endfor %}
           {% else %}
-            <span class="text-danger">No host configured</span>
+            <span class="text-danger">No site address configured</span>
           {% endif %}
         </div>
 
