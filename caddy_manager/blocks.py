@@ -174,13 +174,33 @@ def cleanup_orphaned_metadata():
 # Listing
 # ---------------------------------------------------------------------------
 
-def list_blocks():
+def _conf_paths():
+    """Every .conf/.conf.disabled file path in the caddy dir, or [] if
+    that directory doesn't exist yet."""
     caddy_dir = get_caddy_dir()
     if not os.path.isdir(caddy_dir):
         return []
-    cleanup_orphaned_metadata()
-    paths = glob.glob(os.path.join(caddy_dir, "*.conf")) + \
+    return glob.glob(os.path.join(caddy_dir, "*.conf")) + \
         glob.glob(os.path.join(caddy_dir, "*.conf.disabled"))
+
+
+def refresh_all_metadata():
+    """Bring every block's metadata sidecar up to date: clean up any
+    orphaned sidecars, then read (and, via read_metadata's own self-heal,
+    re-parse/re-write if stale) every .conf/.conf.disabled file's
+    metadata. Called once at login so anything changed outside the app
+    since the last visit -- a hand-edited block, or a .conf dropped in,
+    renamed, or removed directly -- is already reflected before the user
+    reaches the site blocks list or a preview page, rather than only
+    self-healing lazily, file by file, as each happens to be viewed."""
+    cleanup_orphaned_metadata()
+    for path in _conf_paths():
+        read_metadata(os.path.basename(path), path)
+
+
+def list_blocks():
+    cleanup_orphaned_metadata()
+    paths = _conf_paths()
 
     blocks = []
     for path in paths:

@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .configstore import load_config, save_config, is_configured
+from .blocks import refresh_all_metadata
 
 bp = Blueprint("auth", __name__)
 
@@ -77,6 +78,11 @@ def login():
         if username == cfg["username"] and check_password_hash(cfg["password_hash"], password):
             session["logged_in"] = True
             session["username"] = username
+            # Catch up on anything changed outside the app since the last
+            # visit before the user reaches the site blocks list or a
+            # preview page, rather than relying on each file self-healing
+            # only when it happens to be read.
+            refresh_all_metadata()
             return redirect(url_for("main.dashboard"))
         error = "Invalid username or password."
     return render_template("login.html", error=error)
