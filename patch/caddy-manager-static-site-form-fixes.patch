@@ -1,0 +1,73 @@
+From 8a030bafe69969cc686459c9f64d48125935cdde Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Fri, 28 Aug 2026 11:17:12 +0000
+Subject: [PATCH] Static Site form fixes: inline checkbox encode list, fix
+ squished spacing
+
+- Encode is now an inline row of checkboxes (form-check-inline) instead
+  of a <select multiple> -- clearer at a glance, no ctrl/cmd-click
+  discoverability problem, and consistent with every other checkbox in
+  the app. No backend change needed: form.getlist("encode") reads
+  multiple same-named checkboxes exactly the same way it read multiple
+  selected <option>s.
+- Fixed the squished spacing above the Directory browsing toggle in
+  Advanced options: the trailing "remove bottom margin in edit mode"
+  class (mb-md-0) had been left on the Index files field, a leftover
+  from the pattern this was adapted from (where the field it was copied
+  from genuinely was the last one in the accordion). Since Index files
+  isn't the last field here, that removed its spacing before Browse
+  instead. Moved it to Browse, which -- in edit mode, where there's no
+  Create disabled checkbox after it -- actually is the last field.
+
+Verified: confirmed the encode checkboxes submit/round-trip correctly
+(create with multiple checked, edit page reflects the right ones
+checked) and produce identical rendered .conf output as before; confirmed
+Index files now has normal spacing before Browse in both new and edit
+mode, and that Browse still sits flush with the accordion bottom in edit
+mode as originally intended. Full create/edit/preview regression across
+all five block types still passes, and pyflakes is clean.
+---
+ templates/block_form.html | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/templates/block_form.html b/templates/block_form.html
+index 751fec5..84e7cf1 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -278,12 +278,15 @@
+             <div class="invalid-feedback">File path is required.</div>
+           </div>
+           <div class="mb-3">
+-            <label class="form-label">Encode <span class="form-hint d-inline">(optional, ctrl/cmd-click to select more than one)</span></label>
+-            <select name="encode" class="form-select" multiple size="3">
++            <label class="form-label">Encode <span class="form-hint d-inline">(optional)</span></label>
++            <div>
+               {% for fmt in ['gzip', 'zstd', 'br'] %}
+-              <option value="{{ fmt }}" {{ 'selected' if fmt in (meta.encode or []) }}>{{ fmt }}</option>
++              <label class="form-check form-check-inline">
++                <input type="checkbox" class="form-check-input" name="encode" value="{{ fmt }}" {{ 'checked' if fmt in (meta.encode or []) }}>
++                <span class="form-check-label">{{ fmt }}</span>
++              </label>
+               {% endfor %}
+-            </select>
++            </div>
+           </div>
+           <!-- BEGIN ADVANCED OPTIONS -->
+           <div class="accordion mb-3" id="advanced-options">
+@@ -303,11 +306,11 @@
+                     <label class="form-label">Hide <span class="form-hint d-inline">(optional, space-separated glob patterns kept out of listings and direct requests)</span></label>
+                     <input type="text" name="hide" class="form-control" value="{{ meta.hide or '' }}" placeholder=".git .env">
+                   </div>
+-                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
++                  <div class="mb-3">
+                     <label class="form-label">Index files <span class="form-hint d-inline">(optional, space-separated — defaults to index.html/index.txt)</span></label>
+                     <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
+                   </div>
+-                  <div class="mb-3">
++                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
+                     <label class="form-check">
+                       <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
+                       <span class="form-check-label">Directory browsing</span>
+-- 
+2.43.0
+
