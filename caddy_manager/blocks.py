@@ -23,7 +23,8 @@ from .configstore import get_caddy_dir
 from .caddyfile import (
     site_addresses_from_textarea, site_address_header, slugify,
     join_target, parse_conf_content,
-    render_reverse_proxy, render_redirect, render_load_balancer, render_custom,
+    render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
+    ENCODE_FORMATS,
 )
 
 
@@ -214,6 +215,8 @@ def list_blocks():
             upstream_sort = meta.get("target", "")
         elif block_type == "load_balancer":
             upstream_sort = f"{len(meta.get('upstreams', []))} upstreams"
+        elif block_type == "static_site":
+            upstream_sort = meta.get("path", "")
         else:
             upstream_sort = "custom"
 
@@ -229,6 +232,11 @@ def list_blocks():
             "redirect_code": meta.get("redirect_code", ""),
             "upstreams": meta.get("upstreams", []),
             "lb_policy": meta.get("lb_policy", ""),
+            "path": meta.get("path", ""),
+            "encode": meta.get("encode", []),
+            "browse": meta.get("browse", False),
+            "index": meta.get("index", ""),
+            "hide": meta.get("hide", ""),
             "updated": fdate.strftime("%d/%m/%Y %I:%M%p"),
             "updated_ts": os.path.getmtime(path),
             "upstream_sort": upstream_sort,
@@ -343,6 +351,21 @@ def build_block_from_form(block_type, form):
         else:
             content = render_redirect(site_address_header(site_addresses), target, redirect_code)
             meta.update(type="redirect")
+
+    elif block_type == "static_site":
+        path = form.get("path", "").strip()
+        encodings = [e for e in form.getlist("encode") if e in ENCODE_FORMATS]
+        browse = form.get("browse") == "1"
+        index = form.get("index", "").strip()
+        hide = form.get("hide", "").strip()
+        meta.update(path=path, encode=encodings, browse=browse, index=index, hide=hide)
+        if not site_addresses:
+            error = "At least one site address is required."
+        elif not path:
+            error = "File path is required."
+        else:
+            content = render_static_site(site_address_header(site_addresses), path, encodings, browse, index, hide)
+            meta.update(type="static_site")
 
     else:  # custom
         raw = form.get("raw_content", "").strip()

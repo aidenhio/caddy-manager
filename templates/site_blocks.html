@@ -70,6 +70,7 @@
           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="reverse_proxy"> Reverse Proxy</label>
           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="redirect"> Redirect</label>
           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="load_balancer"> Load Balancer</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="static_site"> Static Site</label>
           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="custom"> Custom</label>
           <div class="dropdown-divider"></div>
           <a class="dropdown-item text-danger" href="#" data-dt-clear-filters>
@@ -195,6 +196,14 @@
                 </svg>
                 Load Balancer
               </span>  
+            {% elif b.type == 'static_site' %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-folder">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
+                </svg>
+                Static Site
+              </span>
             {% else %}
               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
@@ -243,6 +252,9 @@
             {% elif b.type == 'load_balancer' %}
               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.upstreams | length }} upstreams</span>
               {% if b.lb_policy %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
+            {% elif b.type == 'static_site' %}
+              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.path or '—' }}</span>
+              {% if b.encode %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.encode | join(', ') }}</span>{% endif %}
             {% else %}
               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">custom</span>
             {% endif %}

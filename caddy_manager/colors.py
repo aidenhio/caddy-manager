@@ -10,6 +10,7 @@ TYPE_COLORS = {
     "reverse_proxy": "azure",
     "redirect": "purple",
     "load_balancer": "pink",
+    "static_site": "lime",
     "custom": "yellow",
 }
 DEFAULT_TYPE_COLOR = TYPE_COLORS["custom"]

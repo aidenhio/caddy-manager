@@ -1,0 +1,444 @@
+From e854f7040f71952035974a2d431f9e3285a779d9 Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Fri, 28 Aug 2026 10:16:08 +0000
+Subject: [PATCH] Add Static Site block type (lime, folder icon)
+
+Fixes up and completes the Static Site card you'd already added to the
+new-block modal (it was a copy-pasted Load Balancer stub -- wrong link,
+wrong icon, wrong description) and wires the type through end to end.
+
+Fields:
+- File path (required) -- the root directory to serve.
+- Encode -- a multiselect of gzip/zstd/br. Caddy negotiates the actual
+  format used per-request against the client's Accept-Encoding, so
+  selecting more than one just widens what the server is willing to use.
+- file_server is always on for this type (a static site block with it
+  off wouldn't serve anything -- that's what the Custom block type is
+  for), so there's no checkbox for it.
+- Advanced options (collapsed by default, alongside the usual Create
+  disabled): Hide (space-separated glob patterns, e.g. .git .env),
+  Index files (space-separated, optional -- Caddy's own default applies
+  if left blank), and a Directory browsing checkbox.
+
+Rendering: file_server is a bare line when none of hide/index/browse are
+set, or a `file_server { ... }` block when any of them are, e.g.:
+
+    example.com {
+        root * /var/www/html
+        encode gzip br
+        file_server {
+            hide .git .env
+            index index.html
+            browse
+        }
+    }
+
+Implementation:
+- colors.py: static_site -> lime, the single place this is defined.
+- caddyfile.py: render_static_site(site_header, path, encodings, browse,
+  index, hide) builds the block as above. parse_conf_content() also
+  learns to recognize this shape (a `root` directive, optionally an
+  `encode` line, optionally a `file_server { ... }` block) in hand-edited
+  or externally-created .conf files, extracting the same fields, so
+  static site blocks dropped in outside the app are detected -- including
+  their encode formats and file_server subdirectives -- the same as every
+  other type.
+- blocks.py: build_block_from_form() gains a static_site branch (path
+  required; encode read via form.getlist() and filtered against the
+  known formats so an unexpected value can never end up in a rendered
+  .conf; hide/index/browse are plain fields); list_blocks() sorts by path
+  and carries path/encode/browse/index/hide through to the site blocks
+  table.
+- views.py: static_site added to new_block()'s allowed block types.
+- templates: block_form.html gets the File path field, the encode
+  multiselect, and Hide/Index/Browse inside Advanced options (alongside
+  Create disabled, new-block only); site_blocks.html gets a filter
+  option, a type badge, and an upstream/target cell showing the path
+  (+ the selected encode formats); preview.html gets a matching type
+  badge and a details entry for path/encode/hide/index/browse. The
+  folder icon (Tabler's icon-tabler-folder) is used consistently
+  everywhere the type appears.
+
+Verified: created static site blocks through the form (both a bare-minimum
+one and one using every field) and confirmed the rendered .conf content is
+correct in both cases; confirmed blocks list, edit (fields prefill
+correctly, including the multiselect and checkbox), preview (all fields
+shown), toggle, and delete correctly; confirmed both a simple and a fully
+loaded externally-created static-site .conf (with a file_server { ... }
+block) are correctly detected via the regex fallback parser, including
+extracting encode formats and hide/index/browse from inside the block;
+confirmed a spoofed/invalid encode form value is silently filtered rather
+than ending up in the rendered Caddyfile; confirmed the missing-path
+validation error renders without writing a file. Ran the full
+create/edit/preview/toggle/delete regression across all five block types,
+and pyflakes is clean.
+---
+ caddy_manager/blocks.py                 | 25 +++++++++-
+ caddy_manager/caddyfile.py              | 57 ++++++++++++++++++++++
+ caddy_manager/colors.py                 |  1 +
+ caddy_manager/views.py                  |  2 +-
+ templates/block_form.html               | 63 +++++++++++++++++++++++++
+ templates/partials/new_block_modal.html | 15 ++----
+ templates/preview.html                  | 19 +++++++-
+ templates/site_blocks.html              | 12 +++++
+ 8 files changed, 181 insertions(+), 13 deletions(-)
+
+diff --git a/caddy_manager/blocks.py b/caddy_manager/blocks.py
+index 99d73a2..3584771 100644
+--- a/caddy_manager/blocks.py
++++ b/caddy_manager/blocks.py
+@@ -23,7 +23,8 @@ from .configstore import get_caddy_dir
+ from .caddyfile import (
+     site_addresses_from_textarea, site_address_header, slugify,
+     join_target, parse_conf_content,
+-    render_reverse_proxy, render_redirect, render_load_balancer, render_custom,
++    render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
++    ENCODE_FORMATS,
+ )
+ 
+ 
+@@ -214,6 +215,8 @@ def list_blocks():
+             upstream_sort = meta.get("target", "")
+         elif block_type == "load_balancer":
+             upstream_sort = f"{len(meta.get('upstreams', []))} upstreams"
++        elif block_type == "static_site":
++            upstream_sort = meta.get("path", "")
+         else:
+             upstream_sort = "custom"
+ 
+@@ -229,6 +232,11 @@ def list_blocks():
+             "redirect_code": meta.get("redirect_code", ""),
+             "upstreams": meta.get("upstreams", []),
+             "lb_policy": meta.get("lb_policy", ""),
++            "path": meta.get("path", ""),
++            "encode": meta.get("encode", []),
++            "browse": meta.get("browse", False),
++            "index": meta.get("index", ""),
++            "hide": meta.get("hide", ""),
+             "updated": fdate.strftime("%d/%m/%Y %I:%M%p"),
+             "updated_ts": os.path.getmtime(path),
+             "upstream_sort": upstream_sort,
+@@ -344,6 +352,21 @@ def build_block_from_form(block_type, form):
+             content = render_redirect(site_address_header(site_addresses), target, redirect_code)
+             meta.update(type="redirect")
+ 
++    elif block_type == "static_site":
++        path = form.get("path", "").strip()
++        encodings = [e for e in form.getlist("encode") if e in ENCODE_FORMATS]
++        browse = form.get("browse") == "1"
++        index = form.get("index", "").strip()
++        hide = form.get("hide", "").strip()
++        meta.update(path=path, encode=encodings, browse=browse, index=index, hide=hide)
++        if not site_addresses:
++            error = "At least one site address is required."
++        elif not path:
++            error = "File path is required."
++        else:
++            content = render_static_site(site_address_header(site_addresses), path, encodings, browse, index, hide)
++            meta.update(type="static_site")
++
+     else:  # custom
+         raw = form.get("raw_content", "").strip()
+         if not site_addresses:
+diff --git a/caddy_manager/caddyfile.py b/caddy_manager/caddyfile.py
+index 6f0dac1..41c2ffd 100644
+--- a/caddy_manager/caddyfile.py
++++ b/caddy_manager/caddyfile.py
+@@ -9,6 +9,17 @@ import re
+ REVERSE_PROXY_RE = re.compile(r"^\s*reverse_proxy\s+([^\n{]+?)\s*\{?\s*$", re.MULTILINE)
+ LB_POLICY_RE = re.compile(r"^\s*lb_policy\s+(\S+)", re.MULTILINE)
+ REDIR_RE = re.compile(r"^\s*redir(?:ect)?\s+(\S+)(?:\s+(\d{3}))?", re.MULTILINE)
++ROOT_RE = re.compile(r"^\s*root\s+(?:\*\s+)?(\S+)", re.MULTILINE)
++ENCODE_RE = re.compile(r"^\s*encode\s+(.+)$", re.MULTILINE)
++FILE_SERVER_BLOCK_RE = re.compile(r"file_server\s*\{(.*?)\n\s*\}", re.DOTALL)
++BROWSE_RE = re.compile(r"^\s*browse\b", re.MULTILINE)
++INDEX_RE = re.compile(r"^\s*index\s+(.+)$", re.MULTILINE)
++HIDE_RE = re.compile(r"^\s*hide\s+(.+)$", re.MULTILINE)
++
++# The encode formats offered in the Static Site form, in the order they're
++# presented -- also used to filter/validate whatever a submitted form or a
++# hand-edited .conf's `encode` line actually contains.
++ENCODE_FORMATS = ("gzip", "zstd", "br")
+ 
+ 
+ # ---------------------------------------------------------------------------
+@@ -108,6 +119,37 @@ def render_redirect(site_header, target, redirect_code=""):
+     return render_domain_block(site_header, [directive])
+ 
+ 
++def render_static_site(site_header, path, encodings=None, browse=False, index="", hide=""):
++    """file_server is always present for this block type (a static site
++    with no file_server wouldn't actually serve anything) -- rendered as a
++    bare `file_server` line when none of browse/index/hide are set, or as
++    a `file_server { ... }` block when any of them are."""
++    encodings = [e for e in (encodings or []) if e in ENCODE_FORMATS]
++    index = (index or "").strip()
++    hide = (hide or "").strip()
++
++    body = [f"root * {path}"]
++    if encodings:
++        body.append("encode " + " ".join(encodings))
++
++    file_server_lines = []
++    if hide:
++        file_server_lines.append(f"hide {hide}")
++    if index:
++        file_server_lines.append(f"index {index}")
++    if browse:
++        file_server_lines.append("browse")
++
++    if file_server_lines:
++        body.append("file_server {")
++        body += [f"    {line}" for line in file_server_lines]
++        body.append("}")
++    else:
++        body.append("file_server")
++
++    return render_domain_block(site_header, body)
++
++
+ def render_load_balancer(site_header, upstreams, lb_policy="", extra_text=""):
+     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
+     inner += extra_lines(extra_text)
+@@ -180,4 +222,19 @@ def parse_conf_content(content):
+         return {"type": "redirect", "site_addresses": site_addresses, "target": redir_match.group(1),
+                 "redirect_code": redir_match.group(2) or ""}
+ 
++    root_match = ROOT_RE.search(content)
++    if root_match:
++        encode_match = ENCODE_RE.search(content)
++        encodings = [e for e in (encode_match.group(1).split() if encode_match else []) if e in ENCODE_FORMATS]
++
++        fs_block_match = FILE_SERVER_BLOCK_RE.search(content)
++        fs_body = fs_block_match.group(1) if fs_block_match else ""
++        index_match = INDEX_RE.search(fs_body)
++        hide_match = HIDE_RE.search(fs_body)
++
++        return {"type": "static_site", "site_addresses": site_addresses, "path": root_match.group(1),
++                "encode": encodings, "browse": bool(BROWSE_RE.search(fs_body)),
++                "index": index_match.group(1).strip() if index_match else "",
++                "hide": hide_match.group(1).strip() if hide_match else ""}
++
+     return {"type": "custom", "site_addresses": site_addresses}
+diff --git a/caddy_manager/colors.py b/caddy_manager/colors.py
+index a0099b1..b89c190 100644
+--- a/caddy_manager/colors.py
++++ b/caddy_manager/colors.py
+@@ -10,6 +10,7 @@ TYPE_COLORS = {
+     "reverse_proxy": "azure",
+     "redirect": "purple",
+     "load_balancer": "pink",
++    "static_site": "lime",
+     "custom": "yellow",
+ }
+ DEFAULT_TYPE_COLOR = TYPE_COLORS["custom"]
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index eb4ebf6..53b08c1 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -45,7 +45,7 @@ def site_blocks():
+ @bp.route("/new/<block_type>", methods=["GET", "POST"])
+ @login_required
+ def new_block(block_type):
+-    if block_type not in ("reverse_proxy", "redirect", "load_balancer", "custom"):
++    if block_type not in ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom"):
+         abort(404)
+     error = None
+     meta = {}
+diff --git a/templates/block_form.html b/templates/block_form.html
+index 10a72c9..751fec5 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -16,6 +16,8 @@
+       Redirect
+     {% elif block_type == 'load_balancer' %}
+       Load Balancer
++    {% elif block_type == 'static_site' %}
++      Static Site
+     {% else %}
+       Custom Block
+     {% endif %}
+@@ -268,6 +270,67 @@
+           {% endif %}
+           <!-- END REDIRECT FIELDS -->
+ 
++          <!-- BEGIN STATIC SITE FIELDS -->
++          {% if block_type == 'static_site' %}
++          <div class="mb-3">
++            <label class="form-label">File path <span class="form-hint d-inline">(the directory on the Caddy server to serve files from)</span></label>
++            <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" required>
++            <div class="invalid-feedback">File path is required.</div>
++          </div>
++          <div class="mb-3">
++            <label class="form-label">Encode <span class="form-hint d-inline">(optional, ctrl/cmd-click to select more than one)</span></label>
++            <select name="encode" class="form-select" multiple size="3">
++              {% for fmt in ['gzip', 'zstd', 'br'] %}
++              <option value="{{ fmt }}" {{ 'selected' if fmt in (meta.encode or []) }}>{{ fmt }}</option>
++              {% endfor %}
++            </select>
++          </div>
++          <!-- BEGIN ADVANCED OPTIONS -->
++          <div class="accordion mb-3" id="advanced-options">
++            <div class="accordion-item">
++              <div class="accordion-header">
++                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
++                  Advanced options
++                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
++                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                    <path d="M6 9l6 6l6 -6" />
++                  </svg>
++                </button>
++              </div>
++              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
++                <div class="accordion-body">
++                  <div class="mb-3">
++                    <label class="form-label">Hide <span class="form-hint d-inline">(optional, space-separated glob patterns kept out of listings and direct requests)</span></label>
++                    <input type="text" name="hide" class="form-control" value="{{ meta.hide or '' }}" placeholder=".git .env">
++                  </div>
++                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
++                    <label class="form-label">Index files <span class="form-hint d-inline">(optional, space-separated — defaults to index.html/index.txt)</span></label>
++                    <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
++                  </div>
++                  <div class="mb-3">
++                    <label class="form-check">
++                      <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
++                      <span class="form-check-label">Directory browsing</span>
++                    </label>
++                    <span class="form-hint">Shows a file listing for directories that have no index file.</span>
++                  </div>
++                  {% if mode == 'new' %}
++                  <div class="mb-0">
++                    <label class="form-check">
++                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
++                      <span class="form-check-label">Create disabled</span>
++                    </label>
++                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
++                  </div>
++                  {% endif %}
++                </div>
++              </div>
++            </div>
++          </div>
++          <!-- END ADVANCED OPTIONS -->
++          {% endif %}
++          <!-- END STATIC SITE FIELDS -->
++
+           <!-- BEGIN CUSTOM FIELDS -->
+           {% if block_type == 'custom' %}
+           <div class="mb-3">
+diff --git a/templates/partials/new_block_modal.html b/templates/partials/new_block_modal.html
+index e56bf4b..6dd317b 100644
+--- a/templates/partials/new_block_modal.html
++++ b/templates/partials/new_block_modal.html
+@@ -70,22 +70,17 @@
+           <!-- END LOAD BALANCER CARD -->
+           <!-- BEGIN STATIC SITE CARD -->
+           <div class="col-12 col-sm-4">
+-            <a href="{{ url_for('main.new_block', block_type='load_balancer') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
+-              <div class="card-status-top bg-lime"></div>
++            <a href="{{ url_for('main.new_block', block_type='static_site') }}" class="card card-link rounded-top-0 h-100 text-decoration-none">
++              <div class="card-status-top bg-{{ type_color('static_site') }}"></div>
+               <div class="card-body text-center py-4">
+-                <span class="avatar avatar-xl bg-lime-lt mb-3">
++                <span class="avatar avatar-xl bg-{{ type_color('static_site') }}-lt mb-3">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M12 3v18" />
+-                    <path d="M16 7l-4 -4l-4 4" />
+-                    <path d="M16 11h5v5" />
+-                    <path d="M8 11h-5v5" />
+-                    <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
+-                    <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
++                    <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
+                   </svg>
+                 </span>
+                 <div class="h4 mb-1">Static Site</div>
+-                <div class="text-secondary">Distribute traffic across multiple upstream hosts</div>
++                <div class="text-secondary">Serve static files straight from a directory</div>
+               </div>
+             </a>
+           </div>
+diff --git a/templates/preview.html b/templates/preview.html
+index 4c10dc6..fb93f7e 100644
+--- a/templates/preview.html
++++ b/templates/preview.html
+@@ -1,7 +1,7 @@
+ {% extends "base.html" %}
+ 
+ {% set type_color = type_color(block_type) %}
+-{% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else 'Custom')) %}
++{% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else ('Static Site' if block_type == 'static_site' else 'Custom'))) %}
+ 
+ {% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}
+ {% block page_pretitle %}Preview{% endblock %}
+@@ -100,6 +100,14 @@
+             </svg>
+             {{ type_label }}
+           </span>
++          {% elif block_type == 'static_site' %}
++          <span class="badge bg-{{ type_color }}-lt">
++            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-folder">
++              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++              <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
++            </svg>
++            {{ type_label }}
++          </span>
+           {% else %}
+           <span class="badge bg-{{ type_color }}-lt">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+@@ -145,6 +153,15 @@
+           {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
+           {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
+         </div>
++        {% elif block_type == 'static_site' %}
++        <div class="list-group-item">
++          <div class="text-secondary small mb-1">File path</div>
++          <div class="font-monospace">{{ meta.path or '—' }}</div>
++          {% if meta.encode %}<div class="text-secondary small mt-1">Encode: {{ meta.encode | join(', ') }}</div>{% endif %}
++          {% if meta.hide %}<div class="text-secondary small mt-1">Hide: {{ meta.hide }}</div>{% endif %}
++          {% if meta.index %}<div class="text-secondary small mt-1">Index: {{ meta.index }}</div>{% endif %}
++          {% if meta.browse %}<div class="text-secondary small mt-1">Directory browsing enabled</div>{% endif %}
++        </div>
+         {% endif %}
+ 
+         <div class="list-group-item">
+diff --git a/templates/site_blocks.html b/templates/site_blocks.html
+index 4742ecd..fb4645e 100644
+--- a/templates/site_blocks.html
++++ b/templates/site_blocks.html
+@@ -70,6 +70,7 @@
+           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="reverse_proxy"> Reverse Proxy</label>
+           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="redirect"> Redirect</label>
+           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="load_balancer"> Load Balancer</label>
++          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="static_site"> Static Site</label>
+           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="custom"> Custom</label>
+           <div class="dropdown-divider"></div>
+           <a class="dropdown-item text-danger" href="#" data-dt-clear-filters>
+@@ -195,6 +196,14 @@
+                 </svg>
+                 Load Balancer
+               </span>  
++            {% elif b.type == 'static_site' %}
++              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
++                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-folder">
++                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                  <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
++                </svg>
++                Static Site
++              </span>
+             {% else %}
+               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+@@ -243,6 +252,9 @@
+             {% elif b.type == 'load_balancer' %}
+               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.upstreams | length }} upstreams</span>
+               {% if b.lb_policy %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
++            {% elif b.type == 'static_site' %}
++              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.path or '—' }}</span>
++              {% if b.encode %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.encode | join(', ') }}</span>{% endif %}
+             {% else %}
+               <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">custom</span>
+             {% endif %}
+-- 
+2.43.0
+

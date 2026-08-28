@@ -16,6 +16,8 @@
       Redirect
     {% elif block_type == 'load_balancer' %}
       Load Balancer
+    {% elif block_type == 'static_site' %}
+      Static Site
     {% else %}
       Custom Block
     {% endif %}
@@ -267,6 +269,67 @@
           <!-- END ADVANCED OPTIONS -->
           {% endif %}
           <!-- END REDIRECT FIELDS -->
+
+          <!-- BEGIN STATIC SITE FIELDS -->
+          {% if block_type == 'static_site' %}
+          <div class="mb-3">
+            <label class="form-label">File path <span class="form-hint d-inline">(the directory on the Caddy server to serve files from)</span></label>
+            <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" required>
+            <div class="invalid-feedback">File path is required.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Encode <span class="form-hint d-inline">(optional, ctrl/cmd-click to select more than one)</span></label>
+            <select name="encode" class="form-select" multiple size="3">
+              {% for fmt in ['gzip', 'zstd', 'br'] %}
+              <option value="{{ fmt }}" {{ 'selected' if fmt in (meta.encode or []) }}>{{ fmt }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <!-- BEGIN ADVANCED OPTIONS -->
+          <div class="accordion mb-3" id="advanced-options">
+            <div class="accordion-item">
+              <div class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+                  Advanced options
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M6 9l6 6l6 -6" />
+                  </svg>
+                </button>
+              </div>
+              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+                <div class="accordion-body">
+                  <div class="mb-3">
+                    <label class="form-label">Hide <span class="form-hint d-inline">(optional, space-separated glob patterns kept out of listings and direct requests)</span></label>
+                    <input type="text" name="hide" class="form-control" value="{{ meta.hide or '' }}" placeholder=".git .env">
+                  </div>
+                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
+                    <label class="form-label">Index files <span class="form-hint d-inline">(optional, space-separated — defaults to index.html/index.txt)</span></label>
+                    <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-check">
+                      <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
+                      <span class="form-check-label">Directory browsing</span>
+                    </label>
+                    <span class="form-hint">Shows a file listing for directories that have no index file.</span>
+                  </div>
+                  {% if mode == 'new' %}
+                  <div class="mb-0">
+                    <label class="form-check">
+                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+                      <span class="form-check-label">Create disabled</span>
+                    </label>
+                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END ADVANCED OPTIONS -->
+          {% endif %}
+          <!-- END STATIC SITE FIELDS -->
 
           <!-- BEGIN CUSTOM FIELDS -->
           {% if block_type == 'custom' %}

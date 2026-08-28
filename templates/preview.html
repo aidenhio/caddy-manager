@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% set type_color = type_color(block_type) %}
-{% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else 'Custom')) %}
+{% set type_label = 'Reverse Proxy' if block_type == 'reverse_proxy' else ('Redirect' if block_type == 'redirect' else ('Load Balancer' if block_type == 'load_balancer' else ('Static Site' if block_type == 'static_site' else 'Custom'))) %}
 
 {% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}
 {% block page_pretitle %}Preview{% endblock %}
@@ -100,6 +100,14 @@
             </svg>
             {{ type_label }}
           </span>
+          {% elif block_type == 'static_site' %}
+          <span class="badge bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-folder">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
+            </svg>
+            {{ type_label }}
+          </span>
           {% else %}
           <span class="badge bg-{{ type_color }}-lt">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
@@ -144,6 +152,15 @@
           <div class="text-secondary small mb-1">Upstreams</div>
           {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
           {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
+        </div>
+        {% elif block_type == 'static_site' %}
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">File path</div>
+          <div class="font-monospace">{{ meta.path or '—' }}</div>
+          {% if meta.encode %}<div class="text-secondary small mt-1">Encode: {{ meta.encode | join(', ') }}</div>{% endif %}
+          {% if meta.hide %}<div class="text-secondary small mt-1">Hide: {{ meta.hide }}</div>{% endif %}
+          {% if meta.index %}<div class="text-secondary small mt-1">Index: {{ meta.index }}</div>{% endif %}
+          {% if meta.browse %}<div class="text-secondary small mt-1">Directory browsing enabled</div>{% endif %}
         </div>
         {% endif %}
 

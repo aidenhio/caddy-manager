@@ -9,6 +9,17 @@ import re
 REVERSE_PROXY_RE = re.compile(r"^\s*reverse_proxy\s+([^\n{]+?)\s*\{?\s*$", re.MULTILINE)
 LB_POLICY_RE = re.compile(r"^\s*lb_policy\s+(\S+)", re.MULTILINE)
 REDIR_RE = re.compile(r"^\s*redir(?:ect)?\s+(\S+)(?:\s+(\d{3}))?", re.MULTILINE)
+ROOT_RE = re.compile(r"^\s*root\s+(?:\*\s+)?(\S+)", re.MULTILINE)
+ENCODE_RE = re.compile(r"^\s*encode\s+(.+)$", re.MULTILINE)
+FILE_SERVER_BLOCK_RE = re.compile(r"file_server\s*\{(.*?)\n\s*\}", re.DOTALL)
+BROWSE_RE = re.compile(r"^\s*browse\b", re.MULTILINE)
+INDEX_RE = re.compile(r"^\s*index\s+(.+)$", re.MULTILINE)
+HIDE_RE = re.compile(r"^\s*hide\s+(.+)$", re.MULTILINE)
+
+# The encode formats offered in the Static Site form, in the order they're
+# presented -- also used to filter/validate whatever a submitted form or a
+# hand-edited .conf's `encode` line actually contains.
+ENCODE_FORMATS = ("gzip", "zstd", "br")
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +119,37 @@ def render_redirect(site_header, target, redirect_code=""):
     return render_domain_block(site_header, [directive])
 
 
+def render_static_site(site_header, path, encodings=None, browse=False, index="", hide=""):
+    """file_server is always present for this block type (a static site
+    with no file_server wouldn't actually serve anything) -- rendered as a
+    bare `file_server` line when none of browse/index/hide are set, or as
+    a `file_server { ... }` block when any of them are."""
+    encodings = [e for e in (encodings or []) if e in ENCODE_FORMATS]
+    index = (index or "").strip()
+    hide = (hide or "").strip()
+
+    body = [f"root * {path}"]
+    if encodings:
+        body.append("encode " + " ".join(encodings))
+
+    file_server_lines = []
+    if hide:
+        file_server_lines.append(f"hide {hide}")
+    if index:
+        file_server_lines.append(f"index {index}")
+    if browse:
+        file_server_lines.append("browse")
+
+    if file_server_lines:
+        body.append("file_server {")
+        body += [f"    {line}" for line in file_server_lines]
+        body.append("}")
+    else:
+        body.append("file_server")
+
+    return render_domain_block(site_header, body)
+
+
 def render_load_balancer(site_header, upstreams, lb_policy="", extra_text=""):
     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
     inner += extra_lines(extra_text)
@@ -179,5 +221,20 @@ def parse_conf_content(content):
     if redir_match:
         return {"type": "redirect", "site_addresses": site_addresses, "target": redir_match.group(1),
                 "redirect_code": redir_match.group(2) or ""}
+
+    root_match = ROOT_RE.search(content)
+    if root_match:
+        encode_match = ENCODE_RE.search(content)
+        encodings = [e for e in (encode_match.group(1).split() if encode_match else []) if e in ENCODE_FORMATS]
+
+        fs_block_match = FILE_SERVER_BLOCK_RE.search(content)
+        fs_body = fs_block_match.group(1) if fs_block_match else ""
+        index_match = INDEX_RE.search(fs_body)
+        hide_match = HIDE_RE.search(fs_body)
+
+        return {"type": "static_site", "site_addresses": site_addresses, "path": root_match.group(1),
+                "encode": encodings, "browse": bool(BROWSE_RE.search(fs_body)),
+                "index": index_match.group(1).strip() if index_match else "",
+                "hide": hide_match.group(1).strip() if hide_match else ""}
 
     return {"type": "custom", "site_addresses": site_addresses}

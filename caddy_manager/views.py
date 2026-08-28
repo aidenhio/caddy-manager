@@ -45,7 +45,7 @@ def site_blocks():
 @bp.route("/new/<block_type>", methods=["GET", "POST"])
 @login_required
 def new_block(block_type):
-    if block_type not in ("reverse_proxy", "redirect", "load_balancer", "custom"):
+    if block_type not in ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom"):
         abort(404)
     error = None
     meta = {}
