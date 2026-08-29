@@ -19,7 +19,7 @@ from datetime import datetime
 
 from flask import abort
 
-from .configstore import get_caddy_dir
+from .configstore import get_conf_dir
 from .caddyfile import (
     site_addresses_from_textarea, site_address_header, slugify,
     join_target, parse_conf_content,
@@ -33,16 +33,16 @@ from .caddyfile import (
 # ---------------------------------------------------------------------------
 
 def safe_path(filename):
-    """Resolve filename inside caddy_dir, preventing path traversal."""
-    caddy_dir = os.path.abspath(get_caddy_dir())
-    target = os.path.abspath(os.path.join(caddy_dir, filename))
-    if target != caddy_dir and not target.startswith(caddy_dir + os.sep):
+    """Resolve filename inside conf_dir, preventing path traversal."""
+    conf_dir = os.path.abspath(get_conf_dir())
+    target = os.path.abspath(os.path.join(conf_dir, filename))
+    if target != conf_dir and not target.startswith(conf_dir + os.sep):
         abort(400, "Invalid filename")
     return target
 
 
 def metadata_dir():
-    return os.path.join(get_caddy_dir(), ".metadata")
+    return os.path.join(get_conf_dir(), ".metadata")
 
 
 def safe_meta_path(filename):
@@ -159,11 +159,11 @@ def cleanup_orphaned_metadata():
     mdir = metadata_dir()
     if not os.path.isdir(mdir):
         return
-    caddy_dir = get_caddy_dir()
+    conf_dir = get_conf_dir()
     for meta_file in glob.glob(os.path.join(mdir, "*.json")):
         stem = os.path.basename(meta_file)[: -len(".json")]
-        conf_exists = os.path.isfile(os.path.join(caddy_dir, stem + ".conf")) or \
-            os.path.isfile(os.path.join(caddy_dir, stem + ".conf.disabled"))
+        conf_exists = os.path.isfile(os.path.join(conf_dir, stem + ".conf")) or \
+            os.path.isfile(os.path.join(conf_dir, stem + ".conf.disabled"))
         if not conf_exists:
             try:
                 os.remove(meta_file)
@@ -178,11 +178,11 @@ def cleanup_orphaned_metadata():
 def _conf_paths():
     """Every .conf/.conf.disabled file path in the caddy dir, or [] if
     that directory doesn't exist yet."""
-    caddy_dir = get_caddy_dir()
-    if not os.path.isdir(caddy_dir):
+    conf_dir = get_conf_dir()
+    if not os.path.isdir(conf_dir):
         return []
-    return glob.glob(os.path.join(caddy_dir, "*.conf")) + \
-        glob.glob(os.path.join(caddy_dir, "*.conf.disabled"))
+    return glob.glob(os.path.join(conf_dir, "*.conf")) + \
+        glob.glob(os.path.join(conf_dir, "*.conf.disabled"))
 
 
 def refresh_all_metadata():
@@ -250,11 +250,11 @@ def list_blocks():
 # ---------------------------------------------------------------------------
 
 def unique_filename(base):
-    caddy_dir = get_caddy_dir()
+    conf_dir = get_conf_dir()
     candidate = f"{base}.conf"
     i = 2
-    while os.path.exists(os.path.join(caddy_dir, candidate)) or \
-            os.path.exists(os.path.join(caddy_dir, candidate + ".disabled")):
+    while os.path.exists(os.path.join(conf_dir, candidate)) or \
+            os.path.exists(os.path.join(conf_dir, candidate + ".disabled")):
         candidate = f"{base}-{i}.conf"
         i += 1
     return candidate

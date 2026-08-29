@@ -114,17 +114,25 @@
             <form method="post" id="directory-form">
               <input type="hidden" name="action" value="update_dir">
               <div class="mb-3">
+                <label class="form-label">Caddy root directory</label>
+                <input type="text" name="root_dir" class="form-control" value="{{ cfg.root_dir or '' }}">
+              </div>
+              <div class="mb-3">
                 <label class="form-label">Conf directory path</label>
-                <input type="text" name="caddy_dir" class="form-control" value="{{ cfg.caddy_dir }}" required>
+                <input type="text" name="conf_dir" class="form-control" value="{{ cfg.conf_dir }}" required>
                 <div class="invalid-feedback">Conf directory path is required.</div>
               </div>
               <div class="mb-3">
-                <label class="form-label">Certifcate directory path</label>
-                <input type="text" class="form-control">
+                <label class="form-label">Certificate directory path <span class="form-hint d-inline">(Caddy's <a href="https://caddyserver.com/docs/conventions#data-directory" target="_blank" rel="noopener">data directory</a>)</span></label>
+                <input type="text" name="certificate_dir" class="form-control" value="{{ cfg.certificate_dir or '' }}">
               </div>
               <div class="mb-3">
                 <label class="form-label">Logs directory path</label>
-                <input type="text" class="form-control">
+                <input type="text" name="log_dir" class="form-control" value="{{ cfg.log_dir or '' }}">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Caddyfile path</label>
+                <input type="text" name="caddyfile_path" class="form-control" value="{{ cfg.caddyfile_path or '' }}">
               </div>
               <button type="submit" class="btn btn-primary">Update directories</button>
             </form>

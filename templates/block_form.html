@@ -78,7 +78,7 @@
       <div class="card-body">
         {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
-        <form method="post" id="block-form" data-type-color="{{ type_color }}" data-caddy-dir="{{ caddy_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
+        <form method="post" id="block-form" data-type-color="{{ type_color }}" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
 
           <!-- BEGIN SITE ADDRESS FIELD -->
           <div class="mb-3">

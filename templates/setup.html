@@ -9,7 +9,7 @@
 <div class="card card-md">
   <div class="card-body">
     <h2 class="h2 text-center mb-4">Initial Setup</h2>
-    <p class="text-secondary text-center mb-4">Create your admin account and set the directory where Caddy <code>.conf</code> files will be stored.</p>
+    <p class="text-secondary text-center mb-4">Create your admin account and point this app at your Caddy root directory.</p>
     {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
     <form method="post" autocomplete="off" id="setup-form">
       <div class="mb-3">
@@ -28,11 +28,48 @@
         <div class="invalid-feedback">Passwords do not match.</div>
       </div>
       <div class="mb-3">
-        <label class="form-label">Caddy conf directory (caddy.d)</label>
-        <input type="text" name="caddy_dir" class="form-control" placeholder="/etc/caddy/caddy.d" required>
-        <div class="invalid-feedback">Caddy conf directory is required.</div>
-        <small class="form-hint">Should match what your Caddyfile imports, e.g. <code>import caddy.d/*.conf</code>. Created automatically if it doesn't exist.</small>
+        <label class="form-label">Caddy root directory</label>
+        <input type="text" name="root_dir" id="root_dir" class="form-control" placeholder="/etc/caddy" required>
+        <div class="invalid-feedback">Caddy root directory is required.</div>
+        <small class="form-hint">This app assumes the conventional layout underneath it: <code>caddy.d/</code>, <code>data/</code>, <code>logs/</code>, and a <code>Caddyfile</code>. Only <code>caddy.d/</code> (where this app's <code>.conf</code> blocks live) is created automatically if it doesn't exist — override any of these paths below if your setup differs.</small>
       </div>
+
+      <!-- BEGIN ADVANCED OPTIONS -->
+      <div class="accordion mb-3" id="advanced-options">
+        <div class="accordion-item">
+          <div class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+              Advanced options
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M6 9l6 6l6 -6" />
+              </svg>
+            </button>
+          </div>
+          <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+            <div class="accordion-body">
+              <div class="mb-3">
+                <label class="form-label">Conf directory <span class="form-hint d-inline">(where this app's .conf blocks live)</span></label>
+                <input type="text" name="conf_dir" id="conf_dir" class="form-control" placeholder="/etc/caddy/caddy.d">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Certificate directory <span class="form-hint d-inline">(Caddy's <a href="https://caddyserver.com/docs/conventions#data-directory" target="_blank" rel="noopener">data directory</a>)</span></label>
+                <input type="text" name="certificate_dir" id="certificate_dir" class="form-control" placeholder="/etc/caddy/data">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Log directory</label>
+                <input type="text" name="log_dir" id="log_dir" class="form-control" placeholder="/etc/caddy/logs">
+              </div>
+              <div class="mb-0">
+                <label class="form-label">Caddyfile path</label>
+                <input type="text" name="caddyfile_path" id="caddyfile_path" class="form-control" placeholder="/etc/caddy/Caddyfile">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- END ADVANCED OPTIONS -->
+
       <div class="form-footer">
         <button type="submit" class="btn btn-primary w-100">Complete setup</button>
       </div>
@@ -47,5 +84,33 @@
     'Passwords do not match.'
   );
   initFormValidation(document.getElementById('setup-form'));
+
+  // Live-update the advanced fields' placeholders to show what each will
+  // default to given the root directory typed above, so the assumed
+  // structure is visible without having to fill anything in.
+  (function () {
+    const rootInput = document.getElementById('root_dir');
+    const suffixes = {
+      conf_dir: 'caddy.d',
+      certificate_dir: 'data',
+      log_dir: 'logs',
+      caddyfile_path: 'Caddyfile',
+    };
+    const inputs = Object.fromEntries(
+      Object.keys(suffixes).map((id) => [id, document.getElementById(id)])
+    );
+    const basePlaceholders = Object.fromEntries(
+      Object.entries(inputs).map(([id, el]) => [id, el.placeholder])
+    );
+
+    function update() {
+      const root = rootInput.value.trim().replace(/[/\\]+$/, '');
+      Object.entries(inputs).forEach(([id, el]) => {
+        el.placeholder = root ? `${root}/${suffixes[id]}` : basePlaceholders[id];
+      });
+    }
+
+    rootInput.addEventListener('input', update);
+  })();
 </script>
 {% endblock %}

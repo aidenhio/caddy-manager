@@ -7,7 +7,7 @@
   if (!wrap || !textInput || !hidden || !form) return;
 
   const typeColor = form.dataset.typeColor || 'primary';
-  const caddyDir = form.dataset.caddyDir || '';
+  const confDir = form.dataset.confDir || '';
   const confPathBadge = document.getElementById('conf-path-badge');
   const originallyDisabled = form.dataset.originallyDisabled === 'true';
 
@@ -46,7 +46,7 @@
 
   function updateConfPathBadge() {
     if (!confPathBadge) return;
-    const dirPrefix = caddyDir.replace(/\/$/, '') + '/';
+    const dirPrefix = confDir.replace(/\/$/, '') + '/';
     const first = sortedFirstSiteAddress();
     if (!first) {
       confPathBadge.textContent = dirPrefix + '...';

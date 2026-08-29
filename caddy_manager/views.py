@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .auth import login_required
-from .configstore import load_config, save_config, get_caddy_dir
+from .configstore import load_config, save_config, get_conf_dir
 from .caddyfile import slugify, extract_body
 from .blocks import (
     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
@@ -18,8 +18,8 @@ bp = Blueprint("main", __name__)
 @bp.route("/")
 @login_required
 def dashboard():
-    caddy_dir = get_caddy_dir()
-    dir_exists = os.path.isdir(caddy_dir)
+    conf_dir = get_conf_dir()
+    dir_exists = os.path.isdir(conf_dir)
     blocks = list_blocks() if dir_exists else []
     stats = {
         "total": len(blocks),
@@ -27,18 +27,18 @@ def dashboard():
         "disabled": sum(1 for b in blocks if b["disabled"]),
     }
     return render_template(
-        "home.html", stats=stats, caddy_dir=caddy_dir, dir_exists=dir_exists
+        "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists
     )
 
 
 @bp.route("/site-blocks")
 @login_required
 def site_blocks():
-    caddy_dir = get_caddy_dir()
-    dir_exists = os.path.isdir(caddy_dir)
+    conf_dir = get_conf_dir()
+    dir_exists = os.path.isdir(conf_dir)
     blocks = list_blocks() if dir_exists else []
     return render_template(
-        "site_blocks.html", blocks=blocks, caddy_dir=caddy_dir, dir_exists=dir_exists
+        "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists
     )
 
 
@@ -57,7 +57,7 @@ def new_block(block_type):
             filename = unique_filename(slugify(meta["site_addresses"][0]))
             if create_disabled:
                 filename += ".disabled"
-            os.makedirs(get_caddy_dir(), exist_ok=True)
+            os.makedirs(get_conf_dir(), exist_ok=True)
             path = safe_path(filename)
             with open(path, "w") as f:
                 f.write(content)
@@ -71,7 +71,7 @@ def new_block(block_type):
     return render_template(
         "block_form.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
-        raw_body_text=raw_body_text, error=error, caddy_dir=get_caddy_dir()
+        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir()
     )
 
 
@@ -116,7 +116,7 @@ def edit_block(filename):
         "block_form.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
-        error=error, caddy_dir=get_caddy_dir()
+        error=error, conf_dir=get_conf_dir()
     )
 
 
@@ -198,18 +198,25 @@ def settings():
         action = request.form.get("action")
 
         if action == "update_dir":
-            new_dir = request.form.get("caddy_dir", "").strip()
-            if not new_dir:
-                error = "Directory is required."
+            root_dir = request.form.get("root_dir", "").strip()
+            conf_dir = request.form.get("conf_dir", "").strip()
+            certificate_dir = request.form.get("certificate_dir", "").strip()
+            log_dir = request.form.get("log_dir", "").strip()
+            caddyfile_path = request.form.get("caddyfile_path", "").strip()
+            if not conf_dir:
+                error = "Conf directory path is required."
             else:
                 try:
-                    os.makedirs(new_dir, exist_ok=True)
+                    os.makedirs(conf_dir, exist_ok=True)
                 except OSError as e:
                     error = f"Could not create/access that directory: {e}"
                 if not error:
-                    cfg["caddy_dir"] = new_dir
+                    cfg.update(
+                        root_dir=root_dir, conf_dir=conf_dir, certificate_dir=certificate_dir,
+                        log_dir=log_dir, caddyfile_path=caddyfile_path,
+                    )
                     save_config(cfg)
-                    flash("Caddy directory updated.", "success")
+                    flash("Directories updated.", "success")
                     return redirect(url_for("main.settings"))
 
         elif action == "change_password":
