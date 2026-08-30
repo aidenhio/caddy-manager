@@ -349,16 +349,23 @@ def rename_block_if_first_site_address_changed(filename, path, old_site_addresse
 
 def parse_logging_fields(form):
     """Parse+validate the Logging accordion's fields, shared by every
-    block type. Falls back to INFO/console for anything missing or not
-    one of the choices the accordion itself offers."""
+    block type. Falls back to INFO/json for anything missing or not one
+    of the choices the accordion itself offers. The rotation fields are
+    all optional and left as free text/number here -- validated (and
+    only if logging is actually enabled) by the caller, since a blank
+    value just means "use Caddy's own rotation defaults" rather than an
+    error."""
     log_enabled = form.get("log_enabled") == "1"
     log_level = form.get("log_level", "INFO").strip().upper()
     if log_level not in LOG_LEVELS:
         log_level = "INFO"
-    log_format = form.get("log_format", "console").strip().lower()
+    log_format = form.get("log_format", "json").strip().lower()
     if log_format not in LOG_FORMATS:
-        log_format = "console"
-    return log_enabled, log_level, log_format
+        log_format = "json"
+    roll_size = form.get("log_roll_size", "").strip()
+    roll_keep = form.get("log_roll_keep", "").strip()
+    roll_keep_for = form.get("log_roll_keep_for", "").strip()
+    return log_enabled, log_level, log_format, roll_size, roll_keep, roll_keep_for
 
 
 def build_block_from_form(block_type, form, log_filename_hint=None):
@@ -387,17 +394,21 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
     content = None
     error = None
 
-    log_enabled, log_level, log_format = parse_logging_fields(form)
-    meta.update(log_enabled=log_enabled, log_level=log_level, log_format=log_format)
+    log_enabled, log_level, log_format, roll_size, roll_keep, roll_keep_for = parse_logging_fields(form)
+    meta.update(log_enabled=log_enabled, log_level=log_level, log_format=log_format,
+                log_roll_size=roll_size, log_roll_keep=roll_keep, log_roll_keep_for=roll_keep_for)
 
     log_lines = None
     log_error = None
     if log_enabled:
-        log_path = log_path_for(log_filename_hint)
-        if not log_path:
-            log_error = "Set a logs directory in Settings before enabling logging."
+        if roll_keep and not (roll_keep.isdigit() and int(roll_keep) > 0):
+            log_error = "Rotated files to keep must be a positive whole number."
         else:
-            log_lines = render_log_block(log_path, log_level, log_format)
+            log_path = log_path_for(log_filename_hint)
+            if not log_path:
+                log_error = "Set a logs directory in Settings before enabling logging."
+            else:
+                log_lines = render_log_block(log_path, log_level, log_format, roll_size, roll_keep, roll_keep_for)
 
     if block_type == "reverse_proxy":
         scheme = form.get("scheme", "http").strip() or "http"

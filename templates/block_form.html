@@ -118,48 +118,6 @@
             </label>
             <span class="form-hint">Adds <code>transport http { tls_insecure_skip_verify }</code> to the block — only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
           </div>
-          <!-- BEGIN LOGGING OPTIONS -->
-          <div class="accordion mb-3" id="logging-options">
-            <div class="accordion-item">
-              <div class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
-                  Logging
-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M6 9l6 6l6 -6" />
-                  </svg>
-                </button>
-              </div>
-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
-                <div class="accordion-body">
-                  <div class="mb-3 {{ 'mb-0' if not meta.log_enabled }}">
-                    <label class="form-check form-switch">
-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
-                      <span class="form-check-label">Enable logging</span>
-                    </label>
-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
-                  </div>
-                  <div class="row" id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
-                    <div class="col-md-6 mb-3 mb-md-0">
-                      <label class="form-label">Log level</label>
-                      <select name="log_level" class="form-select">
-                        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
-                        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
-                      </select>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label">Log format</label>
-                      <select name="log_format" class="form-select">
-                        <option value="console" {{ 'selected' if (meta.log_format or 'console') == 'console' }}>Console</option>
-                        <option value="json" {{ 'selected' if meta.log_format == 'json' }}>JSON</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- END LOGGING OPTIONS -->
           <!-- BEGIN ADVANCED OPTIONS -->
           <div class="accordion mb-3" id="advanced-options">
             <div class="accordion-item">
@@ -192,6 +150,78 @@
             </div>
           </div>
           <!-- END ADVANCED OPTIONS -->
+          <!-- BEGIN LOGGING OPTIONS -->
+          <div class="accordion mb-3" id="logging-options">
+            <div class="accordion-item">
+              <div class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+                  Logging
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M6 9l6 6l6 -6" />
+                  </svg>
+                </button>
+              </div>
+              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+                <div class="accordion-body">
+                  <div class="alert alert-info">
+                    <div class="alert-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler alert-icon icon-2">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                        <path d="M12 9h.01" />
+                        <path d="M11 12h1v4h1" />
+                      </svg>
+                    </div>
+                    Caddy must be reloaded or restarted for logging changes to take effect.
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-check form-switch">
+                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+                      <span class="form-check-label">Enable logging</span>
+                    </label>
+                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+                  </div>
+                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log level</label>
+                        <select name="log_level" class="form-select">
+                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log format</label>
+                        <select name="log_format" class="form-select">
+                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label mb-0">Log rotation <span class="form-hint d-inline">(optional -- Caddy's defaults are 100MiB, 10 files, 2160h/90 days)</span></label>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Max file size</label>
+                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+                      </div>
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Files to keep</label>
+                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Keep for</label>
+                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END LOGGING OPTIONS -->
           {% endif %}
           <!-- END REVERSE PROXY FIELDS -->
 
@@ -229,48 +259,6 @@
               {% endfor %}
             </select>
           </div>
-          <!-- BEGIN LOGGING OPTIONS -->
-          <div class="accordion mb-3" id="logging-options">
-            <div class="accordion-item">
-              <div class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
-                  Logging
-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M6 9l6 6l6 -6" />
-                  </svg>
-                </button>
-              </div>
-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
-                <div class="accordion-body">
-                  <div class="mb-3 {{ 'mb-0' if not meta.log_enabled }}">
-                    <label class="form-check form-switch">
-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
-                      <span class="form-check-label">Enable logging</span>
-                    </label>
-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
-                  </div>
-                  <div class="row" id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
-                    <div class="col-md-6 mb-3 mb-md-0">
-                      <label class="form-label">Log level</label>
-                      <select name="log_level" class="form-select">
-                        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
-                        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
-                      </select>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label">Log format</label>
-                      <select name="log_format" class="form-select">
-                        <option value="console" {{ 'selected' if (meta.log_format or 'console') == 'console' }}>Console</option>
-                        <option value="json" {{ 'selected' if meta.log_format == 'json' }}>JSON</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- END LOGGING OPTIONS -->
           <!-- BEGIN ADVANCED OPTIONS -->
           <div class="accordion mb-3" id="advanced-options">
             <div class="accordion-item">
@@ -303,6 +291,78 @@
             </div>
           </div>
           <!-- END ADVANCED OPTIONS -->
+          <!-- BEGIN LOGGING OPTIONS -->
+          <div class="accordion mb-3" id="logging-options">
+            <div class="accordion-item">
+              <div class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+                  Logging
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M6 9l6 6l6 -6" />
+                  </svg>
+                </button>
+              </div>
+              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+                <div class="accordion-body">
+                  <div class="alert alert-info">
+                    <div class="alert-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler alert-icon icon-2">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                        <path d="M12 9h.01" />
+                        <path d="M11 12h1v4h1" />
+                      </svg>
+                    </div>
+                    Caddy must be reloaded or restarted for logging changes to take effect.
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-check form-switch">
+                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+                      <span class="form-check-label">Enable logging</span>
+                    </label>
+                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+                  </div>
+                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log level</label>
+                        <select name="log_level" class="form-select">
+                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log format</label>
+                        <select name="log_format" class="form-select">
+                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label mb-0">Log rotation <span class="form-hint d-inline">(optional -- Caddy's defaults are 100MiB, 10 files, 2160h/90 days)</span></label>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Max file size</label>
+                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+                      </div>
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Files to keep</label>
+                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Keep for</label>
+                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END LOGGING OPTIONS -->
           {% endif %}
           <!-- END LOAD BALANCER FIELDS -->
 
@@ -321,48 +381,6 @@
               {% endfor %}
             </select>
           </div>
-          <!-- BEGIN LOGGING OPTIONS -->
-          <div class="accordion mb-3" id="logging-options">
-            <div class="accordion-item">
-              <div class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
-                  Logging
-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M6 9l6 6l6 -6" />
-                  </svg>
-                </button>
-              </div>
-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
-                <div class="accordion-body">
-                  <div class="mb-3 {{ 'mb-0' if not meta.log_enabled }}">
-                    <label class="form-check form-switch">
-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
-                      <span class="form-check-label">Enable logging</span>
-                    </label>
-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
-                  </div>
-                  <div class="row" id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
-                    <div class="col-md-6 mb-3 mb-md-0">
-                      <label class="form-label">Log level</label>
-                      <select name="log_level" class="form-select">
-                        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
-                        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
-                      </select>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label">Log format</label>
-                      <select name="log_format" class="form-select">
-                        <option value="console" {{ 'selected' if (meta.log_format or 'console') == 'console' }}>Console</option>
-                        <option value="json" {{ 'selected' if meta.log_format == 'json' }}>JSON</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- END LOGGING OPTIONS -->
           <!-- BEGIN ADVANCED OPTIONS -->
           <div class="accordion mb-3" id="advanced-options">
             <div class="accordion-item">
@@ -393,6 +411,78 @@
             </div>
           </div>
           <!-- END ADVANCED OPTIONS -->
+          <!-- BEGIN LOGGING OPTIONS -->
+          <div class="accordion mb-3" id="logging-options">
+            <div class="accordion-item">
+              <div class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+                  Logging
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M6 9l6 6l6 -6" />
+                  </svg>
+                </button>
+              </div>
+              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+                <div class="accordion-body">
+                  <div class="alert alert-info">
+                    <div class="alert-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler alert-icon icon-2">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                        <path d="M12 9h.01" />
+                        <path d="M11 12h1v4h1" />
+                      </svg>
+                    </div>
+                    Caddy must be reloaded or restarted for logging changes to take effect.
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-check form-switch">
+                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+                      <span class="form-check-label">Enable logging</span>
+                    </label>
+                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+                  </div>
+                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log level</label>
+                        <select name="log_level" class="form-select">
+                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log format</label>
+                        <select name="log_format" class="form-select">
+                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label mb-0">Log rotation <span class="form-hint d-inline">(optional -- Caddy's defaults are 100MiB, 10 files, 2160h/90 days)</span></label>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Max file size</label>
+                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+                      </div>
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Files to keep</label>
+                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Keep for</label>
+                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END LOGGING OPTIONS -->
           {% endif %}
           <!-- END REDIRECT FIELDS -->
 
@@ -414,48 +504,6 @@
               {% endfor %}
             </div>
           </div>
-          <!-- BEGIN LOGGING OPTIONS -->
-          <div class="accordion mb-3" id="logging-options">
-            <div class="accordion-item">
-              <div class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
-                  Logging
-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M6 9l6 6l6 -6" />
-                  </svg>
-                </button>
-              </div>
-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
-                <div class="accordion-body">
-                  <div class="mb-3 {{ 'mb-0' if not meta.log_enabled }}">
-                    <label class="form-check form-switch">
-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
-                      <span class="form-check-label">Enable logging</span>
-                    </label>
-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
-                  </div>
-                  <div class="row" id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
-                    <div class="col-md-6 mb-3 mb-md-0">
-                      <label class="form-label">Log level</label>
-                      <select name="log_level" class="form-select">
-                        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
-                        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
-                      </select>
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label">Log format</label>
-                      <select name="log_format" class="form-select">
-                        <option value="console" {{ 'selected' if (meta.log_format or 'console') == 'console' }}>Console</option>
-                        <option value="json" {{ 'selected' if meta.log_format == 'json' }}>JSON</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- END LOGGING OPTIONS -->
           <!-- BEGIN ADVANCED OPTIONS -->
           <div class="accordion mb-3" id="advanced-options">
             <div class="accordion-item">
@@ -499,16 +547,6 @@
             </div>
           </div>
           <!-- END ADVANCED OPTIONS -->
-          {% endif %}
-          <!-- END STATIC SITE FIELDS -->
-
-          <!-- BEGIN CUSTOM FIELDS -->
-          {% if block_type == 'custom' %}
-          <div class="mb-3">
-            <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the site addresses above are wrapped around it automatically)</span></label>
-            <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
-            <div class="invalid-feedback">Block content is required.</div>
-          </div>
           <!-- BEGIN LOGGING OPTIONS -->
           <div class="accordion mb-3" id="logging-options">
             <div class="accordion-item">
@@ -523,27 +561,57 @@
               </div>
               <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
                 <div class="accordion-body">
-                  <div class="mb-3 {{ 'mb-0' if not meta.log_enabled }}">
+                  <div class="alert alert-info">
+                    <div class="alert-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler alert-icon icon-2">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                        <path d="M12 9h.01" />
+                        <path d="M11 12h1v4h1" />
+                      </svg>
+                    </div>
+                    Caddy must be reloaded or restarted for logging changes to take effect.
+                  </div>
+                  <div class="mb-3">
                     <label class="form-check form-switch">
                       <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
                       <span class="form-check-label">Enable logging</span>
                     </label>
                     <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
                   </div>
-                  <div class="row" id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
-                    <div class="col-md-6 mb-3 mb-md-0">
-                      <label class="form-label">Log level</label>
-                      <select name="log_level" class="form-select">
-                        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
-                        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
-                      </select>
+                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log level</label>
+                        <select name="log_level" class="form-select">
+                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log format</label>
+                        <select name="log_format" class="form-select">
+                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+                        </select>
+                      </div>
                     </div>
-                    <div class="col-md-6">
-                      <label class="form-label">Log format</label>
-                      <select name="log_format" class="form-select">
-                        <option value="console" {{ 'selected' if (meta.log_format or 'console') == 'console' }}>Console</option>
-                        <option value="json" {{ 'selected' if meta.log_format == 'json' }}>JSON</option>
-                      </select>
+                    <div class="mb-2">
+                      <label class="form-label mb-0">Log rotation <span class="form-hint d-inline">(optional -- Caddy's defaults are 100MiB, 10 files, 2160h/90 days)</span></label>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Max file size</label>
+                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+                      </div>
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Files to keep</label>
+                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Keep for</label>
+                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -551,6 +619,16 @@
             </div>
           </div>
           <!-- END LOGGING OPTIONS -->
+          {% endif %}
+          <!-- END STATIC SITE FIELDS -->
+
+          <!-- BEGIN CUSTOM FIELDS -->
+          {% if block_type == 'custom' %}
+          <div class="mb-3">
+            <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the site addresses above are wrapped around it automatically)</span></label>
+            <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
+            <div class="invalid-feedback">Block content is required.</div>
+          </div>
           <!-- BEGIN ADVANCED OPTIONS -->
           <div class="accordion mb-3" id="advanced-options">
             <div class="accordion-item">
@@ -581,6 +659,78 @@
             </div>
           </div>
           <!-- END ADVANCED OPTIONS -->
+          <!-- BEGIN LOGGING OPTIONS -->
+          <div class="accordion mb-3" id="logging-options">
+            <div class="accordion-item">
+              <div class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+                  Logging
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M6 9l6 6l6 -6" />
+                  </svg>
+                </button>
+              </div>
+              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+                <div class="accordion-body">
+                  <div class="alert alert-info">
+                    <div class="alert-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler alert-icon icon-2">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                        <path d="M12 9h.01" />
+                        <path d="M11 12h1v4h1" />
+                      </svg>
+                    </div>
+                    Caddy must be reloaded or restarted for logging changes to take effect.
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-check form-switch">
+                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+                      <span class="form-check-label">Enable logging</span>
+                    </label>
+                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+                  </div>
+                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+                    <div class="row">
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log level</label>
+                        <select name="log_level" class="form-select">
+                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+                        </select>
+                      </div>
+                      <div class="col-md-6 mb-3">
+                        <label class="form-label">Log format</label>
+                        <select name="log_format" class="form-select">
+                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label mb-0">Log rotation <span class="form-hint d-inline">(optional -- Caddy's defaults are 100MiB, 10 files, 2160h/90 days)</span></label>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Max file size</label>
+                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+                      </div>
+                      <div class="col-md-4 mb-3 mb-md-0">
+                        <label class="form-label">Files to keep</label>
+                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Keep for</label>
+                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- END LOGGING OPTIONS -->
           {% endif %}
           <!-- END CUSTOM FIELDS -->
 

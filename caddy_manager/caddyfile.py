@@ -15,9 +15,12 @@ FILE_SERVER_BLOCK_RE = re.compile(r"file_server\s*\{(.*?)\n\s*\}", re.DOTALL)
 BROWSE_RE = re.compile(r"^\s*browse\b", re.MULTILINE)
 INDEX_RE = re.compile(r"^\s*index\s+(.+)$", re.MULTILINE)
 HIDE_RE = re.compile(r"^\s*hide\s+(.+)$", re.MULTILINE)
-LOG_BLOCK_RE = re.compile(r"^\s*log(?:\s+\S+)?\s*\{(.*?)\n\s*\}", re.MULTILINE | re.DOTALL)
+LOG_START_RE = re.compile(r"^\s*log(?:\s+\S+)?\s*\{", re.MULTILINE)
 LOG_FORMAT_RE = re.compile(r"^\s*format\s+(\S+)", re.MULTILINE)
 LOG_LEVEL_RE = re.compile(r"^\s*level\s+(\S+)", re.MULTILINE)
+ROLL_SIZE_RE = re.compile(r"^\s*roll_size\s+(\S+)", re.MULTILINE)
+ROLL_KEEP_RE = re.compile(r"^\s*roll_keep\s+(\d+)\b", re.MULTILINE)
+ROLL_KEEP_FOR_RE = re.compile(r"^\s*roll_keep_for\s+(\S+)", re.MULTILINE)
 
 # The encode formats offered in the Static Site form, in the order they're
 # presented -- also used to filter/validate whatever a submitted form or a
@@ -29,9 +32,29 @@ ENCODE_FORMATS = ("gzip", "zstd", "br")
 # whatever a submitted form or a hand-edited .conf's `log` block actually
 # contains. Caddy supports more of each (e.g. DEBUG/WARN/PANIC/FATAL
 # levels), but the form intentionally only exposes the two most commonly
-# useful choices for a reverse-proxy-style access log.
+# useful choices for a reverse-proxy-style access log. JSON/INFO are also
+# Caddy's own defaults for a non-terminal (file) output.
 LOG_LEVELS = ("INFO", "ERROR")
-LOG_FORMATS = ("console", "json")
+LOG_FORMATS = ("json", "console")
+
+
+def find_braced_block(content, start_match):
+    """Given a regex match ending just after an opening '{', return the
+    text up to its matching '}' (brace-depth aware), or None if unbalanced.
+    Needed for the `log` block specifically because it can itself contain
+    a nested `output file <path> { roll_size ... }` block -- a non-greedy
+    `.*?\\}` regex would stop at that inner '}' instead of the log block's
+    own, so parsing it back out requires actually counting braces."""
+    depth = 1
+    i = start_match.end()
+    start = i
+    while i < len(content) and depth > 0:
+        if content[i] == "{":
+            depth += 1
+        elif content[i] == "}":
+            depth -= 1
+        i += 1
+    return content[start:i - 1] if depth == 0 else None
 
 
 # ---------------------------------------------------------------------------
@@ -117,22 +140,43 @@ def render_domain_block(site_header, body_lines):
     return "\n".join(lines) + "\n"
 
 
-def render_log_block(log_path, level="INFO", format="console"):
+def render_log_block(log_path, level="INFO", format="json", roll_size="", roll_keep="", roll_keep_for=""):
     """Lines for a `log { ... }` directive that writes this block's access
     log to `log_path` -- meant to be prepended to another render_*
     function's body list (each line here gets the same single level of
     indent render_domain_block already applies to every body line).
     Level and format are always stated explicitly, even when they're the
     Caddy default, since this is meant to be a readable, hand-editable
-    admin tool rather than the most terse possible config."""
+    admin tool rather than the most terse possible config.
+
+    roll_size/roll_keep/roll_keep_for are all optional -- when none are
+    set, `output file` is a bare line and Caddy's own rotation defaults
+    (100MiB, 10 files, 2160h) apply; setting any of them nests `output
+    file` into its own block so they can be stated."""
     path = f'"{log_path}"' if log_path and (" " in log_path or "\t" in log_path) else log_path
-    return [
-        "log {",
-        f"    output file {path}",
-        f"    format {format or 'console'}",
-        f"    level {level or 'INFO'}",
-        "}",
-    ]
+    roll_size = (roll_size or "").strip()
+    roll_keep = str(roll_keep or "").strip()
+    roll_keep_for = (roll_keep_for or "").strip()
+
+    roll_lines = []
+    if roll_size:
+        roll_lines.append(f"roll_size {roll_size}")
+    if roll_keep:
+        roll_lines.append(f"roll_keep {roll_keep}")
+    if roll_keep_for:
+        roll_lines.append(f"roll_keep_for {roll_keep_for}")
+
+    lines = ["log {"]
+    if roll_lines:
+        lines.append(f"    output file {path} {{")
+        lines += [f"        {line}" for line in roll_lines]
+        lines.append("    }")
+    else:
+        lines.append(f"    output file {path}")
+    lines.append(f"    format {format or 'json'}")
+    lines.append(f"    level {level or 'INFO'}")
+    lines.append("}")
+    return lines
 
 
 def render_reverse_proxy(site_header, target, extra_text="", insecure_skip_verify=False, log_lines=None):
@@ -247,17 +291,28 @@ def extract_logging(content):
     pre-filled, in the Logging accordion next time the block is opened.
     Only recognizes the level/format combinations the Logging accordion
     itself can produce (see LOG_LEVELS/LOG_FORMATS); anything else falls
-    back to the form's defaults rather than being left blank."""
-    match = LOG_BLOCK_RE.search(content)
-    if not match:
-        return {"log_enabled": False, "log_level": "INFO", "log_format": "console"}
+    back to the form's defaults rather than being left blank. Rotation
+    settings (roll_size/roll_keep/roll_keep_for), being free-form, are
+    carried through as-is if present."""
+    start_match = LOG_START_RE.search(content)
+    body = find_braced_block(content, start_match) if start_match else None
+    if body is None:
+        return {"log_enabled": False, "log_level": "INFO", "log_format": "json",
+                "log_roll_size": "", "log_roll_keep": "", "log_roll_keep_for": ""}
 
-    body = match.group(1)
     format_match = LOG_FORMAT_RE.search(body)
     level_match = LOG_LEVEL_RE.search(body)
-    log_format = format_match.group(1) if format_match and format_match.group(1) in LOG_FORMATS else "console"
+    roll_size_match = ROLL_SIZE_RE.search(body)
+    roll_keep_match = ROLL_KEEP_RE.search(body)
+    roll_keep_for_match = ROLL_KEEP_FOR_RE.search(body)
+    log_format = format_match.group(1) if format_match and format_match.group(1) in LOG_FORMATS else "json"
     log_level = level_match.group(1).upper() if level_match and level_match.group(1).upper() in LOG_LEVELS else "INFO"
-    return {"log_enabled": True, "log_level": log_level, "log_format": log_format}
+    return {
+        "log_enabled": True, "log_level": log_level, "log_format": log_format,
+        "log_roll_size": roll_size_match.group(1) if roll_size_match else "",
+        "log_roll_keep": roll_keep_match.group(1) if roll_keep_match else "",
+        "log_roll_keep_for": roll_keep_for_match.group(1) if roll_keep_for_match else "",
+    }
 
 
 def parse_conf_content(content):
