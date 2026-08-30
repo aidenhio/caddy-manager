@@ -15,11 +15,23 @@ FILE_SERVER_BLOCK_RE = re.compile(r"file_server\s*\{(.*?)\n\s*\}", re.DOTALL)
 BROWSE_RE = re.compile(r"^\s*browse\b", re.MULTILINE)
 INDEX_RE = re.compile(r"^\s*index\s+(.+)$", re.MULTILINE)
 HIDE_RE = re.compile(r"^\s*hide\s+(.+)$", re.MULTILINE)
+LOG_BLOCK_RE = re.compile(r"^\s*log(?:\s+\S+)?\s*\{(.*?)\n\s*\}", re.MULTILINE | re.DOTALL)
+LOG_FORMAT_RE = re.compile(r"^\s*format\s+(\S+)", re.MULTILINE)
+LOG_LEVEL_RE = re.compile(r"^\s*level\s+(\S+)", re.MULTILINE)
 
 # The encode formats offered in the Static Site form, in the order they're
 # presented -- also used to filter/validate whatever a submitted form or a
 # hand-edited .conf's `encode` line actually contains.
 ENCODE_FORMATS = ("gzip", "zstd", "br")
+
+# The log levels/formats offered in the Logging accordion of every block
+# type, in the order they're presented -- also used to filter/validate
+# whatever a submitted form or a hand-edited .conf's `log` block actually
+# contains. Caddy supports more of each (e.g. DEBUG/WARN/PANIC/FATAL
+# levels), but the form intentionally only exposes the two most commonly
+# useful choices for a reverse-proxy-style access log.
+LOG_LEVELS = ("INFO", "ERROR")
+LOG_FORMATS = ("console", "json")
 
 
 # ---------------------------------------------------------------------------
@@ -105,21 +117,42 @@ def render_domain_block(site_header, body_lines):
     return "\n".join(lines) + "\n"
 
 
-def render_reverse_proxy(site_header, target, extra_text="", insecure_skip_verify=False):
-    body = [f"reverse_proxy {target}"]
+def render_log_block(log_path, level="INFO", format="console"):
+    """Lines for a `log { ... }` directive that writes this block's access
+    log to `log_path` -- meant to be prepended to another render_*
+    function's body list (each line here gets the same single level of
+    indent render_domain_block already applies to every body line).
+    Level and format are always stated explicitly, even when they're the
+    Caddy default, since this is meant to be a readable, hand-editable
+    admin tool rather than the most terse possible config."""
+    path = f'"{log_path}"' if log_path and (" " in log_path or "\t" in log_path) else log_path
+    return [
+        "log {",
+        f"    output file {path}",
+        f"    format {format or 'console'}",
+        f"    level {level or 'INFO'}",
+        "}",
+    ]
+
+
+def render_reverse_proxy(site_header, target, extra_text="", insecure_skip_verify=False, log_lines=None):
+    body = list(log_lines or [])
+    body.append(f"reverse_proxy {target}")
     if insecure_skip_verify:
         body += ["transport http {", "    tls_insecure_skip_verify", "}"]
     body += extra_lines(extra_text)
     return render_domain_block(site_header, body)
 
 
-def render_redirect(site_header, target, redirect_code=""):
+def render_redirect(site_header, target, redirect_code="", log_lines=None):
     redirect_code = (redirect_code or "").strip()
     directive = f"redir {target} {redirect_code}" if redirect_code else f"redir {target}"
-    return render_domain_block(site_header, [directive])
+    body = list(log_lines or [])
+    body.append(directive)
+    return render_domain_block(site_header, body)
 
 
-def render_static_site(site_header, path, encodings=None, browse=False, index="", hide=""):
+def render_static_site(site_header, path, encodings=None, browse=False, index="", hide="", log_lines=None):
     """file_server is always present for this block type (a static site
     with no file_server wouldn't actually serve anything) -- rendered as a
     bare `file_server` line when none of browse/index/hide are set, or as
@@ -128,7 +161,8 @@ def render_static_site(site_header, path, encodings=None, browse=False, index=""
     index = (index or "").strip()
     hide = (hide or "").strip()
 
-    body = [f"root * {path}"]
+    body = list(log_lines or [])
+    body.append(f"root * {path}")
     if encodings:
         body.append("encode " + " ".join(encodings))
 
@@ -150,22 +184,29 @@ def render_static_site(site_header, path, encodings=None, browse=False, index=""
     return render_domain_block(site_header, body)
 
 
-def render_load_balancer(site_header, upstreams, lb_policy="", extra_text=""):
+def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", log_lines=None):
     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
     inner += extra_lines(extra_text)
-    body = [f"reverse_proxy {' '.join(upstreams)} {{"]
+    body = list(log_lines or [])
+    body.append(f"reverse_proxy {' '.join(upstreams)} {{")
     body += [f"    {line}" for line in inner]
     body += ["}"]
     return render_domain_block(site_header, body)
 
 
-def render_custom(site_header, body_text):
+def render_custom(site_header, body_text, log_lines=None):
     """Wrap a user-authored body (whatever's between the braces) with the
     site header, which is always derived from the Site Address field -- the
     user only ever writes/edits the inside of the block, never the site
-    address line."""
+    address line. Unlike the other render_* functions, the body here isn't
+    a list of directive lines this module controls -- it's opaque
+    user-authored text -- so a `log` block, if enabled, is stitched onto
+    the front of it directly rather than passed to render_domain_block."""
     body = (body_text or "").rstrip("\n")
-    return f"{site_header} {{\n{body}\n}}\n" if body else f"{site_header} {{\n}}\n"
+    prefix_lines = [f"    {line}" for line in (log_lines or [])]
+    prefix = ("\n".join(prefix_lines) + "\n") if prefix_lines else ""
+    inner = f"{prefix}{body}" if body else prefix.rstrip("\n")
+    return f"{site_header} {{\n{inner}\n}}\n" if inner else f"{site_header} {{\n}}\n"
 
 
 def extract_body(content):
@@ -199,28 +240,49 @@ def extract_site_addresses(content):
     return []
 
 
+def extract_logging(content):
+    """Best-effort parse of a `log { ... }` block out of a raw Caddy block,
+    for the structured (non-custom) block types' fallback parser -- a
+    `log` block added by hand between app saves should still show up,
+    pre-filled, in the Logging accordion next time the block is opened.
+    Only recognizes the level/format combinations the Logging accordion
+    itself can produce (see LOG_LEVELS/LOG_FORMATS); anything else falls
+    back to the form's defaults rather than being left blank."""
+    match = LOG_BLOCK_RE.search(content)
+    if not match:
+        return {"log_enabled": False, "log_level": "INFO", "log_format": "console"}
+
+    body = match.group(1)
+    format_match = LOG_FORMAT_RE.search(body)
+    level_match = LOG_LEVEL_RE.search(body)
+    log_format = format_match.group(1) if format_match and format_match.group(1) in LOG_FORMATS else "console"
+    log_level = level_match.group(1).upper() if level_match and level_match.group(1).upper() in LOG_LEVELS else "INFO"
+    return {"log_enabled": True, "log_level": log_level, "log_format": log_format}
+
+
 def parse_conf_content(content):
     """Best-effort structured parse of a raw Caddy block."""
     site_addresses = extract_site_addresses(content)
     rp_match = REVERSE_PROXY_RE.search(content)
     lb_match = LB_POLICY_RE.search(content)
+    logging_fields = extract_logging(content)
 
     if rp_match and lb_match:
         upstreams = rp_match.group(1).split()
         return {"type": "load_balancer", "site_addresses": site_addresses, "upstreams": upstreams,
-                "lb_policy": lb_match.group(1), "extra": ""}
+                "lb_policy": lb_match.group(1), "extra": "", **logging_fields}
 
     if rp_match:
         tokens = rp_match.group(1).split()
         target = tokens[0] if tokens else ""
         scheme, host, port = split_target(target)
         return {"type": "reverse_proxy", "site_addresses": site_addresses, "target": target,
-                "scheme": scheme, "host": host, "port": port, "extra": ""}
+                "scheme": scheme, "host": host, "port": port, "extra": "", **logging_fields}
 
     redir_match = REDIR_RE.search(content)
     if redir_match:
         return {"type": "redirect", "site_addresses": site_addresses, "target": redir_match.group(1),
-                "redirect_code": redir_match.group(2) or ""}
+                "redirect_code": redir_match.group(2) or "", **logging_fields}
 
     root_match = ROOT_RE.search(content)
     if root_match:
@@ -235,6 +297,6 @@ def parse_conf_content(content):
         return {"type": "static_site", "site_addresses": site_addresses, "path": root_match.group(1),
                 "encode": encodings, "browse": bool(BROWSE_RE.search(fs_body)),
                 "index": index_match.group(1).strip() if index_match else "",
-                "hide": hide_match.group(1).strip() if hide_match else ""}
+                "hide": hide_match.group(1).strip() if hide_match else "", **logging_fields}
 
     return {"type": "custom", "site_addresses": site_addresses}

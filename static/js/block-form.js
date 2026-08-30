@@ -215,6 +215,20 @@
 })();
 // END LOAD BALANCER UPSTREAM ROWS
 
+// BEGIN LOGGING ENABLE TOGGLE
+(function () {
+  const toggle = document.getElementById('log-enabled-input');
+  const row = document.getElementById('log-options-row');
+  if (!toggle || !row) return;
+
+  function sync() {
+    row.hidden = !toggle.checked;
+  }
+  toggle.addEventListener('change', sync);
+  sync();
+})();
+// END LOGGING ENABLE TOGGLE
+
 // BEGIN FORM VALIDATION WIRING
 (function () {
   const form = document.getElementById('block-form');

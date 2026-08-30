@@ -168,7 +168,19 @@
           <div class="text-secondary small mb-1">Conf file path</div>
           <div class="font-monospace text-break">{{ conf_path }}</div>
         </div>
-        
+
+        <!-- BEGIN LOGGING STATUS -->
+        <div class="list-group-item">
+          <div class="text-secondary small mb-1">Logging</div>
+          {% if meta.log_enabled %}
+            <div>{{ meta.log_level or 'INFO' }} &middot; {{ 'JSON' if meta.log_format == 'json' else 'Console' }}</div>
+            {% if log_path %}<div class="font-monospace text-break text-secondary small mt-1">{{ log_path }}</div>{% endif %}
+          {% else %}
+            <span class="text-secondary">Disabled</span>
+          {% endif %}
+        </div>
+        <!-- END LOGGING STATUS -->
+
         {% if created != 'Unknown' %}
         <div class="list-group-item">
           <div class="text-secondary small mb-1">Created</div>

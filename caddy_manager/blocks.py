@@ -19,12 +19,12 @@ from datetime import datetime
 
 from flask import abort
 
-from .configstore import get_conf_dir
+from .configstore import get_conf_dir, get_log_dir
 from .caddyfile import (
     site_addresses_from_textarea, site_address_header, slugify,
     join_target, parse_conf_content,
     render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
-    ENCODE_FORMATS,
+    render_log_block, ENCODE_FORMATS, LOG_LEVELS, LOG_FORMATS,
 )
 
 
@@ -55,15 +55,68 @@ def safe_meta_path(filename):
     return target
 
 
-def meta_filename_for(conf_filename):
+def block_base_name(conf_filename):
+    """The .conf filename with its .disabled and .conf suffixes stripped
+    -- the stem shared by a block's .conf, its .metadata/*.json sidecar,
+    and (when logging is enabled) its logs_dir/*.log file."""
     base = conf_filename[: -len(".disabled")] if conf_filename.endswith(".disabled") else conf_filename
     if base.endswith(".conf"):
         base = base[: -len(".conf")]
-    return base + ".json"
+    return base
+
+
+def meta_filename_for(conf_filename):
+    return block_base_name(conf_filename) + ".json"
 
 
 def meta_path_for(conf_filename):
     return safe_meta_path(meta_filename_for(conf_filename))
+
+
+def safe_log_path(filename):
+    """Resolve filename inside the configured logs directory, preventing
+    path traversal. Returns None if no logs directory is configured."""
+    log_dir = get_log_dir()
+    if not log_dir:
+        return None
+    base = os.path.abspath(log_dir)
+    target = os.path.abspath(os.path.join(base, filename))
+    if target != base and not target.startswith(base + os.sep):
+        abort(400, "Invalid filename")
+    return target
+
+
+def log_path_for(conf_filename):
+    """Absolute path of the log file that would correspond to a given
+    .conf filename (same base name as its .conf/.metadata sidecar, with a
+    .log extension), or None if no logs directory is configured."""
+    if not conf_filename:
+        return None
+    return safe_log_path(block_base_name(conf_filename) + ".log")
+
+
+def delete_log_file(conf_filename):
+    path = log_path_for(conf_filename)
+    if path and os.path.isfile(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def rename_log_file(old_conf_filename, new_conf_filename):
+    """If a log file exists for the old filename, move it to match the
+    new one -- called alongside the .conf/.metadata rename that happens
+    when a block's primary site address changes."""
+    old_path = log_path_for(old_conf_filename)
+    new_path = log_path_for(new_conf_filename)
+    if not old_path or not new_path or old_path == new_path or not os.path.isfile(old_path):
+        return
+    try:
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+        os.rename(old_path, new_path)
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +290,7 @@ def list_blocks():
             "browse": meta.get("browse", False),
             "index": meta.get("index", ""),
             "hide": meta.get("hide", ""),
+            "log_enabled": meta.get("log_enabled", False),
             "updated": fdate.strftime("%d/%m/%Y %I:%M%p"),
             "updated_ts": os.path.getmtime(path),
             "upstream_sort": upstream_sort,
@@ -293,7 +347,21 @@ def rename_block_if_first_site_address_changed(filename, path, old_site_addresse
 # Form parsing -- shared by the new-block and edit-block routes
 # ---------------------------------------------------------------------------
 
-def build_block_from_form(block_type, form):
+def parse_logging_fields(form):
+    """Parse+validate the Logging accordion's fields, shared by every
+    block type. Falls back to INFO/console for anything missing or not
+    one of the choices the accordion itself offers."""
+    log_enabled = form.get("log_enabled") == "1"
+    log_level = form.get("log_level", "INFO").strip().upper()
+    if log_level not in LOG_LEVELS:
+        log_level = "INFO"
+    log_format = form.get("log_format", "console").strip().lower()
+    if log_format not in LOG_FORMATS:
+        log_format = "console"
+    return log_enabled, log_level, log_format
+
+
+def build_block_from_form(block_type, form, log_filename_hint=None):
     """Parse and validate submitted block-form fields for `block_type`,
     rendering the Caddyfile block content. Returns (content, meta, error):
     `content` is the rendered block text (None if invalid), `meta` is the
@@ -301,7 +369,16 @@ def build_block_from_form(block_type, form):
     user submitted even when `error` is set, so the form can re-render the
     attempted values.
 
-    This is the one place the four block-type shapes are described; both
+    `log_filename_hint` is the .conf filename the log block's `output
+    file` path should be derived from (the same base name, in the
+    configured logs directory) -- the eventual filename for a new block,
+    or the block's current filename when editing. It's a hint rather than
+    something this function resolves itself because a new block's
+    filename isn't decided until after this call returns (it depends on
+    the normalized site_addresses this function produces); the caller is
+    expected to pass the filename it intends to use.
+
+    This is the one place the five block-type shapes are described; both
     new_block() and edit_block() call it identically, since every field a
     saved block needs is always resubmitted in full on every save (nothing
     from a previous version needs to be separately preserved/merged in)."""
@@ -309,6 +386,18 @@ def build_block_from_form(block_type, form):
     meta = {"site_addresses": site_addresses}
     content = None
     error = None
+
+    log_enabled, log_level, log_format = parse_logging_fields(form)
+    meta.update(log_enabled=log_enabled, log_level=log_level, log_format=log_format)
+
+    log_lines = None
+    log_error = None
+    if log_enabled:
+        log_path = log_path_for(log_filename_hint)
+        if not log_path:
+            log_error = "Set a logs directory in Settings before enabling logging."
+        else:
+            log_lines = render_log_block(log_path, log_level, log_format)
 
     if block_type == "reverse_proxy":
         scheme = form.get("scheme", "http").strip() or "http"
@@ -324,7 +413,8 @@ def build_block_from_form(block_type, form):
             error = "Upstream host is required."
         else:
             target = join_target(scheme, host, port)
-            content = render_reverse_proxy(site_address_header(site_addresses), target, extra, insecure_skip_verify)
+            content = render_reverse_proxy(site_address_header(site_addresses), target, extra,
+                                            insecure_skip_verify, log_lines)
             meta.update(type="reverse_proxy", target=target)
 
     elif block_type == "load_balancer":
@@ -337,7 +427,7 @@ def build_block_from_form(block_type, form):
         elif len(upstreams) < 2:
             error = "At least two upstreams are required."
         else:
-            content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra)
+            content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra, log_lines)
             meta.update(type="load_balancer")
 
     elif block_type == "redirect":
@@ -349,7 +439,7 @@ def build_block_from_form(block_type, form):
         elif not target:
             error = "Redirect target is required."
         else:
-            content = render_redirect(site_address_header(site_addresses), target, redirect_code)
+            content = render_redirect(site_address_header(site_addresses), target, redirect_code, log_lines)
             meta.update(type="redirect")
 
     elif block_type == "static_site":
@@ -364,7 +454,8 @@ def build_block_from_form(block_type, form):
         elif not path:
             error = "File path is required."
         else:
-            content = render_static_site(site_address_header(site_addresses), path, encodings, browse, index, hide)
+            content = render_static_site(site_address_header(site_addresses), path, encodings, browse, index,
+                                          hide, log_lines)
             meta.update(type="static_site")
 
     else:  # custom
@@ -374,7 +465,10 @@ def build_block_from_form(block_type, form):
         elif not raw:
             error = "Block content is required."
         else:
-            content = render_custom(site_address_header(site_addresses), raw)
+            content = render_custom(site_address_header(site_addresses), raw, log_lines)
             meta.update(type="custom")
+
+    if not error:
+        error = log_error
 
     return content, meta, error
