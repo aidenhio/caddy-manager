@@ -343,6 +343,29 @@ def rename_block_if_first_site_address_changed(filename, path, old_site_addresse
         return filename, path
 
 
+def set_block_disabled(filename, path, disabled):
+    """Add or remove the .disabled suffix on a block's .conf (and its
+    metadata sidecar) to match the requested state -- a no-op if it
+    already matches. Used both by the block form's own disable/enable
+    toggle and the site-blocks list's Enable/Disable action, so the two
+    can never drift out of sync with each other. Returns the
+    filename/path to use from here on (unchanged if no rename happened
+    or the block was already in the requested state)."""
+    if filename.endswith(".disabled") == disabled:
+        return filename, path
+
+    new_filename = filename + ".disabled" if disabled else filename[: -len(".disabled")]
+    try:
+        new_path = safe_path(new_filename)
+        os.rename(path, new_path)
+        old_meta_path = meta_path_for(filename)
+        if os.path.isfile(old_meta_path):
+            os.rename(old_meta_path, meta_path_for(new_filename))
+        return new_filename, new_path
+    except OSError:
+        return filename, path
+
+
 # ---------------------------------------------------------------------------
 # Form parsing -- shared by the new-block and edit-block routes
 # ---------------------------------------------------------------------------

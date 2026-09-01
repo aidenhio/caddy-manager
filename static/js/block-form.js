@@ -52,8 +52,8 @@
       confPathBadge.textContent = dirPrefix + '...';
       return;
     }
-    const createDisabledInput = document.getElementById('create-disabled-input');
-    const isDisabled = createDisabledInput ? createDisabledInput.checked : originallyDisabled;
+    const disabledInput = document.getElementById('block-disabled-input');
+    const isDisabled = disabledInput ? disabledInput.checked : originallyDisabled;
     confPathBadge.textContent = dirPrefix + slugify(first) + '.conf' + (isDisabled ? '.disabled' : '');
   }
 

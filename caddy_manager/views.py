@@ -10,7 +10,7 @@ from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
     unique_filename, rename_block_if_first_site_address_changed, build_block_from_form,
-    delete_log_file, rename_log_file, log_path_for,
+    delete_log_file, rename_log_file, log_path_for, set_block_disabled,
 )
 
 bp = Blueprint("main", __name__)
@@ -59,7 +59,7 @@ def new_block(block_type):
         # that validation here, redo the same cheap parse just to get a
         # filename hint to pass in; build_block_from_form will parse the
         # identical form data the same way, so the two never disagree.
-        create_disabled = request.form.get("create_disabled") == "1"
+        create_disabled = request.form.get("disabled") == "1"
         site_addresses_hint = site_addresses_from_textarea(request.form.get("site_addresses", ""))
         filename_hint = None
         if site_addresses_hint:
@@ -85,10 +85,12 @@ def new_block(block_type):
     upstreams_text = "\n".join(meta.get("upstreams") or [])
     site_addresses_text = "\n".join(meta.get("site_addresses") or [])
     raw_body_text = request.form.get("raw_content", "") if request.method == "POST" and block_type == "custom" else ""
+    disabled_toggle_checked = request.form.get("disabled") == "1" if request.method == "POST" else False
     return render_template(
         "block_form.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
-        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/")
+        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/"),
+        disabled_toggle_checked=disabled_toggle_checked,
     )
 
 
@@ -111,6 +113,7 @@ def edit_block(filename):
 
     if request.method == "POST":
         original_filename = filename
+        disabled_requested = request.form.get("disabled") == "1"
         # The log block's `output file` path (if enabled) is derived from
         # the block's current on-disk filename -- if the primary site
         # address changes below, both the content and the physical log
@@ -150,18 +153,27 @@ def edit_block(filename):
                     with open(path, "w") as f:
                         f.write(fixed_content)
 
-            flash(f"Saved {filename}", "success")
+            # Apply the form's own disable/enable toggle last -- it doesn't
+            # touch the log file (whose name never includes the .disabled
+            # suffix) or the rendered content, just the .conf/.metadata
+            # filenames, so it's independent of everything above.
+            filename, path = set_block_disabled(filename, path, disabled_requested)
+
+            flash(f"Saved {filename}" + (" (disabled)" if disabled_requested else ""), "success")
             return redirect(url_for("main.site_blocks"))
 
     upstreams_text = "\n".join(meta.get("upstreams") or [])
     site_addresses_text = "\n".join(meta.get("site_addresses") or [])
     path = safe_path(filename)
+    disabled_toggle_checked = request.form.get("disabled") == "1" if request.method == "POST" \
+        else filename.endswith(".disabled")
 
     return render_template(
         "block_form.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
-        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/")
+        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/"),
+        disabled_toggle_checked=disabled_toggle_checked,
     )
 
 
@@ -212,12 +224,7 @@ def toggle_block(filename):
     if not os.path.isfile(path):
         abort(404)
 
-    if filename.endswith(".disabled"):
-        new_name = filename[: -len(".disabled")]
-    else:
-        new_name = filename + ".disabled"
-
-    os.rename(path, safe_path(new_name))
+    new_name, _new_path = set_block_disabled(filename, path, not filename.endswith(".disabled"))
     state = "Disabled" if new_name.endswith(".disabled") else "Enabled"
     flash(f"{state} {new_name}", "success")
     return redirect(url_for("main.site_blocks"))

@@ -25,30 +25,6 @@
 {% endblock %}
 
 {% block header_actions %}
-<div class="btn-list">
-  {% if mode == 'edit' %}
-  {% set is_disabled = filename.endswith('.disabled') %}
-  <form method="post" action="{{ url_for('main.toggle_block', filename=filename) }}" class="d-inline">
-    <button type="submit" class="btn btn-{{ type_color }} d-none d-sm-inline-flex">
-      {% if is_disabled %}
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-toggle-right">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-        <path d="M14 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-        <path d="M2 12a6 6 0 0 1 6 -6h8a6 6 0 0 1 6 6a6 6 0 0 1 -6 6h-8a6 6 0 0 1 -6 -6" />
-      </svg>
-      Enable
-      {% else %}
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-toggle-left">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-        <path d="M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-        <path d="M2 12a6 6 0 0 1 6 -6h8a6 6 0 0 1 6 6a6 6 0 0 1 -6 6h-8a6 6 0 0 1 -6 -6" />
-      </svg>
-      Disable
-      {% endif %}
-    </button>
-  </form>
-  {% endif %}
-</div>
 {% endblock %}
 
 <!---->
@@ -132,19 +108,10 @@
               </div>
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
-                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
+                  <div class="mb-0">
                     <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
                     <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
                   </div>
-                  {% if mode == 'new' %}
-                  <div class="mb-0">
-                    <label class="form-check">
-                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
-                      <span class="form-check-label">Create disabled</span>
-                    </label>
-                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
-                  </div>
-                  {% endif %}
                 </div>
               </div>
             </div>
@@ -273,19 +240,10 @@
               </div>
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
-                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
+                  <div class="mb-0">
                     <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the reverse_proxy block)</span></label>
                     <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
                   </div>
-                  {% if mode == 'new' %}
-                  <div class="mb-0">
-                    <label class="form-check">
-                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
-                      <span class="form-check-label">Create disabled</span>
-                    </label>
-                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
-                  </div>
-                  {% endif %}
                 </div>
               </div>
             </div>
@@ -395,17 +353,7 @@
               </div>
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
-                  {% if mode == 'new' %}
-                  <div class="mb-0">
-                    <label class="form-check">
-                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
-                      <span class="form-check-label">Create disabled</span>
-                    </label>
-                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
-                  </div>
-                  {% else %}
                   <p class="text-secondary mb-0">No advanced options for this block type yet.</p>
-                  {% endif %}
                 </div>
               </div>
             </div>
@@ -526,22 +474,13 @@
                     <label class="form-label">Index files <span class="form-hint d-inline">(optional, space-separated — defaults to index.html/index.txt)</span></label>
                     <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
                   </div>
-                  <div class="mb-3 {{ 'mb-md-0' if mode != 'new' }}">
+                  <div class="mb-0">
                     <label class="form-check">
                       <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
                       <span class="form-check-label">Directory browsing</span>
                     </label>
                     <span class="form-hint">Shows a file listing for directories that have no index file.</span>
                   </div>
-                  {% if mode == 'new' %}
-                  <div class="mb-0">
-                    <label class="form-check">
-                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
-                      <span class="form-check-label">Create disabled</span>
-                    </label>
-                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
-                  </div>
-                  {% endif %}
                 </div>
               </div>
             </div>
@@ -643,17 +582,7 @@
               </div>
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
-                  {% if mode == 'new' %}
-                  <div class="mb-0">
-                    <label class="form-check">
-                      <input type="checkbox" class="form-check-input" id="create-disabled-input" name="create_disabled" value="1" onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
-                      <span class="form-check-label">Create disabled</span>
-                    </label>
-                    <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
-                  </div>
-                  {% else %}
                   <p class="text-secondary mb-0">No advanced options for this block type yet.</p>
-                  {% endif %}
                 </div>
               </div>
             </div>
@@ -733,6 +662,20 @@
           <!-- END LOGGING OPTIONS -->
           {% endif %}
           <!-- END CUSTOM FIELDS -->
+
+          <!-- BEGIN DISABLE TOGGLE -->
+          <div class="mb-3">
+            <label class="form-check form-switch">
+              <input type="checkbox" class="form-check-input" id="block-disabled-input" name="disabled" value="1" {{ 'checked' if disabled_toggle_checked }} onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+              <span class="form-check-label">{{ 'Create disabled' if mode == 'new' else 'Disable this block' }}</span>
+            </label>
+            {% if mode == 'new' %}
+            <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
+            {% else %}
+            <span class="form-hint">Renames <code>{{ filename }}</code> with a <code>.disabled</code> suffix on save, so Caddy skips it until you re-enable it.</span>
+            {% endif %}
+          </div>
+          <!-- END DISABLE TOGGLE -->
 
           <!-- BEGIN FORM ACTIONS -->
           <div class="form-footer d-flex gap-2">
