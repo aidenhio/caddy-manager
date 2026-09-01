@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - Caddy Manager{% endblock %}
+{% block page_pretitle %}Caddy{% endblock %}
+{% block page_title %}Logs{% endblock %}
+
+{% block header_actions %}
+{% endblock %}
+
+<!---->
+
+{% block content %}
+
+{% if not dir_exists %}
+  <div class="alert alert-danger">The logs directory doesn't exist yet. It's created automatically the first time a site block has logging enabled.</div>
+{% endif %}
+
+<div class="card">
+  {% if logs %}
+  <!-- BEGIN SEARCH / PAGE-SIZE BAR -->
+  <div class="card-header">
+    <div class="row w-full g-2">
+      <div class="col col-4">
+        <div class="input-group input-group-flat w-auto">
+            <span class="input-group-text">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
+                <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
+                <path d="M21 21l-6 -6"></path>
+              </svg>
+            </span>
+            <input id="logs-search" type="text" class="form-control" autocomplete="off" placeholder="Search…">
+          </div>
+      </div>
+      <div class="ms-auto col-auto">
+        <select id="logs-page-size" class="form-select">
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <!-- END SEARCH / PAGE-SIZE BAR -->
+
+  <!-- BEGIN LOGS TABLE LIST -->
+  <div class="table-responsive" style="min-height: 24rem;">
+    <table class="table card-table table-vcenter" id="logs-table"
+           data-datatable
+           data-dt-search="#logs-search"
+           data-dt-page-size="#logs-page-size"
+           data-dt-page-size-default="10"
+           data-dt-summary="#logs-page-summary"
+           data-dt-pagination="#logs-pagination"
+           data-dt-default-sort="filename"
+           data-dt-default-sort-dir="asc"
+           data-dt-storage-key="logs-table">
+      <thead>
+        <tr>
+          <th>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="filename" data-sort-type="text">
+              Filename
+            </button>
+          </th>
+          <th>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="updated" data-sort-type="number">
+              Updated
+            </button>
+          </th>
+          <th class="w-1"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for log in logs %}
+        <tr data-filename="{{ log.filename | lower }}" data-updated="{{ log.updated_ts }}">
+          <!-- BEGIN FILENAME CELL -->
+          <td>
+            <span class="font-monospace">{{ log.filename }}</span>
+            {% if log.count > 1 %}
+              <span class="badge bg-lt" title="{{ log.count }} log files, including rotated backups">+{{ log.count - 1 }}</span>
+            {% endif %}
+          </td>
+          <!-- END FILENAME CELL -->
+          <td>{{ log.updated }}</td>
+          <td>
+            <button type="button" class="btn btn-sm" disabled title="Coming soon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icons-tabler-outline icon-tabler-eye">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
+              </svg>
+              View
+            </button>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <!-- END LOGS TABLE LIST -->
+
+  <!-- BEGIN PAGINATION BAR -->
+  <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <p class="m-0 text-secondary" id="logs-page-summary"></p>
+    <ul class="pagination m-0" id="logs-pagination"></ul>
+  </div>
+  <!-- END PAGINATION BAR -->
+  {% else %}
+  <div class="card-body text-secondary">
+    {% if dir_exists %}
+    No log files found in <code>{{ log_dir }}</code> yet. Enable logging on a site block to start writing one.
+    {% else %}
+    No logs directory configured yet. Set one in Settings, then enable logging on a site block to start writing one.
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

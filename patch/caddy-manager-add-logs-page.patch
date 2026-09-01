@@ -1,0 +1,292 @@
+From d7c97dc2bb2a30c9b2d465b782527f523091962b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 08:57:33 +0000
+Subject: [PATCH] Add a Logs page listing log files from the configured logs
+ directory
+
+New /logs route (wired to the nav bar's existing 'Logs' item, previously
+a placeholder), using the same data-table search/page-size/pagination
+UI as Site Blocks -- no filter dropdown, since there's nothing to
+filter by yet.
+
+Rotated log files (Caddy's roll_size/roll_keep/roll_keep_for backups,
+named <prefix>-<timestamp>-<reason><ext>, optionally .gz/.zst
+compressed) are grouped back under the live log they rolled from, so
+each row is one logical log stream rather than one file. A row shows
+the live filename, a +N badge when N-1 rotated backups exist alongside
+it, and the most recent mtime across the whole group as 'Updated'. A
+disabled 'View' button is in place for now, per the request that
+viewing a log's contents is a follow-up.
+
+New caddy_manager/logs.py holds the grouping logic (logical_log_name +
+list_log_files), kept separate from blocks.py since it scans the logs
+directory directly rather than cross-referencing block metadata --
+every file in logs_dir is listed, whether or not it was written by a
+block this app manages.
+
+Verified: unit checks on logical_log_name covering uncompressed/gzip/
+zstd rotated names, a custom rotation reason tag, and a base filename
+that itself contains dashes (to rule out false positives); a Flask
+test-client check of grouping counts/timestamps and full-page rendering
+(badge, search/page-size/pagination present, no filter dropdown,
+disabled View button, nav link wired and marked active); confirmed
+every other page still renders with the updated nav.html. Full prior
+regression suite (logging, rotation, disable toggle) still passes.
+pyflakes clean.
+---
+ caddy_manager/logs.py  |  69 ++++++++++++++++++++++++
+ caddy_manager/views.py |  12 +++++
+ templates/logs.html    | 119 +++++++++++++++++++++++++++++++++++++++++
+ templates/nav.html     |   4 +-
+ 4 files changed, 202 insertions(+), 2 deletions(-)
+ create mode 100644 caddy_manager/logs.py
+ create mode 100644 templates/logs.html
+
+diff --git a/caddy_manager/logs.py b/caddy_manager/logs.py
+new file mode 100644
+index 0000000..999e44b
+--- /dev/null
++++ b/caddy_manager/logs.py
+@@ -0,0 +1,69 @@
++"""Logs page: scanning the configured logs directory for log files,
++grouping Caddy's rotated/rolled backups (created via the roll_size /
++roll_keep / roll_keep_for options on the log directive -- see
++blocks.py's render_log_block) back under the live log file they rolled
++from.
++
++Caddy's file writer (backed by the timberjack library) names a rotated
++backup `<prefix>-<timestamp>-<reason><ext>`, e.g.
++"app-2024-01-02T15-04-05.123-size.log" rolled from "app.log", gaining a
++further .gz/.zst suffix if compressed. ROTATED_SUFFIX_RE recognizes
++that shape well enough to fold a backup back under its logical
++`<prefix><ext>` name. This module doesn't cross-reference blocks.py's
++metadata at all -- it just reports whatever files actually exist in the
++logs directory, whether or not they were written by a block this app
++manages.
++"""
++import os
++import re
++from datetime import datetime
++
++from .configstore import get_log_dir
++
++ROTATED_SUFFIX_RE = re.compile(
++    r"^(?P<prefix>.+)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}-[A-Za-z0-9_]+"
++    r"(?P<ext>\.[A-Za-z0-9]+)(?:\.gz|\.zst)?$"
++)
++
++
++def logical_log_name(filename):
++    """The live log filename a given file belongs to -- itself, unless
++    it matches Caddy's rotated-backup naming pattern, in which case
++    it's the prefix + original extension that pattern rolled from."""
++    match = ROTATED_SUFFIX_RE.match(filename)
++    if not match:
++        return filename
++    return match.group("prefix") + match.group("ext")
++
++
++def list_log_files():
++    """Every file in the configured logs directory, grouped by
++    logical_log_name() into one row per logical log stream -- each
++    carrying how many physical files (the live file plus any rotated
++    backups) belong to it, and the most recent mtime among them.
++    Returns [] if no logs directory is configured or it doesn't exist
++    yet. Dotfiles are skipped; everything else is treated as a log
++    file, since this directory is expected to hold only those."""
++    log_dir = get_log_dir()
++    if not log_dir or not os.path.isdir(log_dir):
++        return []
++
++    groups = {}
++    with os.scandir(log_dir) as entries:
++        for entry in entries:
++            if entry.name.startswith(".") or not entry.is_file():
++                continue
++            try:
++                mtime = entry.stat().st_mtime
++            except OSError:
++                continue
++            name = logical_log_name(entry.name)
++            group = groups.setdefault(name, {"filename": name, "count": 0, "updated_ts": 0.0})
++            group["count"] += 1
++            group["updated_ts"] = max(group["updated_ts"], mtime)
++
++    logs = list(groups.values())
++    for log in logs:
++        log["updated"] = datetime.fromtimestamp(log["updated_ts"]).strftime("%d/%m/%Y %I:%M%p")
++    logs.sort(key=lambda entry: entry["filename"].lower())
++    return logs
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index ea2c694..69a277f 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -12,6 +12,7 @@ from .blocks import (
+     unique_filename, rename_block_if_first_site_address_changed, build_block_from_form,
+     delete_log_file, rename_log_file, log_path_for, set_block_disabled,
+ )
++from .logs import list_log_files
+ 
+ bp = Blueprint("main", __name__)
+ 
+@@ -43,6 +44,17 @@ def site_blocks():
+     )
+ 
+ 
++@bp.route("/logs")
++@login_required
++def logs():
++    log_dir = get_log_dir()
++    dir_exists = bool(log_dir) and os.path.isdir(log_dir)
++    logs = list_log_files() if dir_exists else []
++    return render_template(
++        "logs.html", logs=logs, log_dir=log_dir, dir_exists=dir_exists
++    )
++
++
+ @bp.route("/new/<block_type>", methods=["GET", "POST"])
+ @login_required
+ def new_block(block_type):
+diff --git a/templates/logs.html b/templates/logs.html
+new file mode 100644
+index 0000000..813f44b
+--- /dev/null
++++ b/templates/logs.html
+@@ -0,0 +1,119 @@
++{% extends "base.html" %}
++
++{% block title %}Logs - Caddy Manager{% endblock %}
++{% block page_pretitle %}Caddy{% endblock %}
++{% block page_title %}Logs{% endblock %}
++
++{% block header_actions %}
++{% endblock %}
++
++<!---->
++
++{% block content %}
++
++{% if not dir_exists %}
++  <div class="alert alert-danger">The logs directory doesn't exist yet. It's created automatically the first time a site block has logging enabled.</div>
++{% endif %}
++
++<div class="card">
++  {% if logs %}
++  <!-- BEGIN SEARCH / PAGE-SIZE BAR -->
++  <div class="card-header">
++    <div class="row w-full g-2">
++      <div class="col col-4">
++        <div class="input-group input-group-flat w-auto">
++            <span class="input-group-text">
++              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
++                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-1">
++                <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
++                <path d="M21 21l-6 -6"></path>
++              </svg>
++            </span>
++            <input id="logs-search" type="text" class="form-control" autocomplete="off" placeholder="Search…">
++          </div>
++      </div>
++      <div class="ms-auto col-auto">
++        <select id="logs-page-size" class="form-select">
++          <option value="10" selected>10</option>
++          <option value="20">20</option>
++          <option value="50">50</option>
++          <option value="100">100</option>
++        </select>
++      </div>
++    </div>
++  </div>
++  <!-- END SEARCH / PAGE-SIZE BAR -->
++
++  <!-- BEGIN LOGS TABLE LIST -->
++  <div class="table-responsive" style="min-height: 24rem;">
++    <table class="table card-table table-vcenter" id="logs-table"
++           data-datatable
++           data-dt-search="#logs-search"
++           data-dt-page-size="#logs-page-size"
++           data-dt-page-size-default="10"
++           data-dt-summary="#logs-page-summary"
++           data-dt-pagination="#logs-pagination"
++           data-dt-default-sort="filename"
++           data-dt-default-sort-dir="asc"
++           data-dt-storage-key="logs-table">
++      <thead>
++        <tr>
++          <th>
++            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="filename" data-sort-type="text">
++              Filename
++            </button>
++          </th>
++          <th>
++            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="updated" data-sort-type="number">
++              Updated
++            </button>
++          </th>
++          <th class="w-1"></th>
++        </tr>
++      </thead>
++      <tbody>
++      {% for log in logs %}
++        <tr data-filename="{{ log.filename | lower }}" data-updated="{{ log.updated_ts }}">
++          <!-- BEGIN FILENAME CELL -->
++          <td>
++            <span class="font-monospace">{{ log.filename }}</span>
++            {% if log.count > 1 %}
++              <span class="badge bg-lt" title="{{ log.count }} log files, including rotated backups">+{{ log.count - 1 }}</span>
++            {% endif %}
++          </td>
++          <!-- END FILENAME CELL -->
++          <td>{{ log.updated }}</td>
++          <td>
++            <button type="button" class="btn btn-sm" disabled title="Coming soon">
++              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icons-tabler-outline icon-tabler-eye">
++                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
++                <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
++              </svg>
++              View
++            </button>
++          </td>
++        </tr>
++      {% endfor %}
++      </tbody>
++    </table>
++  </div>
++  <!-- END LOGS TABLE LIST -->
++
++  <!-- BEGIN PAGINATION BAR -->
++  <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
++    <p class="m-0 text-secondary" id="logs-page-summary"></p>
++    <ul class="pagination m-0" id="logs-pagination"></ul>
++  </div>
++  <!-- END PAGINATION BAR -->
++  {% else %}
++  <div class="card-body text-secondary">
++    {% if dir_exists %}
++    No log files found in <code>{{ log_dir }}</code> yet. Enable logging on a site block to start writing one.
++    {% else %}
++    No logs directory configured yet. Set one in Settings, then enable logging on a site block to start writing one.
++    {% endif %}
++  </div>
++  {% endif %}
++</div>
++{% endblock %}
+diff --git a/templates/nav.html b/templates/nav.html
+index e4a160f..d6c5088 100644
+--- a/templates/nav.html
++++ b/templates/nav.html
+@@ -143,8 +143,8 @@
+             <span class="nav-link-title"> Certificates </span>
+             </a>
+         </li>
+-        <li class="nav-item">
+-            <a class="nav-link" href="#">
++        <li class="nav-item {{ 'active' if request.path == url_for('main.logs') else '' }}">
++            <a class="nav-link" href="{{ url_for('main.logs') }}">
+             <span class="nav-link-icon text-secondary">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+-- 
+2.43.0
+

@@ -12,6 +12,7 @@ from .blocks import (
     unique_filename, rename_block_if_first_site_address_changed, build_block_from_form,
     delete_log_file, rename_log_file, log_path_for, set_block_disabled,
 )
+from .logs import list_log_files
 
 bp = Blueprint("main", __name__)
 
@@ -40,6 +41,17 @@ def site_blocks():
     blocks = list_blocks() if dir_exists else []
     return render_template(
         "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists
+    )
+
+
+@bp.route("/logs")
+@login_required
+def logs():
+    log_dir = get_log_dir()
+    dir_exists = bool(log_dir) and os.path.isdir(log_dir)
+    logs = list_log_files() if dir_exists else []
+    return render_template(
+        "logs.html", logs=logs, log_dir=log_dir, dir_exists=dir_exists
     )
 
 
