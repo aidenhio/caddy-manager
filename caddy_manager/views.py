@@ -13,6 +13,7 @@ from .blocks import (
     delete_log_file, rename_log_file, log_path_for, set_block_disabled,
 )
 from .logs import list_log_files
+from .certs import certificates_root, list_certificates
 
 bp = Blueprint("main", __name__)
 
@@ -52,6 +53,17 @@ def logs():
     logs = list_log_files() if dir_exists else []
     return render_template(
         "logs.html", logs=logs, log_dir=log_dir, dir_exists=dir_exists
+    )
+
+
+@bp.route("/certificates")
+@login_required
+def certificates():
+    certs_root = certificates_root()
+    dir_exists = bool(certs_root) and os.path.isdir(certs_root)
+    certs = list_certificates() if dir_exists else []
+    return render_template(
+        "certificates.html", certs=certs, certificate_dir=certs_root, dir_exists=dir_exists
     )
 
 
