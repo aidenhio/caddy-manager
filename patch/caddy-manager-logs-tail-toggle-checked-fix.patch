@@ -1,0 +1,63 @@
+From a0956bd38e657cdd45f30bdf06f402b5513986e9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 4 Sep 2026 10:15:09 +0000
+Subject: [PATCH] Remove leftover duplicate view-toggle markup left in the
+ modal body
+
+Moving the Formatted/Raw toggle into the modal footer left a second,
+hidden copy of the same block behind in the modal body, so the page
+had two elements sharing id="log-view-formatted" / id="log-view-raw"
+and data-field="view-toggle" / "view-formatted-btn" / "view-raw-btn".
+
+Duplicate ids are invalid HTML, and the browser resolves id lookups
+(getElementById, querySelector('#id'), and a <label for="..."> click
+target) to the first match in the document -- the leftover body copy,
+not the visible footer one. Both pairs shared name="log-view-mode", so
+setting .checked on the (hidden) body input via script correctly
+toggled the underlying view, but as a side effect of native radio
+mutual-exclusivity it also unchecked the footer's own radios, leaving
+neither footer label matched by the .btn-check:checked + .btn CSS rule
+-- hence "the buttons toggle the view but never show as checked".
+
+Deleting the body's duplicate leaves one radio/label pair per id, so
+the footer's own input is what gets checked and its adjacent label
+lights up as expected.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ templates/partials/log_tail_modal.html | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
+
+diff --git a/templates/partials/log_tail_modal.html b/templates/partials/log_tail_modal.html
+index 4b92089..8e859e1 100644
+--- a/templates/partials/log_tail_modal.html
++++ b/templates/partials/log_tail_modal.html
+@@ -13,15 +13,6 @@
+         <div data-field="loading" class="text-secondary">Loading…</div>
+         <div data-field="error" class="alert alert-danger" hidden></div>
+ 
+-        <!-- BEGIN JSON VIEW TOGGLE -->
+-        <div class="btn-group btn-group-sm mb-2" role="group" aria-label="View" data-field="view-toggle" hidden>
+-          <input type="radio" class="btn-check" name="log-view-mode" id="log-view-formatted" autocomplete="off" checked>
+-          <label for="log-view-formatted" class="btn btn-outline-secondary" data-field="view-formatted-btn">Formatted</label>
+-          <input type="radio" class="btn-check" name="log-view-mode" id="log-view-raw" autocomplete="off">
+-          <label for="log-view-raw" class="btn btn-outline-secondary" data-field="view-raw-btn">Raw</label>
+-        </div>
+-        <!-- END JSON VIEW TOGGLE -->
+-
+         <!-- BEGIN JSON ENTRIES VIEW -->
+         <div data-field="entries" class="border rounded" style="max-height: 60vh; overflow-y: auto;" hidden></div>
+         <!-- END JSON ENTRIES VIEW -->
+@@ -34,7 +25,7 @@
+         
+ 
+         <!-- BEGIN JSON VIEW TOGGLE -->
+-        <div class="btn-group me-auto" role="group" aria-label="View" data-field="view-toggle">
++        <div class="btn-group me-auto" role="group" aria-label="View" data-field="view-toggle" hidden>
+           <input type="radio" class="btn-check" name="log-view-mode" id="log-view-formatted" autocomplete="off" checked>
+           <label for="log-view-formatted" class="btn" data-field="view-formatted-btn">Formatted</label>
+ 
+-- 
+2.43.0
+

@@ -13,15 +13,6 @@
         <div data-field="loading" class="text-secondary">Loading…</div>
         <div data-field="error" class="alert alert-danger" hidden></div>
 
-        <!-- BEGIN JSON VIEW TOGGLE -->
-        <div class="btn-group btn-group-sm mb-2" role="group" aria-label="View" data-field="view-toggle" hidden>
-          <input type="radio" class="btn-check" name="log-view-mode" id="log-view-formatted" autocomplete="off" checked>
-          <label for="log-view-formatted" class="btn btn-outline-secondary" data-field="view-formatted-btn">Formatted</label>
-          <input type="radio" class="btn-check" name="log-view-mode" id="log-view-raw" autocomplete="off">
-          <label for="log-view-raw" class="btn btn-outline-secondary" data-field="view-raw-btn">Raw</label>
-        </div>
-        <!-- END JSON VIEW TOGGLE -->
-
         <!-- BEGIN JSON ENTRIES VIEW -->
         <div data-field="entries" class="border rounded" style="max-height: 60vh; overflow-y: auto;" hidden></div>
         <!-- END JSON ENTRIES VIEW -->
@@ -31,21 +22,15 @@
       <!-- END MODAL BODY -->
       <!-- BEGIN MODAL FOOTER -->
       <div class="modal-footer">
-        
-
         <!-- BEGIN JSON VIEW TOGGLE -->
-        <div class="btn-group me-auto" role="group" aria-label="View" data-field="view-toggle">
+        <div class="btn-group me-auto" role="group" aria-label="View" data-field="view-toggle" hidden>
           <input type="radio" class="btn-check" name="log-view-mode" id="log-view-formatted" autocomplete="off" checked>
           <label for="log-view-formatted" class="btn" data-field="view-formatted-btn">Formatted</label>
-
           <input type="radio" class="btn-check" name="log-view-mode" id="log-view-raw" autocomplete="off">
           <label for="log-view-raw" class="btn" data-field="view-raw-btn">Raw</label>
         </div>
         <!-- END JSON VIEW TOGGLE -->
-
         <span class="text-secondary" data-field="summary"></span>
-
-        <!--<button type="button" class="btn" data-bs-dismiss="modal">Close</button>-->
       </div>
       <!-- END MODAL FOOTER -->
     </div>

@@ -23,10 +23,10 @@
   });
 
   const LEVEL_BADGE_CLASS = {
-    debug: 'bg-secondary-lt',
-    info: 'bg-blue-lt',
-    warn: 'bg-orange-lt',
-    warning: 'bg-orange-lt',
+    debug: 'bg-blue-lt',
+    info: 'bg-green-lt',
+    warn: 'bg-yellow-lt',
+    warning: 'bg-yellow-lt',
     error: 'bg-red-lt',
     dpanic: 'bg-red-lt',
     panic: 'bg-red-lt',
@@ -175,7 +175,7 @@
         </div>
         <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#${ACCORDION_ID}">
           <div class="accordion-body">
-            <pre class="font-monospace small mb-0" style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(raw)}</pre>
+            <pre class="font-monospace mb-0" style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(raw)}</pre>
           </div>
         </div>
       </div>`;
@@ -226,7 +226,7 @@
           fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n\n') : '(empty file)';
         }
         if (fieldEls.summary) {
-          fieldEls.summary.textContent = `Showing the last ${data.lines.length} line${data.lines.length === 1 ? '' : 's'} (configured tail length: ${data.tail_lines})`;
+          fieldEls.summary.textContent = `Showing the last ${data.lines.length} line${data.lines.length === 1 ? '' : 's'}`;
         }
 
         const jsonEntries = parseJsonEntries(data.lines);
