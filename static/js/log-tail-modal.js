@@ -132,7 +132,11 @@
   // accordion-button-toggle class inside .accordion-button -- its CSS
   // rotates that icon on expand -- rather than relying on Bootstrap's
   // bare ::after chevron.
-  const ACCORDION_TOGGLE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" ' +
+  // flex-shrink-0 keeps the chevron at its natural size -- without it,
+  // it's just another flex item competing for space the same as the
+  // (much less important) summary text, and shrinks/squishes right
+  // along with it once the row runs out of room.
+  const ACCORDION_TOGGLE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle flex-shrink-0" ' +
     'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 9l6 6l6 -6" /></svg>';
 
@@ -144,23 +148,29 @@
   function buildEntryItem(obj, idx) {
     const headingId = `log-json-heading-${idx}`;
     const collapseId = `log-json-collapse-${idx}`;
+    // Every one of these is fixed-content -- flex-shrink-0 pins them at
+    // their natural size, so the summary span (the only item without it)
+    // is the sole thing that gives up width when a row is too long,
+    // rather than the browser's default flex-shrink:1 spreading the
+    // squeeze evenly across the badges, time, status, duration, size and
+    // chevron too.
     const badges = [];
     if (obj.level !== undefined) {
-      badges.push(`<span class="badge ${levelBadgeClass(obj.level)} text-uppercase" style="min-width: 3.75rem;">${escapeHtml(obj.level)}</span>`);
+      badges.push(`<span class="badge ${levelBadgeClass(obj.level)} text-uppercase flex-shrink-0" style="min-width: 3.75rem;">${escapeHtml(obj.level)}</span>`);
     }
     const time = formatTime(obj.ts);
 
     let statusHtml = '';
     if (typeof obj.status === 'number') {
-      statusHtml = `<span class="badge ${statusBadgeClass(obj.status)}">${obj.status}</span>`;
+      statusHtml = `<span class="badge ${statusBadgeClass(obj.status)} flex-shrink-0">${obj.status}</span>`;
     }
     let durationHtml = '';
     if (typeof obj.duration === 'number') {
-      durationHtml = `<span class="text-secondary text-nowrap">${formatDuration(obj.duration)}</span>`;
+      durationHtml = `<span class="text-secondary text-nowrap flex-shrink-0">${formatDuration(obj.duration)}</span>`;
     }
     let sizeHtml = '';
     if (typeof obj.size === 'number') {
-      sizeHtml = `<span class="text-secondary text-nowrap d-none d-md-inline">${formatSize(obj.size)}</span>`;
+      sizeHtml = `<span class="text-secondary text-nowrap flex-shrink-0 d-none d-md-inline">${formatSize(obj.size)}</span>`;
     }
 
     let raw = '';
@@ -175,10 +185,10 @@
         <div class="accordion-header" id="${headingId}">
           <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
               data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-            <div class="d-flex align-items-center gap-2 flex-fill small overflow-hidden">
+            <div class="d-flex align-items-center gap-2 flex-fill small overflow-hidden" style="min-width: 0;">
               ${badges.join('')}
-              <span class="font-monospace text-secondary text-nowrap">${time}</span>
-              <span class="flex-fill text-truncate">${buildSummary(obj)}</span>
+              <span class="font-monospace text-secondary text-nowrap flex-shrink-0">${time}</span>
+              <span class="flex-fill text-truncate" style="min-width: 0;">${buildSummary(obj)}</span>
               ${statusHtml}
               ${durationHtml}
               ${sizeHtml}
