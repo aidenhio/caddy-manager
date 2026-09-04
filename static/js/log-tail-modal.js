@@ -249,7 +249,7 @@
           fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n\n') : '(empty file)';
         }
         if (fieldEls.summary) {
-          fieldEls.summary.textContent = `Showing the last ${data.lines.length} line${data.lines.length === 1 ? '' : 's'}`;
+          fieldEls.summary.textContent = `Showing the last ${data.lines.length} log line${data.lines.length === 1 ? '' : 's'}`;
         }
 
         const jsonEntries = parseJsonEntries(data.lines);

@@ -19,8 +19,6 @@
   <div class="alert alert-danger">The logs directory doesn't exist yet. It's created automatically the first time a site block has logging enabled.</div>
 {% endif %}
 
-<p class="text-secondary">"More" shows the last <strong>{{ tail_lines }} lines</strong> of a log's active file -- change this in <a href="{{ url_for('main.settings') }}#logging">Settings</a>.</p>
-
 <div class="card">
   {% if logs %}
   <!-- BEGIN SEARCH / PAGE-SIZE BAR -->

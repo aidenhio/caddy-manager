@@ -19,8 +19,6 @@
   <div class="alert alert-danger">The certificates directory doesn't exist yet. Caddy creates it the first time it obtains a certificate.</div>
 {% endif %}
 
-<p class="text-secondary">Certificates within <strong>{{ expiring_soon_days }} days</strong> of expiry are flagged below -- change this in <a href="{{ url_for('main.settings') }}#certificates">Settings</a>.</p>
-
 <div class="card">
   {% if certs %}
   <!-- BEGIN SEARCH BAR -->
