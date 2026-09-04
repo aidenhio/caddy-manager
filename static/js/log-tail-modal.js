@@ -22,15 +22,20 @@
     fieldEls[el.dataset.field] = el;
   });
 
-  const LEVEL_BADGE_CLASS = {
-    debug: 'bg-blue-lt',
-    info: 'bg-green-lt',
-    warn: 'bg-yellow-lt',
-    warning: 'bg-yellow-lt',
-    error: 'bg-red-lt',
-    dpanic: 'bg-red-lt',
-    panic: 'bg-red-lt',
-    fatal: 'bg-red-lt',
+  // Single source of truth for "which Tabler color represents this log
+  // level" -- both the level badge (bg-<color>-lt) and the raw-JSON code
+  // block's background (code-<color>-lt, the same convention preview.html
+  // uses for its Caddyfile/metadata <pre> blocks) are derived from this,
+  // so they can never drift apart.
+  const LEVEL_COLORS = {
+    debug: 'blue',
+    info: 'green',
+    warn: 'yellow',
+    warning: 'yellow',
+    error: 'red',
+    dpanic: 'red',
+    panic: 'red',
+    fatal: 'red',
   };
 
   function escapeHtml(str) {
@@ -39,8 +44,16 @@
     }[c]));
   }
 
+  function levelColor(level) {
+    return LEVEL_COLORS[String(level || '').toLowerCase()] || 'secondary';
+  }
+
   function levelBadgeClass(level) {
-    return LEVEL_BADGE_CLASS[String(level || '').toLowerCase()] || 'bg-secondary-lt';
+    return `bg-${levelColor(level)}-lt`;
+  }
+
+  function levelCodeClass(level) {
+    return `code-${levelColor(level)}-lt`;
   }
 
   function statusBadgeClass(status) {
@@ -175,7 +188,7 @@
         </div>
         <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#${ACCORDION_ID}">
           <div class="accordion-body">
-            <pre class="font-monospace mb-0" style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(raw)}</pre>
+            <pre class="${levelCodeClass(obj.level)} font-monospace p-2 mb-0" style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(raw)}</pre>
           </div>
         </div>
       </div>`;
