@@ -59,8 +59,13 @@
       <thead>
         <tr>
           <th>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="status" data-sort-type="text">
+              Status
+            </button>
+          </th>
+          <th>
             <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="cn" data-sort-type="text">
-              CN
+              Common Name
             </button>
           </th>
           <th>
@@ -79,7 +84,42 @@
       <tbody>
       {% for cert in certs %}
         <tr data-cn="{{ cert.cn | lower }}" data-provider="{{ cert.provider | lower }}" data-expiry="{{ cert.expiry_ts }}">
-          <td><span class="font-monospace">{{ cert.cn }}</span></td>
+          <td>
+            {% if cert.expired %}
+              <span class="text-danger">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-xbox-x">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M12 21a9 9 0 0 0 9 -9a9 9 0 0 0 -9 -9a9 9 0 0 0 -9 9a9 9 0 0 0 9 9" />
+                  <path d="M9 8l6 8" />
+                  <path d="M15 8l-6 8" />
+                </svg>
+              </span>
+              <span class="badge bg-danger-lt">Expired</span>
+            {% elif cert.expiring_soon %}
+              <span class="text-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-exclamation-circle">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                  <path d="M12 9v4" />
+                  <path d="M12 16v.01" />
+                </svg>
+              </span>
+              <span class="badge bg-yellow-lt">0 days</span>
+            {% else %}
+              <span class="text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-circle-check">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                  <path d="M9 12l2 2l4 -4" />
+                </svg>
+              </span>
+              <span class="badge bg-success-lt">0 days</span>
+            {% endif %}
+          </td>
+          <td>
+            {{ cert.cn }}
+            <span class="badge bg-lt font-monospace"> +0</span>
+          </td>
           <!-- BEGIN PROVIDER CELL -->
           <td>
             {% if cert.provider.startswith('Local') %}
@@ -95,10 +135,9 @@
               </span>
             {% elif cert.provider.startswith("Let's Encrypt") %}
               <span class="badge bg-blue-lt">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-shield-check">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-shield">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" />
-                  <path d="M9 12l2 2l4 -4" />
                 </svg>
                 {{ cert.provider }}
               </span>
@@ -109,20 +148,22 @@
           <!-- END PROVIDER CELL -->
           <!-- BEGIN EXPIRY CELL -->
           <td>
-            <span class="badge {{ 'bg-danger-lt' if (cert.expired or cert.expiring_soon) else 'bg-green-lt' }}">
-              {{ cert.expiry }}{% if cert.expired %} &middot; Expired{% endif %}
-            </span>
+            {{ cert.expiry }}
           </td>
           <!-- END EXPIRY CELL -->
           <td>
-            <button type="button" class="btn btn-sm" disabled title="Coming soon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icons-tabler-outline icon-tabler-eye">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
-              </svg>
-              View
-            </button>
+            <div class="btn-list flex-nowrap">
+                <button class="btn btn-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="icon icon-tabler icons-tabler-outline icon-tabler-dots">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                    <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                    <path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                  </svg>
+                </button>
+            </div>
           </td>
         </tr>
       {% endfor %}
