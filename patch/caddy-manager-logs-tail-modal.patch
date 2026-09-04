@@ -1,0 +1,389 @@
+From ea1b7aba3212ff4ab662827649a8439a575f9c1f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 4 Sep 2026 07:35:40 +0000
+Subject: [PATCH] Add log tail modal to Logs page with configurable line count
+
+Wires the Logs page's "More" button to a shared modal showing the last
+N lines of a log's live (un-rotated) file, fetched fresh from a new
+/logs/<filename>/tail JSON endpoint on each open rather than baking
+content into the page at load time, since log files are large and
+change constantly. Tail reading walks the file backwards in 8KB chunks
+so it never loads the whole file into memory. The line count defaults
+to 50 and is configurable in Settings > Logging (log_tail_lines),
+capped at 2000 regardless of the configured value.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ caddy_manager/configstore.py           | 15 ++++++
+ caddy_manager/logs.py                  | 70 +++++++++++++++++++++++++-
+ caddy_manager/views.py                 | 28 +++++++++--
+ static/js/log-tail-modal.js            | 56 +++++++++++++++++++++
+ templates/logs.html                    | 14 +++++-
+ templates/partials/log_tail_modal.html | 27 ++++++++++
+ templates/settings.html                | 25 ++++++---
+ 7 files changed, 223 insertions(+), 12 deletions(-)
+ create mode 100644 static/js/log-tail-modal.js
+ create mode 100644 templates/partials/log_tail_modal.html
+
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index e5e6fce..a346919 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -105,3 +105,18 @@ def get_cert_expiring_soon_days():
+     except (TypeError, ValueError):
+         pass
+     return DEFAULT_CERT_EXPIRING_SOON_DAYS
++
++
++DEFAULT_LOG_TAIL_LINES = 50
++
++
++def get_log_tail_lines():
++    cfg = load_config()
++    value = cfg.get("log_tail_lines") if cfg else None
++    try:
++        lines = int(value)
++        if lines > 0:
++            return lines
++    except (TypeError, ValueError):
++        pass
++    return DEFAULT_LOG_TAIL_LINES
+diff --git a/caddy_manager/logs.py b/caddy_manager/logs.py
+index 999e44b..167aee6 100644
+--- a/caddy_manager/logs.py
++++ b/caddy_manager/logs.py
+@@ -18,13 +18,20 @@ import os
+ import re
+ from datetime import datetime
+ 
+-from .configstore import get_log_dir
++from .configstore import get_log_dir, get_log_tail_lines
+ 
+ ROTATED_SUFFIX_RE = re.compile(
+     r"^(?P<prefix>.+)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}-[A-Za-z0-9_]+"
+     r"(?P<ext>\.[A-Za-z0-9]+)(?:\.gz|\.zst)?$"
+ )
+ 
++# Guard against reading an absurd number of lines regardless of what's
++# configured in Settings (or hand-edited into config.json) -- the tail
++# read below still has to walk the file backwards in chunks, and there's
++# no reason for a "recent activity" modal to ever need more than this.
++MAX_TAIL_LINES = 2000
++TAIL_CHUNK_SIZE = 8192
++
+ 
+ def logical_log_name(filename):
+     """The live log filename a given file belongs to -- itself, unless
+@@ -67,3 +74,64 @@ def list_log_files():
+         log["updated"] = datetime.fromtimestamp(log["updated_ts"]).strftime("%d/%m/%Y %I:%M%p")
+     logs.sort(key=lambda entry: entry["filename"].lower())
+     return logs
++
++
++def _safe_log_dir_path(filename):
++    """Resolve filename inside the configured logs directory, preventing
++    path traversal. Returns None if no logs directory is configured, or
++    if filename would resolve outside it."""
++    log_dir = get_log_dir()
++    if not log_dir:
++        return None
++    base = os.path.abspath(log_dir)
++    target = os.path.abspath(os.path.join(base, filename))
++    if target != base and not target.startswith(base + os.sep):
++        return None
++    return target
++
++
++def _tail_lines(path, n):
++    """The last `n` lines of a (potentially large) text file, read
++    backwards in chunks rather than loading the whole file into memory
++    -- an access log can grow to many MB, and this runs fresh on every
++    "More" click rather than once at page load."""
++    with open(path, "rb") as f:
++        f.seek(0, os.SEEK_END)
++        remaining = f.tell()
++        data = b""
++        while remaining > 0 and data.count(b"\n") <= n:
++            read_size = min(TAIL_CHUNK_SIZE, remaining)
++            remaining -= read_size
++            f.seek(remaining)
++            data = f.read(read_size) + data
++        lines = data.splitlines()
++        if remaining > 0 and lines:
++            # The read window started mid-file, so its first entry is
++            # very likely a partial line (we cut in after some earlier,
++            # unread line's content) -- drop it rather than show a
++            # truncated line as if it were whole.
++            lines = lines[1:]
++    tail = lines[-n:] if len(lines) > n else lines
++    return [line.decode("utf-8", errors="replace") for line in tail]
++
++
++def read_log_tail(filename):
++    """(lines, error) for the live log file matching a Logs page row's
++    `filename` (i.e. logical_log_name() -- the un-rotated path Caddy is
++    actively appending to, since that's what "the latest log file"
++    means for a group that may also include rotated backups). `lines`
++    is [] and `error` a user-facing message whenever the file can't be
++    read; the number of lines returned is capped by Settings' configured
++    tail length (default 50), itself capped at MAX_TAIL_LINES."""
++    if not get_log_dir():
++        return [], "No logs directory is configured."
++    path = _safe_log_dir_path(filename)
++    if not path:
++        return [], "Invalid log filename."
++    if not os.path.isfile(path):
++        return [], f"No active log file found for {filename}."
++    n = min(get_log_tail_lines(), MAX_TAIL_LINES)
++    try:
++        return _tail_lines(path, n), None
++    except OSError as e:
++        return [], f"Could not read the log file: {e}"
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 3a3a4e8..102a5cf 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -1,18 +1,20 @@
+ import os
+ from datetime import datetime
+ 
+-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
++from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
+ from werkzeug.security import generate_password_hash, check_password_hash
+ 
+ from .auth import login_required
+-from .configstore import load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days
++from .configstore import (
++    load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
++)
+ from .caddyfile import slugify, extract_body, site_addresses_from_textarea
+ from .blocks import (
+     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
+     unique_filename, rename_block_if_first_site_address_changed, build_block_from_form,
+     delete_log_file, rename_log_file, log_path_for, set_block_disabled,
+ )
+-from .logs import list_log_files
++from .logs import list_log_files, read_log_tail
+ from .certs import certificates_root, list_certificates
+ 
+ bp = Blueprint("main", __name__)
+@@ -52,10 +54,18 @@ def logs():
+     dir_exists = bool(log_dir) and os.path.isdir(log_dir)
+     logs = list_log_files() if dir_exists else []
+     return render_template(
+-        "logs.html", logs=logs, log_dir=log_dir, dir_exists=dir_exists
++        "logs.html", logs=logs, log_dir=log_dir, dir_exists=dir_exists,
++        tail_lines=get_log_tail_lines(),
+     )
+ 
+ 
++@bp.route("/logs/<path:filename>/tail")
++@login_required
++def log_tail(filename):
++    lines, error = read_log_tail(filename)
++    return jsonify(filename=filename, lines=lines, error=error, tail_lines=get_log_tail_lines())
++
++
+ @bp.route("/certificates")
+ @login_required
+ def certificates():
+@@ -298,6 +308,16 @@ def settings():
+                     flash("Directories updated.", "success")
+                     return redirect(url_for("main.settings"))
+ 
++        elif action == "update_logging":
++            log_tail_lines = request.form.get("log_tail_lines", "").strip()
++            if not (log_tail_lines.isdigit() and int(log_tail_lines) > 0):
++                error = "Log tail length must be a positive whole number of lines."
++            else:
++                cfg["log_tail_lines"] = int(log_tail_lines)
++                save_config(cfg)
++                flash("Logging settings updated.", "success")
++                return redirect(url_for("main.settings"))
++
+         elif action == "update_certificates":
+             cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()
+             if not (cert_expiring_soon_days.isdigit() and int(cert_expiring_soon_days) > 0):
+diff --git a/static/js/log-tail-modal.js b/static/js/log-tail-modal.js
+new file mode 100644
+index 0000000..3ce21ea
+--- /dev/null
++++ b/static/js/log-tail-modal.js
+@@ -0,0 +1,56 @@
++// BEGIN LOG TAIL MODAL
++// Fills the shared #log-tail-modal from whichever row's "More" button
++// triggered it (same one-modal-many-triggers pattern as
++// certificate-detail-modal.js), fetching the tail fresh from the server
++// on every open rather than baking log content into the page up front --
++// log files can be large and change constantly, so a snapshot taken at
++// page load would already be stale by the time someone clicks "More".
++(function () {
++  const modal = document.getElementById('log-tail-modal');
++  if (!modal) return;
++
++  const fieldEls = {};
++  modal.querySelectorAll('[data-field]').forEach((el) => {
++    fieldEls[el.dataset.field] = el;
++  });
++
++  function showState(state) {
++    ['loading', 'error', 'lines'].forEach((key) => {
++      if (fieldEls[key]) fieldEls[key].hidden = key !== state;
++    });
++  }
++
++  modal.addEventListener('show.bs.modal', (event) => {
++    const button = event.relatedTarget;
++    if (!button) return;
++    const filename = button.dataset.logFilename || '';
++
++    if (fieldEls.filename) fieldEls.filename.textContent = filename;
++    if (fieldEls.summary) fieldEls.summary.textContent = '';
++    if (fieldEls.lines) fieldEls.lines.textContent = '';
++    if (fieldEls.error) fieldEls.error.textContent = '';
++    showState('loading');
++
++    fetch(`/logs/${encodeURIComponent(filename)}/tail`, { headers: { Accept: 'application/json' } })
++      .then((res) => res.json())
++      .then((data) => {
++        if (data.error) {
++          if (fieldEls.error) fieldEls.error.textContent = data.error;
++          showState('error');
++          return;
++        }
++        if (fieldEls.lines) {
++          fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n') : '(empty file)';
++        }
++        if (fieldEls.summary) {
++          fieldEls.summary.textContent = `Showing the last ${data.lines.length} line${data.lines.length === 1 ? '' : 's'} (configured tail length: ${data.tail_lines})`;
++        }
++        showState('lines');
++      })
++      .catch(() => {
++        if (fieldEls.error) fieldEls.error.textContent = 'Could not load the log file.';
++        showState('error');
++      });
++  });
++})();
++// END LOG TAIL MODAL
+diff --git a/templates/logs.html b/templates/logs.html
+index 1eb7851..b31f29d 100644
+--- a/templates/logs.html
++++ b/templates/logs.html
+@@ -7,6 +7,10 @@
+ {% block header_actions %}
+ {% endblock %}
+ 
++{% block page_modal %}
++{% include 'partials/log_tail_modal.html' %}
++{% endblock %}
++
+ <!---->
+ 
+ {% block content %}
+@@ -15,6 +19,8 @@
+   <div class="alert alert-danger">The logs directory doesn't exist yet. It's created automatically the first time a site block has logging enabled.</div>
+ {% endif %}
+ 
++<p class="text-secondary">"More" shows the last <strong>{{ tail_lines }} lines</strong> of a log's active file -- change this in <a href="{{ url_for('main.settings') }}#logging">Settings</a>.</p>
++
+ <div class="card">
+   {% if logs %}
+   <!-- BEGIN SEARCH / PAGE-SIZE BAR -->
+@@ -85,7 +91,9 @@
+           <td>{{ log.updated }}</td>
+           <td>
+             <div class="btn-list flex-nowrap">
+-                <button type="button" class="btn btn-icon" title="More">
++                <button type="button" class="btn btn-icon" title="More"
++                    data-bs-toggle="modal" data-bs-target="#log-tail-modal"
++                    data-log-filename="{{ log.filename }}">
+                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                     class="icon icon-tabler icons-tabler-outline icon-tabler-dots">
+@@ -121,3 +129,7 @@
+   {% endif %}
+ </div>
+ {% endblock %}
++
++{% block extra_scripts %}
++<script src="{{ url_for('static', filename='js/log-tail-modal.js') }}"></script>
++{% endblock %}
+diff --git a/templates/partials/log_tail_modal.html b/templates/partials/log_tail_modal.html
+new file mode 100644
+index 0000000..0a4e65e
+--- /dev/null
++++ b/templates/partials/log_tail_modal.html
+@@ -0,0 +1,27 @@
++<!-- BEGIN LOG TAIL MODAL -->
++<div class="modal modal-blur fade" id="log-tail-modal" tabindex="-1">
++  <div class="modal-dialog modal-xl modal-dialog-centered">
++    <div class="modal-content">
++      <!-- BEGIN MODAL HEADER -->
++      <div class="modal-header">
++        <h5 class="modal-title font-monospace" data-field="filename"></h5>
++        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
++      </div>
++      <!-- END MODAL HEADER -->
++      <!-- BEGIN MODAL BODY -->
++      <div class="modal-body">
++        <div data-field="loading" class="text-secondary">Loading…</div>
++        <div data-field="error" class="alert alert-danger" hidden></div>
++        <pre data-field="lines" class="bg-secondary-lt p-3 rounded font-monospace small mb-0" style="max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;" hidden></pre>
++      </div>
++      <!-- END MODAL BODY -->
++      <!-- BEGIN MODAL FOOTER -->
++      <div class="modal-footer">
++        <span class="text-secondary small me-auto" data-field="summary"></span>
++        <button type="button" class="btn" data-bs-dismiss="modal">Close</button>
++      </div>
++      <!-- END MODAL FOOTER -->
++    </div>
++  </div>
++</div>
++<!-- END LOG TAIL MODAL -->
+diff --git a/templates/settings.html b/templates/settings.html
+index 433e0ae..e98ea5a 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -157,17 +157,30 @@
+           </div>
+         </div>
+ 
+-        <!-- TAB 5: LOGGING --> 
++        <!-- TAB 5: LOGGING -->
+         <div id="logging" class="tab-pane">
+           <div class="card-body">
+             <h2 class="mb-4">Caddy Logging</h2>
+-            <h3 class="card-title">Log Level</h3>
++            <h3 class="card-title">Log Viewer</h3>
+             <p class="text-secondary">
+-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+-              alias aliquid
+-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+-              odit.
++              Controls how many lines the <a href="{{ url_for('main.logs') }}">Logs</a> page's "More" button shows from the end of a log file.
+             </p>
++            <form method="post" id="logging-form">
++              <input type="hidden" name="action" value="update_logging">
++              <div class="mb-0">
++                <label class="form-label">Log tail length <span class="form-hint d-inline">(lines)</span></label>
++                <input type="number" min="1" max="2000" step="1" name="log_tail_lines" class="form-control" style="max-width: 12rem"
++                       value="{{ cfg.log_tail_lines or 50 }}" required>
++                <div class="invalid-feedback">Must be a positive whole number of lines.</div>
++                <small class="form-hint">Read fresh from the file each time -- capped at 2000 lines regardless of this setting.</small>
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++            <script>
++              initFormValidation(document.getElementById('logging-form'));
++            </script>
+           </div>
+         </div>
+ 
+-- 
+2.43.0
+

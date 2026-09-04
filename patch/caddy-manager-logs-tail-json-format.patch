@@ -1,0 +1,261 @@
+From ea101748b5e93238c9361f14ebf5b8dd32ba5e2e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 4 Sep 2026 08:59:31 +0000
+Subject: [PATCH] Render JSON-formatted log tails as a readable, expandable
+ list
+
+When every line in a log's tail parses as a JSON object (Caddy's
+`format json` log directive), the modal now shows a structured view
+instead of a raw text blob: per line, a level badge, timestamp,
+request summary (method/host/uri) or message, and status/duration/size
+badges when present, each expandable to its full pretty-printed JSON.
+A Formatted/Raw toggle switches back to the plain-text tail. Detection
+is per-open and client-side (every non-blank line must parse as a JSON
+object, or it falls back to plain text), so console-format logs and
+anything else are unaffected.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ static/js/log-tail-modal.js            | 172 ++++++++++++++++++++++++-
+ templates/partials/log_tail_modal.html |  14 ++
+ 2 files changed, 184 insertions(+), 2 deletions(-)
+
+diff --git a/static/js/log-tail-modal.js b/static/js/log-tail-modal.js
+index 3ce21ea..6958b85 100644
+--- a/static/js/log-tail-modal.js
++++ b/static/js/log-tail-modal.js
+@@ -5,6 +5,14 @@
+ // on every open rather than baking log content into the page up front --
+ // log files can be large and change constantly, so a snapshot taken at
+ // page load would already be stale by the time someone clicks "More".
++//
++// When every returned line parses as a JSON object -- i.e. the block is
++// using Caddy's `format json` log directive, one JSON object per line --
++// the tail is also rendered as a readable list (time, level, request/msg
++// summary, status, duration), each entry expandable to its raw JSON,
++// with a Formatted/Raw toggle to fall back to the plain-text view. When
++// the lines aren't uniformly JSON (console format, or anything else),
++// only the plain-text view is offered, same as before.
+ (function () {
+   const modal = document.getElementById('log-tail-modal');
+   if (!modal) return;
+@@ -14,12 +22,161 @@
+     fieldEls[el.dataset.field] = el;
+   });
+ 
++  const LEVEL_BADGE_CLASS = {
++    debug: 'bg-secondary-lt',
++    info: 'bg-blue-lt',
++    warn: 'bg-orange-lt',
++    warning: 'bg-orange-lt',
++    error: 'bg-red-lt',
++    dpanic: 'bg-red-lt',
++    panic: 'bg-red-lt',
++    fatal: 'bg-red-lt',
++  };
++
++  const CHEVRON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" ' +
++    'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
++    'class="icon icon-tabler icons-tabler-outline icon-tabler-chevron-down">' +
++    '<path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 9l6 6l6 -6" /></svg>';
++
++  function escapeHtml(str) {
++    return String(str).replace(/[&<>"']/g, (c) => ({
++      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
++    }[c]));
++  }
++
++  function levelBadgeClass(level) {
++    return LEVEL_BADGE_CLASS[String(level || '').toLowerCase()] || 'bg-secondary-lt';
++  }
++
++  function statusBadgeClass(status) {
++    if (status < 300) return 'bg-green-lt';
++    if (status < 400) return 'bg-azure-lt';
++    if (status < 500) return 'bg-orange-lt';
++    return 'bg-red-lt';
++  }
++
++  function formatTime(ts) {
++    if (typeof ts !== 'number') return '';
++    const d = new Date(ts * 1000);
++    if (isNaN(d.getTime())) return '';
++    const pad = (n, len) => String(n).padStart(len || 2, '0');
++    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
++  }
++
++  function formatDuration(seconds) {
++    if (typeof seconds !== 'number') return '';
++    if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
++    return `${seconds.toFixed(2)}s`;
++  }
++
++  function formatSize(bytes) {
++    if (typeof bytes !== 'number') return '';
++    if (bytes < 1024) return `${bytes} B`;
++    return `${(bytes / 1024).toFixed(1)} KB`;
++  }
++
++  // Every non-blank line must parse as a JSON object (not an array or
++  // scalar) for the tail to be treated as JSON-formatted -- Caddy's log
++  // format is uniform for a given file, so a single non-JSON line means
++  // this isn't NDJSON and the whole tail falls back to plain text.
++  function parseJsonEntries(lines) {
++    const entries = [];
++    for (const line of lines) {
++      const trimmed = line.trim();
++      if (!trimmed) continue;
++      let obj;
++      try {
++        obj = JSON.parse(trimmed);
++      } catch (e) {
++        return null;
++      }
++      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
++      entries.push(obj);
++    }
++    return entries.length ? entries : null;
++  }
++
++  function buildSummary(obj) {
++    const req = obj.request;
++    if (req && typeof req === 'object' && (req.method || req.uri)) {
++      const method = req.method ? escapeHtml(req.method) : '';
++      const hostUri = escapeHtml(`${req.host || ''}${req.uri || ''}`);
++      return `<span class="fw-medium">${method}</span> <span class="font-monospace">${hostUri}</span>`;
++    }
++    if (typeof obj.msg === 'string' && obj.msg) {
++      return escapeHtml(obj.msg);
++    }
++    let preview = '';
++    try {
++      preview = JSON.stringify(obj);
++    } catch (e) {
++      preview = '';
++    }
++    if (preview.length > 140) preview = `${preview.slice(0, 140)}…`;
++    return `<span class="font-monospace text-secondary">${escapeHtml(preview)}</span>`;
++  }
++
++  function buildEntryRow(obj, idx) {
++    const rowId = `log-json-raw-${idx}`;
++    const badges = [];
++    if (obj.level !== undefined) {
++      badges.push(`<span class="badge ${levelBadgeClass(obj.level)} text-uppercase" style="min-width: 3.75rem;">${escapeHtml(obj.level)}</span>`);
++    }
++    const time = formatTime(obj.ts);
++
++    let statusHtml = '';
++    if (typeof obj.status === 'number') {
++      statusHtml = `<span class="badge ${statusBadgeClass(obj.status)}">${obj.status}</span>`;
++    }
++    let durationHtml = '';
++    if (typeof obj.duration === 'number') {
++      durationHtml = `<span class="text-secondary text-nowrap">${formatDuration(obj.duration)}</span>`;
++    }
++    let sizeHtml = '';
++    if (typeof obj.size === 'number') {
++      sizeHtml = `<span class="text-secondary text-nowrap d-none d-md-inline">${formatSize(obj.size)}</span>`;
++    }
++
++    let raw = '';
++    try {
++      raw = JSON.stringify(obj, null, 2);
++    } catch (e) {
++      raw = String(obj);
++    }
++
++    return `
++      <div class="d-flex align-items-center gap-2 px-2 py-2 border-bottom small">
++        ${badges.join('')}
++        <span class="font-monospace text-secondary text-nowrap">${time}</span>
++        <span class="flex-fill text-truncate">${buildSummary(obj)}</span>
++        ${statusHtml}
++        ${durationHtml}
++        ${sizeHtml}
++        <button type="button" class="btn btn-icon btn-sm" data-bs-toggle="collapse" data-bs-target="#${rowId}"
++            aria-expanded="false" title="Show raw JSON">
++          ${CHEVRON_SVG}
++        </button>
++      </div>
++      <div class="collapse" id="${rowId}">
++        <pre class="bg-secondary-lt p-2 m-2 rounded font-monospace small mb-0" style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(raw)}</pre>
++      </div>`;
++  }
++
++  function buildEntriesHtml(entries) {
++    return entries.map((obj, idx) => buildEntryRow(obj, idx)).join('');
++  }
++
+   function showState(state) {
+-    ['loading', 'error', 'lines'].forEach((key) => {
++    ['loading', 'error', 'entries', 'lines'].forEach((key) => {
+       if (fieldEls[key]) fieldEls[key].hidden = key !== state;
+     });
+   }
+ 
++  const formattedRadio = modal.querySelector('#log-view-formatted');
++  const rawRadio = modal.querySelector('#log-view-raw');
++  if (formattedRadio) formattedRadio.addEventListener('change', () => { if (formattedRadio.checked) showState('entries'); });
++  if (rawRadio) rawRadio.addEventListener('change', () => { if (rawRadio.checked) showState('lines'); });
++
+   modal.addEventListener('show.bs.modal', (event) => {
+     const button = event.relatedTarget;
+     if (!button) return;
+@@ -28,7 +185,10 @@
+     if (fieldEls.filename) fieldEls.filename.textContent = filename;
+     if (fieldEls.summary) fieldEls.summary.textContent = '';
+     if (fieldEls.lines) fieldEls.lines.textContent = '';
++    if (fieldEls.entries) fieldEls.entries.innerHTML = '';
+     if (fieldEls.error) fieldEls.error.textContent = '';
++    if (fieldEls['view-toggle']) fieldEls['view-toggle'].hidden = true;
++    if (formattedRadio) formattedRadio.checked = true;
+     showState('loading');
+ 
+     fetch(`/logs/${encodeURIComponent(filename)}/tail`, { headers: { Accept: 'application/json' } })
+@@ -45,7 +205,15 @@
+         if (fieldEls.summary) {
+           fieldEls.summary.textContent = `Showing the last ${data.lines.length} line${data.lines.length === 1 ? '' : 's'} (configured tail length: ${data.tail_lines})`;
+         }
+-        showState('lines');
++
++        const jsonEntries = parseJsonEntries(data.lines);
++        if (jsonEntries && fieldEls.entries) {
++          fieldEls.entries.innerHTML = buildEntriesHtml(jsonEntries);
++          if (fieldEls['view-toggle']) fieldEls['view-toggle'].hidden = false;
++          showState('entries');
++        } else {
++          showState('lines');
++        }
+       })
+       .catch(() => {
+         if (fieldEls.error) fieldEls.error.textContent = 'Could not load the log file.';
+diff --git a/templates/partials/log_tail_modal.html b/templates/partials/log_tail_modal.html
+index 0a4e65e..29a8274 100644
+--- a/templates/partials/log_tail_modal.html
++++ b/templates/partials/log_tail_modal.html
+@@ -12,6 +12,20 @@
+       <div class="modal-body">
+         <div data-field="loading" class="text-secondary">Loading…</div>
+         <div data-field="error" class="alert alert-danger" hidden></div>
++
++        <!-- BEGIN JSON VIEW TOGGLE -->
++        <div class="btn-group btn-group-sm mb-2" role="group" aria-label="View" data-field="view-toggle" hidden>
++          <input type="radio" class="btn-check" name="log-view-mode" id="log-view-formatted" autocomplete="off" checked>
++          <label for="log-view-formatted" class="btn btn-outline-secondary" data-field="view-formatted-btn">Formatted</label>
++          <input type="radio" class="btn-check" name="log-view-mode" id="log-view-raw" autocomplete="off">
++          <label for="log-view-raw" class="btn btn-outline-secondary" data-field="view-raw-btn">Raw</label>
++        </div>
++        <!-- END JSON VIEW TOGGLE -->
++
++        <!-- BEGIN JSON ENTRIES VIEW -->
++        <div data-field="entries" class="border rounded" style="max-height: 60vh; overflow-y: auto;" hidden></div>
++        <!-- END JSON ENTRIES VIEW -->
++
+         <pre data-field="lines" class="bg-secondary-lt p-3 rounded font-monospace small mb-0" style="max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;" hidden></pre>
+       </div>
+       <!-- END MODAL BODY -->
+-- 
+2.43.0
+

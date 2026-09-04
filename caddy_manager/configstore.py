@@ -105,3 +105,18 @@ def get_cert_expiring_soon_days():
     except (TypeError, ValueError):
         pass
     return DEFAULT_CERT_EXPIRING_SOON_DAYS
+
+
+DEFAULT_LOG_TAIL_LINES = 20
+
+
+def get_log_tail_lines():
+    cfg = load_config()
+    value = cfg.get("log_tail_lines") if cfg else None
+    try:
+        lines = int(value)
+        if lines > 0:
+            return lines
+    except (TypeError, ValueError):
+        pass
+    return DEFAULT_LOG_TAIL_LINES

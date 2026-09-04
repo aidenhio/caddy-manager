@@ -1,18 +1,20 @@
 import os
 from datetime import datetime
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .auth import login_required
-from .configstore import load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days
+from .configstore import (
+    load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
+)
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
     unique_filename, rename_block_if_first_site_address_changed, build_block_from_form,
     delete_log_file, rename_log_file, log_path_for, set_block_disabled,
 )
-from .logs import list_log_files
+from .logs import list_log_files, read_log_tail
 from .certs import certificates_root, list_certificates
 
 bp = Blueprint("main", __name__)
@@ -52,8 +54,16 @@ def logs():
     dir_exists = bool(log_dir) and os.path.isdir(log_dir)
     logs = list_log_files() if dir_exists else []
     return render_template(
-        "logs.html", logs=logs, log_dir=log_dir, dir_exists=dir_exists
+        "logs.html", logs=logs, log_dir=log_dir, dir_exists=dir_exists,
+        tail_lines=get_log_tail_lines(),
     )
+
+
+@bp.route("/logs/<path:filename>/tail")
+@login_required
+def log_tail(filename):
+    lines, error = read_log_tail(filename)
+    return jsonify(filename=filename, lines=lines, error=error, tail_lines=get_log_tail_lines())
 
 
 @bp.route("/certificates")
@@ -297,6 +307,16 @@ def settings():
                     save_config(cfg)
                     flash("Directories updated.", "success")
                     return redirect(url_for("main.settings"))
+
+        elif action == "update_logging":
+            log_tail_lines = request.form.get("log_tail_lines", "").strip()
+            if not (log_tail_lines.isdigit() and int(log_tail_lines) > 0):
+                error = "Log tail length must be a positive whole number of lines."
+            else:
+                cfg["log_tail_lines"] = int(log_tail_lines)
+                save_config(cfg)
+                flash("Logging settings updated.", "success")
+                return redirect(url_for("main.settings"))
 
         elif action == "update_certificates":
             cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()

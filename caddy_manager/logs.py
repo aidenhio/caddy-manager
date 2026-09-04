@@ -18,12 +18,19 @@ import os
 import re
 from datetime import datetime
 
-from .configstore import get_log_dir
+from .configstore import get_log_dir, get_log_tail_lines
 
 ROTATED_SUFFIX_RE = re.compile(
     r"^(?P<prefix>.+)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}-[A-Za-z0-9_]+"
     r"(?P<ext>\.[A-Za-z0-9]+)(?:\.gz|\.zst)?$"
 )
+
+# Guard against reading an absurd number of lines regardless of what's
+# configured in Settings (or hand-edited into config.json) -- the tail
+# read below still has to walk the file backwards in chunks, and there's
+# no reason for a "recent activity" modal to ever need more than this.
+MAX_TAIL_LINES = 2000
+TAIL_CHUNK_SIZE = 8192
 
 
 def logical_log_name(filename):
@@ -67,3 +74,64 @@ def list_log_files():
         log["updated"] = datetime.fromtimestamp(log["updated_ts"]).strftime("%d/%m/%Y %I:%M%p")
     logs.sort(key=lambda entry: entry["filename"].lower())
     return logs
+
+
+def _safe_log_dir_path(filename):
+    """Resolve filename inside the configured logs directory, preventing
+    path traversal. Returns None if no logs directory is configured, or
+    if filename would resolve outside it."""
+    log_dir = get_log_dir()
+    if not log_dir:
+        return None
+    base = os.path.abspath(log_dir)
+    target = os.path.abspath(os.path.join(base, filename))
+    if target != base and not target.startswith(base + os.sep):
+        return None
+    return target
+
+
+def _tail_lines(path, n):
+    """The last `n` lines of a (potentially large) text file, read
+    backwards in chunks rather than loading the whole file into memory
+    -- an access log can grow to many MB, and this runs fresh on every
+    "More" click rather than once at page load."""
+    with open(path, "rb") as f:
+        f.seek(0, os.SEEK_END)
+        remaining = f.tell()
+        data = b""
+        while remaining > 0 and data.count(b"\n") <= n:
+            read_size = min(TAIL_CHUNK_SIZE, remaining)
+            remaining -= read_size
+            f.seek(remaining)
+            data = f.read(read_size) + data
+        lines = data.splitlines()
+        if remaining > 0 and lines:
+            # The read window started mid-file, so its first entry is
+            # very likely a partial line (we cut in after some earlier,
+            # unread line's content) -- drop it rather than show a
+            # truncated line as if it were whole.
+            lines = lines[1:]
+    tail = lines[-n:] if len(lines) > n else lines
+    return [line.decode("utf-8", errors="replace") for line in tail]
+
+
+def read_log_tail(filename):
+    """(lines, error) for the live log file matching a Logs page row's
+    `filename` (i.e. logical_log_name() -- the un-rotated path Caddy is
+    actively appending to, since that's what "the latest log file"
+    means for a group that may also include rotated backups). `lines`
+    is [] and `error` a user-facing message whenever the file can't be
+    read; the number of lines returned is capped by Settings' configured
+    tail length (default 50), itself capped at MAX_TAIL_LINES."""
+    if not get_log_dir():
+        return [], "No logs directory is configured."
+    path = _safe_log_dir_path(filename)
+    if not path:
+        return [], "Invalid log filename."
+    if not os.path.isfile(path):
+        return [], f"No active log file found for {filename}."
+    n = min(get_log_tail_lines(), MAX_TAIL_LINES)
+    try:
+        return _tail_lines(path, n), None
+    except OSError as e:
+        return [], f"Could not read the log file: {e}"

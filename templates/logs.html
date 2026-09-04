@@ -7,6 +7,10 @@
 {% block header_actions %}
 {% endblock %}
 
+{% block page_modal %}
+{% include 'partials/log_tail_modal.html' %}
+{% endblock %}
+
 <!---->
 
 {% block content %}
@@ -14,6 +18,8 @@
 {% if not dir_exists %}
   <div class="alert alert-danger">The logs directory doesn't exist yet. It's created automatically the first time a site block has logging enabled.</div>
 {% endif %}
+
+<p class="text-secondary">"More" shows the last <strong>{{ tail_lines }} lines</strong> of a log's active file -- change this in <a href="{{ url_for('main.settings') }}#logging">Settings</a>.</p>
 
 <div class="card">
   {% if logs %}
@@ -85,7 +91,9 @@
           <td>{{ log.updated }}</td>
           <td>
             <div class="btn-list flex-nowrap">
-                <button type="button" class="btn btn-icon" title="More">
+                <button type="button" class="btn btn-icon" title="More"
+                    data-bs-toggle="modal" data-bs-target="#log-tail-modal"
+                    data-log-filename="{{ log.filename }}">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                     class="icon icon-tabler icons-tabler-outline icon-tabler-dots">
@@ -120,4 +128,8 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/log-tail-modal.js') }}"></script>
 {% endblock %}

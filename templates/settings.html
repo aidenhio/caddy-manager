@@ -157,17 +157,30 @@
           </div>
         </div>
 
-        <!-- TAB 5: LOGGING --> 
+        <!-- TAB 5: LOGGING -->
         <div id="logging" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Caddy Logging</h2>
-            <h3 class="card-title">Log Level</h3>
+            <h3 class="card-title">Log Viewer</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Controls how many lines the <a href="{{ url_for('main.logs') }}">Logs</a> page's "More" button shows from the end of a log file.
             </p>
+            <form method="post" id="logging-form">
+              <input type="hidden" name="action" value="update_logging">
+              <div class="mb-0">
+                <label class="form-label">Log tail length <span class="form-hint d-inline">(lines)</span></label>
+                <input type="number" min="1" max="2000" step="1" name="log_tail_lines" class="form-control" style="max-width: 12rem"
+                       value="{{ cfg.log_tail_lines or 20 }}" required>
+                <div class="invalid-feedback">Must be a positive whole number of lines.</div>
+                <small class="form-hint">Read fresh from the file each time -- capped at 2000 lines regardless of this setting.</small>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('logging-form'));
+            </script>
           </div>
         </div>
 
