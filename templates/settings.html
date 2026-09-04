@@ -36,6 +36,7 @@
             <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>
             <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Caddy API</a>
             <a href="#logging" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Logging</a>
+            <a href="#certificates" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Certificates</a>
           </div>
           <h4 class="card-header subheader mt-4">Other Settings</h4>
           <div>            
@@ -170,7 +171,34 @@
           </div>
         </div>
 
-        <!-- TAB 6 --> 
+        <!-- TAB 5B: CERTIFICATES -->
+        <div id="certificates" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Certificate Settings</h2>
+            <h3 class="card-title">Expiry Warning</h3>
+            <p class="text-secondary">
+              Controls when the <a href="{{ url_for('main.certificates') }}">Certificates</a> page's Status column flags a certificate as "Expiring soon" instead of "Valid".
+            </p>
+            <form method="post" id="certificates-form">
+              <input type="hidden" name="action" value="update_certificates">
+              <div class="mb-0">
+                <label class="form-label">Expiring soon threshold <span class="form-hint d-inline">(days before expiry)</span></label>
+                <input type="number" min="1" step="1" name="cert_expiring_soon_days" class="form-control" style="max-width: 12rem"
+                       value="{{ cfg.cert_expiring_soon_days or 37 }}" required>
+                <div class="invalid-feedback">Must be a positive whole number of days.</div>
+                <small class="form-hint">Caddy attempts renewal starting 30 days before expiry by default -- the default here (37) gives it a week of retries before flagging a cert, so "Expiring soon" tends to mean renewal needs attention rather than just "due soon."</small>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('certificates-form'));
+            </script>
+          </div>
+        </div>
+
+        <!-- TAB 6 -->
         <div id="setting1" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Setting 1</h2>

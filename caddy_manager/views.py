@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .auth import login_required
-from .configstore import load_config, save_config, get_conf_dir, get_log_dir
+from .configstore import load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
@@ -63,7 +63,8 @@ def certificates():
     dir_exists = bool(certs_root) and os.path.isdir(certs_root)
     certs = list_certificates() if dir_exists else []
     return render_template(
-        "certificates.html", certs=certs, certificate_dir=certs_root, dir_exists=dir_exists
+        "certificates.html", certs=certs, certificate_dir=certs_root, dir_exists=dir_exists,
+        expiring_soon_days=get_cert_expiring_soon_days(),
     )
 
 
@@ -296,6 +297,16 @@ def settings():
                     save_config(cfg)
                     flash("Directories updated.", "success")
                     return redirect(url_for("main.settings"))
+
+        elif action == "update_certificates":
+            cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()
+            if not (cert_expiring_soon_days.isdigit() and int(cert_expiring_soon_days) > 0):
+                error = "Expiring soon threshold must be a positive whole number of days."
+            else:
+                cfg["cert_expiring_soon_days"] = int(cert_expiring_soon_days)
+                save_config(cfg)
+                flash("Certificate settings updated.", "success")
+                return redirect(url_for("main.settings"))
 
         elif action == "change_password":
             current = request.form.get("current_password", "")

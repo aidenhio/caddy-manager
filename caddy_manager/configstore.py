@@ -85,3 +85,23 @@ def get_log_dir():
 
 def get_caddyfile_path():
     return load_config().get("caddyfile_path", "")
+
+
+# Caddy's built-in default is to attempt renewal starting 30 days before
+# expiry -- 37 gives it a week of retries (rate limits, a flaky ACME
+# challenge, DNS propagation) before the Certificates page calls a cert
+# "expiring soon", so the badge means "renewal may need attention" rather
+# than just "due soon and presumably fine."
+DEFAULT_CERT_EXPIRING_SOON_DAYS = 37
+
+
+def get_cert_expiring_soon_days():
+    cfg = load_config()
+    value = cfg.get("cert_expiring_soon_days") if cfg else None
+    try:
+        days = int(value)
+        if days > 0:
+            return days
+    except (TypeError, ValueError):
+        pass
+    return DEFAULT_CERT_EXPIRING_SOON_DAYS

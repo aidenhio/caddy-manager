@@ -7,6 +7,10 @@
 {% block header_actions %}
 {% endblock %}
 
+{% block page_modal %}
+{% include 'partials/certificate_detail_modal.html' %}
+{% endblock %}
+
 <!---->
 
 {% block content %}
@@ -14,6 +18,8 @@
 {% if not dir_exists %}
   <div class="alert alert-danger">The certificates directory doesn't exist yet. Caddy creates it the first time it obtains a certificate.</div>
 {% endif %}
+
+<p class="text-secondary">Certificates within <strong>{{ expiring_soon_days }} days</strong> of expiry are flagged below -- change this in <a href="{{ url_for('main.settings') }}#certificates">Settings</a>.</p>
 
 <div class="card">
   {% if certs %}
@@ -32,7 +38,45 @@
             <input id="certificates-search" type="text" class="form-control" autocomplete="off" placeholder="Search…">
           </div>
       </div>
-      <div class="ms-auto col-auto">
+      <div class="ms-auto col-auto" data-bs-auto-close="outside">
+        <a href="#" class="btn dropdown-toggle d-none d-sm-inline-block" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-adjustments-horizontal">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+            <path d="M4 6l8 0" />
+            <path d="M16 6l4 0" />
+            <path d="M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+            <path d="M4 12l2 0" />
+            <path d="M10 12l10 0" />
+            <path d="M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+            <path d="M4 18l11 0" />
+            <path d="M19 18l1 0" />
+          </svg>
+          Filters
+        </a>
+        <div class="dropdown-menu" id="certificates-filters-menu">
+          <h6 class="dropdown-header">Status</h6>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="status" value="expired"> Expired</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="status" value="expiring_soon"> Expiring soon</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="status" value="valid"> Valid</label>
+          <h6 class="dropdown-header">Provider</h6>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="local"> Local</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="letsencrypt"> Let's Encrypt</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="zerossl"> ZeroSSL</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="buypass"> Buypass</label>
+          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="other"> Other</label>
+          <div class="dropdown-divider"></div>
+          <a class="dropdown-item text-danger" href="#" data-dt-clear-filters>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon  icon-tabler icons-tabler-outline icon-tabler-x text-danger">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M18 6l-12 12" />
+              <path d="M6 6l12 12" />
+            </svg>
+            Clear
+          </a>
+        </div>
+      </div>
+      <div class="col-auto">
         <select id="certificates-page-size" class="form-select">
           <option value="10" selected>10</option>
           <option value="20">20</option>
@@ -49,6 +93,7 @@
     <table class="table card-table table-vcenter" id="certificates-table"
            data-datatable
            data-dt-search="#certificates-search"
+           data-dt-filters="#certificates-filters-menu"
            data-dt-page-size="#certificates-page-size"
            data-dt-page-size-default="10"
            data-dt-summary="#certificates-page-summary"
@@ -83,7 +128,7 @@
       </thead>
       <tbody>
       {% for cert in certs %}
-        <tr data-cn="{{ cert.cn | lower }}" data-provider="{{ cert.provider | lower }}" data-expiry="{{ cert.expiry_ts }}">
+        <tr data-cn="{{ cert.cn | lower }}" data-provider="{{ cert.provider_key }}" data-status="{{ cert.status }}" data-expiry="{{ cert.expiry_ts }}">
           <td>
             {% if cert.expired %}
               <span class="text-danger">
@@ -104,7 +149,7 @@
                   <path d="M12 16v.01" />
                 </svg>
               </span>
-              <span class="badge bg-yellow-lt">0 days</span>
+              <span class="badge bg-yellow-lt">{{ cert.days_remaining }} day{{ 's' if cert.days_remaining != 1 }}</span>
             {% else %}
               <span class="text-success">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-circle-check">
@@ -113,12 +158,14 @@
                   <path d="M9 12l2 2l4 -4" />
                 </svg>
               </span>
-              <span class="badge bg-success-lt">0 days</span>
+              <span class="badge bg-success-lt">{{ cert.days_remaining }} day{{ 's' if cert.days_remaining != 1 }}</span>
             {% endif %}
           </td>
           <td>
             {{ cert.cn }}
-            <span class="badge bg-lt font-monospace"> +0</span>
+            {% if cert.sans %}
+              <span class="badge bg-lt font-monospace" title="{{ cert.sans | join(', ') }}"> +{{ cert.sans | length }}</span>
+            {% endif %}
           </td>
           <!-- BEGIN PROVIDER CELL -->
           <td>
@@ -153,7 +200,21 @@
           <!-- END EXPIRY CELL -->
           <td>
             <div class="btn-list flex-nowrap">
-                <button class="btn btn-icon">
+                <button type="button" class="btn btn-icon" title="More"
+                    data-bs-toggle="modal" data-bs-target="#certificate-detail-modal"
+                    data-cert-cn="{{ cert.cn }}"
+                    data-cert-status-label="{{ cert.status_label }}"
+                    data-cert-provider="{{ cert.provider }}"
+                    data-cert-not-before="{{ cert.not_before }}"
+                    data-cert-expiry="{{ cert.expiry }}"
+                    data-cert-days-remaining="{{ cert.days_remaining }} day{{ 's' if cert.days_remaining != 1 }}"
+                    data-cert-key-info="{{ cert.key_info }}"
+                    data-cert-serial="{{ cert.serial }}"
+                    data-cert-fingerprint="{{ cert.fingerprint }}"
+                    data-cert-subject="{{ cert.subject }}"
+                    data-cert-issuer="{{ cert.issuer }}"
+                    data-cert-sans="{{ cert.sans | join(', ') if cert.sans else 'None' }}"
+                    data-cert-path="{{ cert.path }}">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                     class="icon icon-tabler icons-tabler-outline icon-tabler-dots">
@@ -188,4 +249,8 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/certificate-detail-modal.js') }}"></script>
 {% endblock %}
