@@ -213,3 +213,17 @@ def list_certificates():
 
     certs.sort(key=lambda c: c["cn"].lower())
     return certs
+
+
+def certificate_stats(certs):
+    """Summary counts for a list of certificates as returned by
+    list_certificates() -- total plus a breakdown by status. Used by the
+    dashboard's SSL Certificates widget; the per-status counts aren't all
+    surfaced there yet but are ready for the dashboard's other planned
+    certificate widgets."""
+    return {
+        "cert_total": len(certs),
+        "cert_valid": sum(1 for c in certs if c["status"] == "valid"),
+        "cert_expiring_soon": sum(1 for c in certs if c["status"] == "expiring_soon"),
+        "cert_expired": sum(1 for c in certs if c["status"] == "expired"),
+    }

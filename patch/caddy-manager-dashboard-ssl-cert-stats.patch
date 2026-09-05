@@ -1,0 +1,90 @@
+From 168de45e943e3db848fd72e9185d025b1678a5a3 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 5 Sep 2026 08:27:48 +0000
+Subject: [PATCH] Fix the Dashboard SSL Certificates widget to show the real
+ count
+
+The widget was hardcoded to always show "10 SSL Certificates". It now
+reflects the actual number of certificates found under the configured
+certificate directory.
+
+Also adds a certificate_stats() helper (certs.py) returning valid/
+expiring-soon/expired counts alongside the total, computed from the
+same per-certificate status list_certificates() already produces for
+the Certificates page. Only the total is shown on the dashboard for
+now; the per-status counts are wired into the dashboard's stats context
+for the dashboard's other planned certificate widgets.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ caddy_manager/certs.py | 14 ++++++++++++++
+ caddy_manager/views.py |  5 ++++-
+ templates/home.html    |  2 +-
+ 3 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/caddy_manager/certs.py b/caddy_manager/certs.py
+index c46267f..b2e5aed 100644
+--- a/caddy_manager/certs.py
++++ b/caddy_manager/certs.py
+@@ -213,3 +213,17 @@ def list_certificates():
+ 
+     certs.sort(key=lambda c: c["cn"].lower())
+     return certs
++
++
++def certificate_stats(certs):
++    """Summary counts for a list of certificates as returned by
++    list_certificates() -- total plus a breakdown by status. Used by the
++    dashboard's SSL Certificates widget; the per-status counts aren't all
++    surfaced there yet but are ready for the dashboard's other planned
++    certificate widgets."""
++    return {
++        "cert_total": len(certs),
++        "cert_valid": sum(1 for c in certs if c["status"] == "valid"),
++        "cert_expiring_soon": sum(1 for c in certs if c["status"] == "expiring_soon"),
++        "cert_expired": sum(1 for c in certs if c["status"] == "expired"),
++    }
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 423d9fd..73a49ec 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -17,7 +17,7 @@ from .blocks import (
+     delete_log_file, rename_log_file, log_path_for, set_block_disabled,
+ )
+ from .logs import list_log_files, read_log_tail
+-from .certs import certificates_root, list_certificates
++from .certs import certificates_root, list_certificates, certificate_stats
+ 
+ bp = Blueprint("main", __name__)
+ 
+@@ -28,10 +28,13 @@ def dashboard():
+     conf_dir = get_conf_dir()
+     dir_exists = os.path.isdir(conf_dir)
+     blocks = list_blocks() if dir_exists else []
++    certs_root = certificates_root()
++    certs = list_certificates() if certs_root and os.path.isdir(certs_root) else []
+     stats = {
+         "total": len(blocks),
+         "enabled": sum(1 for b in blocks if not b["disabled"]),
+         "disabled": sum(1 for b in blocks if b["disabled"]),
++        **certificate_stats(certs),
+     }
+     return render_template(
+         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
+diff --git a/templates/home.html b/templates/home.html
+index 8540ac7..4a0117c 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -103,7 +103,7 @@
+             </span>
+           </div>
+           <div class="col">
+-            <div class="font-weight-medium">10 SSL Certificates</div>
++            <div class="font-weight-medium">{{ stats.cert_total }} SSL Certificates</div>
+           </div>
+         </div>
+       </div>
+-- 
+2.43.0
+

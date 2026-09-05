@@ -17,7 +17,7 @@ from .blocks import (
     delete_log_file, rename_log_file, log_path_for, set_block_disabled,
 )
 from .logs import list_log_files, read_log_tail
-from .certs import certificates_root, list_certificates
+from .certs import certificates_root, list_certificates, certificate_stats
 
 bp = Blueprint("main", __name__)
 
@@ -28,10 +28,13 @@ def dashboard():
     conf_dir = get_conf_dir()
     dir_exists = os.path.isdir(conf_dir)
     blocks = list_blocks() if dir_exists else []
+    certs_root = certificates_root()
+    certs = list_certificates() if certs_root and os.path.isdir(certs_root) else []
     stats = {
         "total": len(blocks),
         "enabled": sum(1 for b in blocks if not b["disabled"]),
         "disabled": sum(1 for b in blocks if b["disabled"]),
+        **certificate_stats(certs),
     }
     return render_template(
         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
