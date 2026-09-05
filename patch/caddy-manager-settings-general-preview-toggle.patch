@@ -1,0 +1,268 @@
+From bfa88f699af835c04ee307e147a5bfdea36e26e4 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 5 Sep 2026 07:13:08 +0000
+Subject: [PATCH] Move log tail length and cert expiry threshold into General
+ settings; add a metadata card toggle for the Preview page
+
+- The "Log tail length" and "Expiring soon threshold" options are app
+  behavior, not Caddy configuration, so they move from their own
+  Logging/Certificates tabs into the General tab. Those two tabs are
+  removed from Settings since they had no other content.
+- Add a "Show Metadata card" toggle to General's Preview Page Options
+  section, defaulted to on, controlling whether a block's Preview page
+  displays the raw metadata sidecar alongside the Caddy config.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ caddy_manager/configstore.py |  15 +++++
+ caddy_manager/views.py       |   8 +++
+ templates/preview.html       |   4 +-
+ templates/settings.html      | 127 ++++++++++++++++++-----------------
+ 4 files changed, 90 insertions(+), 64 deletions(-)
+
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index d15ddc2..562c469 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -142,3 +142,18 @@ def get_quick_add_type_site_blocks():
+     cfg = load_config()
+     value = cfg.get("quick_add_type_site_blocks") if cfg else None
+     return value if value in QUICK_ADD_BLOCK_TYPES else None
++
++
++# Whether a block's Preview page shows the raw metadata sidecar alongside its
++# Caddy config -- on by default, since the metadata card is how someone
++# double-checks what the app has stored about a block (creation time, log
++# settings, etc.) without opening the sidecar file directly.
++DEFAULT_SHOW_METADATA_CARD = True
++
++
++def get_show_metadata_card():
++    cfg = load_config()
++    value = cfg.get("show_metadata_card") if cfg else None
++    if isinstance(value, bool):
++        return value
++    return DEFAULT_SHOW_METADATA_CARD
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 838692d..fed13f9 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -8,6 +8,7 @@ from .auth import login_required
+ from .configstore import (
+     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
+     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
++    get_show_metadata_card,
+ )
+ from .caddyfile import slugify, extract_body, site_addresses_from_textarea
+ from .blocks import (
+@@ -249,6 +250,7 @@ def preview_block(filename):
+         conf_path=path,
+         conf_content=conf_content,
+         metadata_content=metadata_content,
++        show_metadata_card=get_show_metadata_card(),
+         created=datetime.fromtimestamp(created_ts).strftime("%d/%m/%Y %I:%M%p") if created_ts else "Unknown",
+         updated=datetime.fromtimestamp(os.path.getmtime(path)).strftime("%d/%m/%Y %I:%M%p"),
+         log_path=log_path_for(filename) if meta.get("log_enabled") else None,
+@@ -331,6 +333,12 @@ def settings():
+                 flash("Certificate settings updated.", "success")
+                 return redirect(url_for("main.settings"))
+ 
++        elif action == "update_preview":
++            cfg["show_metadata_card"] = request.form.get("show_metadata_card") == "on"
++            save_config(cfg)
++            flash("Preview page settings updated.", "success")
++            return redirect(url_for("main.settings"))
++
+         elif action == "update_quick_add":
+             quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")
+             quick_add_type_site_blocks = request.form.get("quick_add_type_site_blocks", "")
+diff --git a/templates/preview.html b/templates/preview.html
+index ad73839..23e2b17 100644
+--- a/templates/preview.html
++++ b/templates/preview.html
+@@ -215,6 +215,7 @@
+     <!-- END CONF CARD -->
+ 
+     <!-- BEGIN METADATA CARD -->
++    {% if show_metadata_card %}
+     <div class="card rounded-top-0 mt-2">
+       <div class="card-status-top bg-{{ type_color }}"></div>
+       <div class="card-header">
+@@ -224,7 +225,8 @@
+         <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ metadata_content }}</code></pre>
+       </div>
+     </div>
+-    <!-- END METADATA CARD --> 
++    {% endif %}
++    <!-- END METADATA CARD -->
+ 
+   </div>
+   <!-- END FILE CARDS -->
+diff --git a/templates/settings.html b/templates/settings.html
+index 6abaaa9..855e1ed 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -34,15 +34,13 @@
+           <h4 class="card-header subheader mt-4">App Settings</h4>
+           <div>
+             <a href="#general" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">General</a>
+-            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>           
++            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>
+             <a href="#dashboard" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Dashboard</a>
+             <a href="#quick-add" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Quick Add</a>
+           </div>
+           <h4 class="card-header subheader mt-4">Caddy Settings</h4>
+-          <div>            
++          <div>
+             <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Caddy API</a>
+-            <a href="#logging" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Logging</a>
+-            <a href="#certificates" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Certificates</a>
+           </div>
+         </div>
+       
+@@ -105,18 +103,75 @@
+           </div>
+         </div>
+ 
+-        <!-- TAB GENERAL --> 
++        <!-- TAB GENERAL -->
+         <div id="general" class="tab-pane">
++          {% set show_metadata_card = cfg.show_metadata_card if cfg.show_metadata_card is defined else true %}
+           <div class="card-body">
+             <h2 class="mb-4">General Settings</h2>
++
+             <h3 class="card-title">Preview Page Options</h3>
+             <p class="text-secondary">
+-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+-              alias aliquid
+-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+-              odit.
++              Controls what's shown on a site block's Preview page.
++            </p>
++            <form method="post" id="preview-form">
++              <input type="hidden" name="action" value="update_preview">
++              <div class="mb-0">
++                <label class="form-check form-switch">
++                  <input type="checkbox" class="form-check-input" id="show-metadata-card-input" name="show_metadata_card" value="on" {{ 'checked' if show_metadata_card }}>
++                  <span class="form-check-label">Show Metadata card</span>
++                </label>
++                <span class="form-hint">Displays the raw metadata sidecar file alongside the Caddy config on a block's Preview page.</span>
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++
++            <hr class="my-4">
++
++            <h3 class="card-title">Log Viewer</h3>
++            <p class="text-secondary">
++              Controls how many lines the <a href="{{ url_for('main.logs') }}">Logs</a> page's "More" button shows from the end of a log file.
+             </p>
++            <form method="post" id="logging-form">
++              <input type="hidden" name="action" value="update_logging">
++              <div class="mb-0">
++                <label class="form-label">Log tail length <span class="form-hint d-inline">(lines)</span></label>
++                <input type="number" min="1" max="2000" step="1" name="log_tail_lines" class="form-control" style="max-width: 12rem"
++                       value="{{ cfg.log_tail_lines or 20 }}" required>
++                <div class="invalid-feedback">Must be a positive whole number of lines.</div>
++                <small class="form-hint">Read fresh from the file each time -- capped at 2000 lines regardless of this setting.</small>
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++
++            <hr class="my-4">
++
++            <h3 class="card-title">Certificate Expiry</h3>
++            <p class="text-secondary">
++              Controls when the <a href="{{ url_for('main.certificates') }}">Certificates</a> page's Status column flags a certificate as "Expiring soon" instead of "Valid".
++            </p>
++            <form method="post" id="certificates-form">
++              <input type="hidden" name="action" value="update_certificates">
++              <div class="mb-0">
++                <label class="form-label">Expiring soon threshold <span class="form-hint d-inline">(days before expiry)</span></label>
++                <input type="number" min="1" step="1" name="cert_expiring_soon_days" class="form-control" style="max-width: 12rem"
++                       value="{{ cfg.cert_expiring_soon_days or 37 }}" required>
++                <div class="invalid-feedback">Must be a positive whole number of days.</div>
++                <small class="form-hint">Caddy attempts renewal starting 30 days before expiry by default -- the default here (37) gives it a week of retries before flagging a cert, so "Expiring soon" tends to mean renewal needs attention rather than just "due soon."</small>
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
+           </div>
++          <script>
++            initFormValidation(document.getElementById('preview-form'));
++            initFormValidation(document.getElementById('logging-form'));
++            initFormValidation(document.getElementById('certificates-form'));
++          </script>
+         </div>
+ 
+         <!-- TAB DIRECTORY --> 
+@@ -228,60 +283,6 @@
+           </div>
+         </div>
+ 
+-        <!-- TAB LOGGING -->
+-        <div id="logging" class="tab-pane">
+-          <div class="card-body">
+-            <h2 class="mb-4">Caddy Logging</h2>
+-            <h3 class="card-title">Log Viewer</h3>
+-            <p class="text-secondary">
+-              Controls how many lines the <a href="{{ url_for('main.logs') }}">Logs</a> page's "More" button shows from the end of a log file.
+-            </p>
+-            <form method="post" id="logging-form">
+-              <input type="hidden" name="action" value="update_logging">
+-              <div class="mb-0">
+-                <label class="form-label">Log tail length <span class="form-hint d-inline">(lines)</span></label>
+-                <input type="number" min="1" max="2000" step="1" name="log_tail_lines" class="form-control" style="max-width: 12rem"
+-                       value="{{ cfg.log_tail_lines or 20 }}" required>
+-                <div class="invalid-feedback">Must be a positive whole number of lines.</div>
+-                <small class="form-hint">Read fresh from the file each time -- capped at 2000 lines regardless of this setting.</small>
+-              </div>
+-              <div class="form-footer">
+-                <button type="submit" class="btn btn-primary">Update</button>
+-              </div>
+-            </form>
+-            <script>
+-              initFormValidation(document.getElementById('logging-form'));
+-            </script>
+-          </div>
+-        </div>
+-
+-        <!-- TAB CERTIFICATES -->
+-        <div id="certificates" class="tab-pane">
+-          <div class="card-body">
+-            <h2 class="mb-4">Certificate Settings</h2>
+-            <h3 class="card-title">Expiry Warning</h3>
+-            <p class="text-secondary">
+-              Controls when the <a href="{{ url_for('main.certificates') }}">Certificates</a> page's Status column flags a certificate as "Expiring soon" instead of "Valid".
+-            </p>
+-            <form method="post" id="certificates-form">
+-              <input type="hidden" name="action" value="update_certificates">
+-              <div class="mb-0">
+-                <label class="form-label">Expiring soon threshold <span class="form-hint d-inline">(days before expiry)</span></label>
+-                <input type="number" min="1" step="1" name="cert_expiring_soon_days" class="form-control" style="max-width: 12rem"
+-                       value="{{ cfg.cert_expiring_soon_days or 37 }}" required>
+-                <div class="invalid-feedback">Must be a positive whole number of days.</div>
+-                <small class="form-hint">Caddy attempts renewal starting 30 days before expiry by default -- the default here (37) gives it a week of retries before flagging a cert, so "Expiring soon" tends to mean renewal needs attention rather than just "due soon."</small>
+-              </div>
+-              <div class="form-footer">
+-                <button type="submit" class="btn btn-primary">Update</button>
+-              </div>
+-            </form>
+-            <script>
+-              initFormValidation(document.getElementById('certificates-form'));
+-            </script>
+-          </div>
+-        </div>
+-
+       </div>
+ 
+     </div>
+-- 
+2.43.0
+

@@ -34,15 +34,15 @@
           <h4 class="card-header subheader mt-4">App Settings</h4>
           <div>
             <a href="#general" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">General</a>
-            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>           
+            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>
             <a href="#dashboard" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Dashboard</a>
             <a href="#quick-add" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Quick Add</a>
           </div>
           <h4 class="card-header subheader mt-4">Caddy Settings</h4>
-          <div>            
+          <div>
+            <a href="#global" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Global Configuration</a>
             <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Caddy API</a>
-            <a href="#logging" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Logging</a>
-            <a href="#certificates" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Certificates</a>
+            <a href="#logs" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Logging</a>
           </div>
         </div>
       
@@ -105,18 +105,75 @@
           </div>
         </div>
 
-        <!-- TAB GENERAL --> 
+        <!-- TAB GENERAL -->
         <div id="general" class="tab-pane">
+          {% set show_metadata_card = cfg.show_metadata_card if cfg.show_metadata_card is defined else true %}
           <div class="card-body">
             <h2 class="mb-4">General Settings</h2>
+
             <h3 class="card-title">Preview Page Options</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Controls what's shown on a site block's Preview page.
             </p>
+            <form method="post" id="preview-form">
+              <input type="hidden" name="action" value="update_preview">
+              <div class="mb-0">
+                <label class="form-check form-switch">
+                  <input type="checkbox" class="form-check-input" id="show-metadata-card-input" name="show_metadata_card" value="on" {{ 'checked' if show_metadata_card }}>
+                  <span class="form-check-label">Show Metadata card</span>
+                </label>
+                <span class="form-hint">Displays the raw metadata sidecar file alongside the Caddy config on a block's Preview page.</span>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+
+            <hr class="my-4">
+
+            <h3 class="card-title">Log Viewer</h3>
+            <p class="text-secondary">
+              Controls how many lines the <a href="{{ url_for('main.logs') }}">Logs</a> page's "More" button shows from the end of a log file.
+            </p>
+            <form method="post" id="logging-form">
+              <input type="hidden" name="action" value="update_logging">
+              <div class="mb-0">
+                <label class="form-label">Log tail length <span class="form-hint d-inline">(lines)</span></label>
+                <input type="number" min="1" max="2000" step="1" name="log_tail_lines" class="form-control" style="max-width: 12rem"
+                       value="{{ cfg.log_tail_lines or 20 }}" required>
+                <div class="invalid-feedback">Must be a positive whole number of lines.</div>
+                <small class="form-hint">Read fresh from the file each time -- capped at 2000 lines regardless of this setting.</small>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+
+            <hr class="my-4">
+
+            <h3 class="card-title">Certificate Expiry</h3>
+            <p class="text-secondary">
+              Controls when the <a href="{{ url_for('main.certificates') }}">Certificates</a> page's Status column flags a certificate as "Expiring soon" instead of "Valid".
+            </p>
+            <form method="post" id="certificates-form">
+              <input type="hidden" name="action" value="update_certificates">
+              <div class="mb-0">
+                <label class="form-label">Expiring soon threshold <span class="form-hint d-inline">(days before expiry)</span></label>
+                <input type="number" min="1" step="1" name="cert_expiring_soon_days" class="form-control" style="max-width: 12rem"
+                       value="{{ cfg.cert_expiring_soon_days or 37 }}" required>
+                <div class="invalid-feedback">Must be a positive whole number of days.</div>
+                <small class="form-hint">Caddy attempts renewal starting 30 days before expiry by default -- the default here (37) gives it a week of retries before flagging a cert, so "Expiring soon" tends to mean renewal needs attention rather than just "due soon."</small>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
           </div>
+          <script>
+            initFormValidation(document.getElementById('preview-form'));
+            initFormValidation(document.getElementById('logging-form'));
+            initFormValidation(document.getElementById('certificates-form'));
+          </script>
         </div>
 
         <!-- TAB DIRECTORY --> 
@@ -214,6 +271,20 @@
           </div>
         </div>
 
+        <!-- TAB GLOBAL -->
+        <div id="global" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Caddy Global Configuration</h2>
+            <h3 class="card-title">XXX</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
         <!-- TAB API --> 
         <div id="api" class="tab-pane">
           <div class="card-body">
@@ -228,57 +299,17 @@
           </div>
         </div>
 
-        <!-- TAB LOGGING -->
-        <div id="logging" class="tab-pane">
+        <!-- TAB LOGS -->
+        <div id="logs" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Caddy Logging</h2>
-            <h3 class="card-title">Log Viewer</h3>
+            <h3 class="card-title">XXX</h3>
             <p class="text-secondary">
-              Controls how many lines the <a href="{{ url_for('main.logs') }}">Logs</a> page's "More" button shows from the end of a log file.
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
             </p>
-            <form method="post" id="logging-form">
-              <input type="hidden" name="action" value="update_logging">
-              <div class="mb-0">
-                <label class="form-label">Log tail length <span class="form-hint d-inline">(lines)</span></label>
-                <input type="number" min="1" max="2000" step="1" name="log_tail_lines" class="form-control" style="max-width: 12rem"
-                       value="{{ cfg.log_tail_lines or 20 }}" required>
-                <div class="invalid-feedback">Must be a positive whole number of lines.</div>
-                <small class="form-hint">Read fresh from the file each time -- capped at 2000 lines regardless of this setting.</small>
-              </div>
-              <div class="form-footer">
-                <button type="submit" class="btn btn-primary">Update</button>
-              </div>
-            </form>
-            <script>
-              initFormValidation(document.getElementById('logging-form'));
-            </script>
-          </div>
-        </div>
-
-        <!-- TAB CERTIFICATES -->
-        <div id="certificates" class="tab-pane">
-          <div class="card-body">
-            <h2 class="mb-4">Certificate Settings</h2>
-            <h3 class="card-title">Expiry Warning</h3>
-            <p class="text-secondary">
-              Controls when the <a href="{{ url_for('main.certificates') }}">Certificates</a> page's Status column flags a certificate as "Expiring soon" instead of "Valid".
-            </p>
-            <form method="post" id="certificates-form">
-              <input type="hidden" name="action" value="update_certificates">
-              <div class="mb-0">
-                <label class="form-label">Expiring soon threshold <span class="form-hint d-inline">(days before expiry)</span></label>
-                <input type="number" min="1" step="1" name="cert_expiring_soon_days" class="form-control" style="max-width: 12rem"
-                       value="{{ cfg.cert_expiring_soon_days or 37 }}" required>
-                <div class="invalid-feedback">Must be a positive whole number of days.</div>
-                <small class="form-hint">Caddy attempts renewal starting 30 days before expiry by default -- the default here (37) gives it a week of retries before flagging a cert, so "Expiring soon" tends to mean renewal needs attention rather than just "due soon."</small>
-              </div>
-              <div class="form-footer">
-                <button type="submit" class="btn btn-primary">Update</button>
-              </div>
-            </form>
-            <script>
-              initFormValidation(document.getElementById('certificates-form'));
-            </script>
           </div>
         </div>
 

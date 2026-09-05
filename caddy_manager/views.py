@@ -8,6 +8,7 @@ from .auth import login_required
 from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
+    get_show_metadata_card,
 )
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
@@ -249,6 +250,7 @@ def preview_block(filename):
         conf_path=path,
         conf_content=conf_content,
         metadata_content=metadata_content,
+        show_metadata_card=get_show_metadata_card(),
         created=datetime.fromtimestamp(created_ts).strftime("%d/%m/%Y %I:%M%p") if created_ts else "Unknown",
         updated=datetime.fromtimestamp(os.path.getmtime(path)).strftime("%d/%m/%Y %I:%M%p"),
         log_path=log_path_for(filename) if meta.get("log_enabled") else None,
@@ -330,6 +332,12 @@ def settings():
                 save_config(cfg)
                 flash("Certificate settings updated.", "success")
                 return redirect(url_for("main.settings"))
+
+        elif action == "update_preview":
+            cfg["show_metadata_card"] = request.form.get("show_metadata_card") == "on"
+            save_config(cfg)
+            flash("Preview page settings updated.", "success")
+            return redirect(url_for("main.settings"))
 
         elif action == "update_quick_add":
             quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")

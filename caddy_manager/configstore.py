@@ -142,3 +142,18 @@ def get_quick_add_type_site_blocks():
     cfg = load_config()
     value = cfg.get("quick_add_type_site_blocks") if cfg else None
     return value if value in QUICK_ADD_BLOCK_TYPES else None
+
+
+# Whether a block's Preview page shows the raw metadata sidecar alongside its
+# Caddy config -- on by default, since the metadata card is how someone
+# double-checks what the app has stored about a block (creation time, log
+# settings, etc.) without opening the sidecar file directly.
+DEFAULT_SHOW_METADATA_CARD = True
+
+
+def get_show_metadata_card():
+    cfg = load_config()
+    value = cfg.get("show_metadata_card") if cfg else None
+    if isinstance(value, bool):
+        return value
+    return DEFAULT_SHOW_METADATA_CARD

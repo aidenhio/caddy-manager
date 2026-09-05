@@ -215,6 +215,7 @@
     <!-- END CONF CARD -->
 
     <!-- BEGIN METADATA CARD -->
+    {% if show_metadata_card %}
     <div class="card rounded-top-0 mt-2">
       <div class="card-status-top bg-{{ type_color }}"></div>
       <div class="card-header">
@@ -224,7 +225,8 @@
         <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ metadata_content }}</code></pre>
       </div>
     </div>
-    <!-- END METADATA CARD --> 
+    {% endif %}
+    <!-- END METADATA CARD -->
 
   </div>
   <!-- END FILE CARDS -->
