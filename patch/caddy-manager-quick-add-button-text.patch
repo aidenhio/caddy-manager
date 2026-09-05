@@ -1,0 +1,32 @@
+From 23238f94fff5b076af1a639ca4f39125dde62a63 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 5 Sep 2026 06:56:27 +0000
+Subject: [PATCH] Show the specific block type in the Quick Add button label
+
+Changes the button text from generic "Quick Add" to "Add <Type>" (e.g.
+"Add Reverse Proxy", "Add Static Site") using the label already
+computed for the tooltip, so the button communicates what it will
+create at a glance.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ templates/partials/quick_add_button.html | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/templates/partials/quick_add_button.html b/templates/partials/quick_add_button.html
+index c9d191e..d1c1346 100644
+--- a/templates/partials/quick_add_button.html
++++ b/templates/partials/quick_add_button.html
+@@ -42,7 +42,7 @@
+         <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
+       </svg>
+     {% endif %}
+-    Quick Add
++    Add {{ qa_label }}
+   </a>
+ {% endif %}
+ <!-- END QUICK ADD BUTTON -->
+-- 
+2.43.0
+

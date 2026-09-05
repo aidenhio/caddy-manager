@@ -172,17 +172,45 @@
           </div>
         </div>
 
-        <!-- TAB QUICK ADD--> 
+        <!-- TAB QUICK ADD-->
         <div id="quick-add" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Quick Add</h2>
-            <h3 class="card-title">Enable Quick Add</h3>
+            <h3 class="card-title">Quick Add Button</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Adds a one-click shortcut button to the header of the <a href="{{ url_for('main.dashboard') }}">Home Dashboard</a> and/or <a href="{{ url_for('main.site_blocks') }}">Site Blocks</a> page that jumps straight to a chosen block type's form, skipping the "New Site Block" type picker. Each page can be configured with a different type, or left at "None" to leave that page's header unchanged.
             </p>
+            <form method="post" id="quick-add-form">
+              <input type="hidden" name="action" value="update_quick_add">
+              <div class="mb-3">
+                <label class="form-label">Home Dashboard quick add type</label>
+                <select name="quick_add_type_dashboard" class="form-select">
+                  <option value="" {{ 'selected' if not cfg.quick_add_type_dashboard }}>None</option>
+                  <option value="reverse_proxy" {{ 'selected' if cfg.quick_add_type_dashboard == 'reverse_proxy' }}>Reverse Proxy</option>
+                  <option value="redirect" {{ 'selected' if cfg.quick_add_type_dashboard == 'redirect' }}>Redirect</option>
+                  <option value="load_balancer" {{ 'selected' if cfg.quick_add_type_dashboard == 'load_balancer' }}>Load Balancer</option>
+                  <option value="static_site" {{ 'selected' if cfg.quick_add_type_dashboard == 'static_site' }}>Static Site</option>
+                  <option value="custom" {{ 'selected' if cfg.quick_add_type_dashboard == 'custom' }}>Custom Block</option>
+                </select>
+              </div>
+              <div class="mb-0">
+                <label class="form-label">Site Blocks page quick add type</label>
+                <select name="quick_add_type_site_blocks" class="form-select">
+                  <option value="" {{ 'selected' if not cfg.quick_add_type_site_blocks }}>None</option>
+                  <option value="reverse_proxy" {{ 'selected' if cfg.quick_add_type_site_blocks == 'reverse_proxy' }}>Reverse Proxy</option>
+                  <option value="redirect" {{ 'selected' if cfg.quick_add_type_site_blocks == 'redirect' }}>Redirect</option>
+                  <option value="load_balancer" {{ 'selected' if cfg.quick_add_type_site_blocks == 'load_balancer' }}>Load Balancer</option>
+                  <option value="static_site" {{ 'selected' if cfg.quick_add_type_site_blocks == 'static_site' }}>Static Site</option>
+                  <option value="custom" {{ 'selected' if cfg.quick_add_type_site_blocks == 'custom' }}>Custom Block</option>
+                </select>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('quick-add-form'));
+            </script>
           </div>
         </div>
 

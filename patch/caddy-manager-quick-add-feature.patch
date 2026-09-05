@@ -1,0 +1,263 @@
+From 70593af6e38b0b4fdbf2b13454b8a9860538b395 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 5 Sep 2026 06:49:33 +0000
+Subject: [PATCH] Add a configurable Quick Add shortcut button to the Home
+ Dashboard and Site Blocks headers
+
+Settings > Quick Add gets two independent type pickers -- Home
+Dashboard and Site Blocks page can each be configured with their own
+block type, defaulting to "None" -- since a deployment might mostly
+create one type of block on one page and a different type on the
+other. There's no separate enable switch: a page's button appears as
+soon as that page's picker is set to anything other than "None", and
+disappears again if it's reset back to "None". When shown, the button
+is styled with that type's color and icon (matching the existing
+type_color()-driven styling used elsewhere) and jumps straight to
+main.new_block for that type, skipping the "New Site Block" modal's
+type picker.
+
+- configstore.py: get_quick_add_type_dashboard()/
+  get_quick_add_type_site_blocks(), each validated against
+  QUICK_ADD_BLOCK_TYPES, falling back to None on anything else.
+- views.py: dashboard()/site_blocks() pass their own page's configured
+  type; settings() gains an update_quick_add POST action, rejecting
+  any block type value outside the known set.
+- templates/partials/quick_add_button.html: new shared partial (same
+  "one partial, included by both pages" pattern as new_block_modal.html)
+  that renders the button only when a type is set, mirroring the
+  icon/label/color used by the existing type-picker modal.
+- settings.html: real Quick Add tab (was a lorem-ipsum stub) with the
+  two <select> pickers, both visible directly -- no toggle to show/hide
+  them first.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ caddy_manager/configstore.py             | 22 +++++++++++
+ caddy_manager/views.py                   | 20 +++++++++-
+ templates/home.html                      |  1 +
+ templates/partials/quick_add_button.html | 48 ++++++++++++++++++++++++
+ templates/settings.html                  | 40 +++++++++++++++++---
+ templates/site_blocks.html               |  1 +
+ 6 files changed, 124 insertions(+), 8 deletions(-)
+ create mode 100644 templates/partials/quick_add_button.html
+
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index ffcd93e..d15ddc2 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -120,3 +120,25 @@ def get_log_tail_lines():
+     except (TypeError, ValueError):
+         pass
+     return DEFAULT_LOG_TAIL_LINES
++
++
++# The header "Quick Add" button skips the New Site Block type-picker modal,
++# linking straight to main.new_block for one pre-chosen type -- configured
++# separately per page (Home Dashboard vs Site Blocks) since a deployment
++# might create mostly reverse proxies on one and mostly static sites on the
++# other. A page's type defaults to (and can be reset to) "None", which is
++# itself what turns the button off for that page -- there's no separate
++# enable switch.
++QUICK_ADD_BLOCK_TYPES = ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom")
++
++
++def get_quick_add_type_dashboard():
++    cfg = load_config()
++    value = cfg.get("quick_add_type_dashboard") if cfg else None
++    return value if value in QUICK_ADD_BLOCK_TYPES else None
++
++
++def get_quick_add_type_site_blocks():
++    cfg = load_config()
++    value = cfg.get("quick_add_type_site_blocks") if cfg else None
++    return value if value in QUICK_ADD_BLOCK_TYPES else None
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 102a5cf..838692d 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
+ from .auth import login_required
+ from .configstore import (
+     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
++    QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
+ )
+ from .caddyfile import slugify, extract_body, site_addresses_from_textarea
+ from .blocks import (
+@@ -32,7 +33,8 @@ def dashboard():
+         "disabled": sum(1 for b in blocks if b["disabled"]),
+     }
+     return render_template(
+-        "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists
++        "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
++        quick_add_type=get_quick_add_type_dashboard(),
+     )
+ 
+ 
+@@ -43,7 +45,8 @@ def site_blocks():
+     dir_exists = os.path.isdir(conf_dir)
+     blocks = list_blocks() if dir_exists else []
+     return render_template(
+-        "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists
++        "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists,
++        quick_add_type=get_quick_add_type_site_blocks(),
+     )
+ 
+ 
+@@ -328,6 +331,19 @@ def settings():
+                 flash("Certificate settings updated.", "success")
+                 return redirect(url_for("main.settings"))
+ 
++        elif action == "update_quick_add":
++            quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")
++            quick_add_type_site_blocks = request.form.get("quick_add_type_site_blocks", "")
++            valid_choices = ("",) + QUICK_ADD_BLOCK_TYPES
++            if quick_add_type_dashboard not in valid_choices or quick_add_type_site_blocks not in valid_choices:
++                error = "Invalid Quick Add block type selected."
++            else:
++                cfg["quick_add_type_dashboard"] = quick_add_type_dashboard
++                cfg["quick_add_type_site_blocks"] = quick_add_type_site_blocks
++                save_config(cfg)
++                flash("Quick Add settings updated.", "success")
++                return redirect(url_for("main.settings"))
++
+         elif action == "change_password":
+             current = request.form.get("current_password", "")
+             new_password = request.form.get("new_password", "")
+diff --git a/templates/home.html b/templates/home.html
+index 1ac6e5f..8540ac7 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -6,6 +6,7 @@
+ 
+ {% block header_actions %}
+ <div class="btn-list">
++  {% include 'partials/quick_add_button.html' %}
+   <button type="button" class="btn btn-1 d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
+     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
+diff --git a/templates/partials/quick_add_button.html b/templates/partials/quick_add_button.html
+new file mode 100644
+index 0000000..c9d191e
+--- /dev/null
++++ b/templates/partials/quick_add_button.html
+@@ -0,0 +1,48 @@
++<!-- BEGIN QUICK ADD BUTTON -->
++{% if quick_add_type %}
++  {% set qa_label = 'Reverse Proxy' if quick_add_type == 'reverse_proxy' else ('Redirect' if quick_add_type == 'redirect' else ('Load Balancer' if quick_add_type == 'load_balancer' else ('Static Site' if quick_add_type == 'static_site' else 'Custom Block'))) %}
++  <a href="{{ url_for('main.new_block', block_type=quick_add_type) }}" class="btn btn-{{ type_color(quick_add_type) }} btn-5 d-none d-sm-inline-block"
++     title="Quick add a {{ qa_label }} block">
++    {% if quick_add_type == 'reverse_proxy' %}
++      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
++        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++        <path d="M9 14l-4 -4l4 -4" />
++        <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
++      </svg>
++    {% elif quick_add_type == 'redirect' %}
++      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
++        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++        <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
++      </svg>
++    {% elif quick_add_type == 'load_balancer' %}
++      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
++        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++        <path d="M12 3v18" />
++        <path d="M16 7l-4 -4l-4 4" />
++        <path d="M16 11h5v5" />
++        <path d="M8 11h-5v5" />
++        <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
++        <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
++      </svg>
++    {% elif quick_add_type == 'static_site' %}
++      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
++        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++        <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
++      </svg>
++    {% else %}
++      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
++        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++        <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
++        <path d="M12 11.875l3 -1.687" />
++        <path d="M12 11.875v3.375" />
++        <path d="M12 11.875l-3 -1.687" />
++        <path d="M12 11.875l3 1.688" />
++        <path d="M12 8.5v3.375" />
++        <path d="M12 11.875l-3 1.688" />
++        <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
++      </svg>
++    {% endif %}
++    Quick Add
++  </a>
++{% endif %}
++<!-- END QUICK ADD BUTTON -->
+diff --git a/templates/settings.html b/templates/settings.html
+index b7f525e..6abaaa9 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -172,17 +172,45 @@
+           </div>
+         </div>
+ 
+-        <!-- TAB QUICK ADD--> 
++        <!-- TAB QUICK ADD-->
+         <div id="quick-add" class="tab-pane">
+           <div class="card-body">
+             <h2 class="mb-4">Quick Add</h2>
+-            <h3 class="card-title">Enable Quick Add</h3>
++            <h3 class="card-title">Quick Add Button</h3>
+             <p class="text-secondary">
+-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+-              alias aliquid
+-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+-              odit.
++              Adds a one-click shortcut button to the header of the <a href="{{ url_for('main.dashboard') }}">Home Dashboard</a> and/or <a href="{{ url_for('main.site_blocks') }}">Site Blocks</a> page that jumps straight to a chosen block type's form, skipping the "New Site Block" type picker. Each page can be configured with a different type, or left at "None" to leave that page's header unchanged.
+             </p>
++            <form method="post" id="quick-add-form">
++              <input type="hidden" name="action" value="update_quick_add">
++              <div class="mb-3">
++                <label class="form-label">Home Dashboard quick add type</label>
++                <select name="quick_add_type_dashboard" class="form-select">
++                  <option value="" {{ 'selected' if not cfg.quick_add_type_dashboard }}>None</option>
++                  <option value="reverse_proxy" {{ 'selected' if cfg.quick_add_type_dashboard == 'reverse_proxy' }}>Reverse Proxy</option>
++                  <option value="redirect" {{ 'selected' if cfg.quick_add_type_dashboard == 'redirect' }}>Redirect</option>
++                  <option value="load_balancer" {{ 'selected' if cfg.quick_add_type_dashboard == 'load_balancer' }}>Load Balancer</option>
++                  <option value="static_site" {{ 'selected' if cfg.quick_add_type_dashboard == 'static_site' }}>Static Site</option>
++                  <option value="custom" {{ 'selected' if cfg.quick_add_type_dashboard == 'custom' }}>Custom Block</option>
++                </select>
++              </div>
++              <div class="mb-0">
++                <label class="form-label">Site Blocks page quick add type</label>
++                <select name="quick_add_type_site_blocks" class="form-select">
++                  <option value="" {{ 'selected' if not cfg.quick_add_type_site_blocks }}>None</option>
++                  <option value="reverse_proxy" {{ 'selected' if cfg.quick_add_type_site_blocks == 'reverse_proxy' }}>Reverse Proxy</option>
++                  <option value="redirect" {{ 'selected' if cfg.quick_add_type_site_blocks == 'redirect' }}>Redirect</option>
++                  <option value="load_balancer" {{ 'selected' if cfg.quick_add_type_site_blocks == 'load_balancer' }}>Load Balancer</option>
++                  <option value="static_site" {{ 'selected' if cfg.quick_add_type_site_blocks == 'static_site' }}>Static Site</option>
++                  <option value="custom" {{ 'selected' if cfg.quick_add_type_site_blocks == 'custom' }}>Custom Block</option>
++                </select>
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++            <script>
++              initFormValidation(document.getElementById('quick-add-form'));
++            </script>
+           </div>
+         </div>
+ 
+diff --git a/templates/site_blocks.html b/templates/site_blocks.html
+index b900e4a..9fb771b 100644
+--- a/templates/site_blocks.html
++++ b/templates/site_blocks.html
+@@ -6,6 +6,7 @@
+ 
+ {% block header_actions %}
+ <div class="btn-list">
++  {% include 'partials/quick_add_button.html' %}
+   <button type="button" class="btn btn-1 d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
+     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
+-- 
+2.43.0
+

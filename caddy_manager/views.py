@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .auth import login_required
 from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
+    QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
 )
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
@@ -32,7 +33,8 @@ def dashboard():
         "disabled": sum(1 for b in blocks if b["disabled"]),
     }
     return render_template(
-        "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists
+        "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
+        quick_add_type=get_quick_add_type_dashboard(),
     )
 
 
@@ -43,7 +45,8 @@ def site_blocks():
     dir_exists = os.path.isdir(conf_dir)
     blocks = list_blocks() if dir_exists else []
     return render_template(
-        "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists
+        "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists,
+        quick_add_type=get_quick_add_type_site_blocks(),
     )
 
 
@@ -326,6 +329,19 @@ def settings():
                 cfg["cert_expiring_soon_days"] = int(cert_expiring_soon_days)
                 save_config(cfg)
                 flash("Certificate settings updated.", "success")
+                return redirect(url_for("main.settings"))
+
+        elif action == "update_quick_add":
+            quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")
+            quick_add_type_site_blocks = request.form.get("quick_add_type_site_blocks", "")
+            valid_choices = ("",) + QUICK_ADD_BLOCK_TYPES
+            if quick_add_type_dashboard not in valid_choices or quick_add_type_site_blocks not in valid_choices:
+                error = "Invalid Quick Add block type selected."
+            else:
+                cfg["quick_add_type_dashboard"] = quick_add_type_dashboard
+                cfg["quick_add_type_site_blocks"] = quick_add_type_site_blocks
+                save_config(cfg)
+                flash("Quick Add settings updated.", "success")
                 return redirect(url_for("main.settings"))
 
         elif action == "change_password":

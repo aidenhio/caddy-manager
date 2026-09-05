@@ -120,3 +120,25 @@ def get_log_tail_lines():
     except (TypeError, ValueError):
         pass
     return DEFAULT_LOG_TAIL_LINES
+
+
+# The header "Quick Add" button skips the New Site Block type-picker modal,
+# linking straight to main.new_block for one pre-chosen type -- configured
+# separately per page (Home Dashboard vs Site Blocks) since a deployment
+# might create mostly reverse proxies on one and mostly static sites on the
+# other. A page's type defaults to (and can be reset to) "None", which is
+# itself what turns the button off for that page -- there's no separate
+# enable switch.
+QUICK_ADD_BLOCK_TYPES = ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom")
+
+
+def get_quick_add_type_dashboard():
+    cfg = load_config()
+    value = cfg.get("quick_add_type_dashboard") if cfg else None
+    return value if value in QUICK_ADD_BLOCK_TYPES else None
+
+
+def get_quick_add_type_site_blocks():
+    cfg = load_config()
+    value = cfg.get("quick_add_type_site_blocks") if cfg else None
+    return value if value in QUICK_ADD_BLOCK_TYPES else None
