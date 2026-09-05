@@ -8,7 +8,7 @@ from .auth import login_required
 from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
-    get_show_metadata_card,
+    get_show_metadata_card, get_caddy_log_output_dir,
 )
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
@@ -128,7 +128,7 @@ def new_block(block_type):
     return render_template(
         "block_form.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
-        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/"),
+        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
         disabled_toggle_checked=disabled_toggle_checked,
     )
 
@@ -211,7 +211,7 @@ def edit_block(filename):
         "block_form.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
-        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/"),
+        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
         disabled_toggle_checked=disabled_toggle_checked,
     )
 
@@ -322,6 +322,12 @@ def settings():
                 save_config(cfg)
                 flash("Logging settings updated.", "success")
                 return redirect(url_for("main.settings"))
+
+        elif action == "update_caddy_logging":
+            cfg["caddy_log_output_dir"] = request.form.get("caddy_log_output_dir", "").strip()
+            save_config(cfg)
+            flash("Caddy logging settings updated.", "success")
+            return redirect(url_for("main.settings"))
 
         elif action == "update_certificates":
             cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()

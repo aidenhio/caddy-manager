@@ -1,0 +1,194 @@
+From ed7a0131638c5b8c883838fcf0a375bdc4a6a509 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 5 Sep 2026 07:50:04 +0000
+Subject: [PATCH] Add an optional Caddy log output directory setting, separate
+ from Caddy Manager's own logs directory
+
+Adds Settings > Caddy Settings > Logging > "Caddy log output directory":
+an optional override for the directory written into a block's `output
+file` line, i.e. where Caddy itself will actually write that block's
+access log. It's independent from the existing Logs directory path
+(Directories tab), which is only where Caddy Manager looks to list,
+tail, and delete log files -- the two default to the same place but can
+now be pointed at different filesystem paths, for setups where Caddy
+and Caddy Manager don't share the same view of the logs volume (e.g.
+separate containers). Leaving it blank keeps current behavior exactly
+as before.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ caddy_manager/blocks.py      | 26 +++++++++++++++++++++++---
+ caddy_manager/configstore.py | 19 +++++++++++++++++++
+ caddy_manager/views.py       | 12 +++++++++---
+ templates/settings.html      | 22 +++++++++++++++++-----
+ 4 files changed, 68 insertions(+), 11 deletions(-)
+
+diff --git a/caddy_manager/blocks.py b/caddy_manager/blocks.py
+index e7c26d0..8182ad1 100644
+--- a/caddy_manager/blocks.py
++++ b/caddy_manager/blocks.py
+@@ -19,7 +19,7 @@ from datetime import datetime
+ 
+ from flask import abort
+ 
+-from .configstore import get_conf_dir, get_log_dir
++from .configstore import get_conf_dir, get_log_dir, get_caddy_log_output_dir
+ from .caddyfile import (
+     site_addresses_from_textarea, site_address_header, slugify,
+     join_target, parse_conf_content,
+@@ -89,12 +89,32 @@ def safe_log_path(filename):
+ def log_path_for(conf_filename):
+     """Absolute path of the log file that would correspond to a given
+     .conf filename (same base name as its .conf/.metadata sidecar, with a
+-    .log extension), or None if no logs directory is configured."""
++    .log extension), or None if no logs directory is configured.
++
++    This is Caddy Manager's own view of where the log file lives, used
++    whenever the app itself reads/tails/deletes/renames a log file. It is
++    NOT necessarily the path Caddy itself writes to -- see
++    caddy_log_path_for() below for that."""
+     if not conf_filename:
+         return None
+     return safe_log_path(block_base_name(conf_filename) + ".log")
+ 
+ 
++def caddy_log_path_for(conf_filename):
++    """Absolute path Caddy itself will write conf_filename's access log to,
++    as baked into the block's `output file` directive -- resolved within
++    the configured Caddy log output directory (get_caddy_log_output_dir()),
++    which defaults to the same directory log_path_for() uses but can be
++    overridden separately in Settings > Caddy Settings > Logging. Returns
++    None if no output directory can be determined."""
++    if not conf_filename:
++        return None
++    log_dir = get_caddy_log_output_dir()
++    if not log_dir:
++        return None
++    return os.path.join(os.path.abspath(log_dir), block_base_name(conf_filename) + ".log")
++
++
+ def delete_log_file(conf_filename):
+     path = log_path_for(conf_filename)
+     if path and os.path.isfile(path):
+@@ -427,7 +447,7 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
+         if roll_keep and not (roll_keep.isdigit() and int(roll_keep) > 0):
+             log_error = "Rotated files to keep must be a positive whole number."
+         else:
+-            log_path = log_path_for(log_filename_hint)
++            log_path = caddy_log_path_for(log_filename_hint)
+             if not log_path:
+                 log_error = "Set a logs directory in Settings before enabling logging."
+             else:
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index 562c469..516701d 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -87,6 +87,25 @@ def get_caddyfile_path():
+     return load_config().get("caddyfile_path", "")
+ 
+ 
++def get_caddy_log_output_dir():
++    """The directory path written into a block's `output file` line when
++    logging is enabled -- i.e. where Caddy itself will actually write that
++    block's access log, as far as Caddy's own filesystem sees it.
++
++    This is deliberately independent from get_log_dir(), which is where
++    Caddy Manager looks to read/tail/delete/rename log files on its own
++    side. The two normally point at the same directory (this defaults to
++    get_log_dir(), itself root_dir/logs by default), but they can be split
++    apart when Caddy and Caddy Manager don't share the same filesystem
++    view of the logs volume -- for example, each running in its own
++    container with that volume mounted at a different path. Overriding
++    this setting only changes what gets written into newly rendered .conf
++    files; it never affects where Caddy Manager itself looks for logs."""
++    cfg = load_config()
++    value = (cfg.get("caddy_log_output_dir") or "").strip() if cfg else ""
++    return value or get_log_dir()
++
++
+ # Caddy's built-in default is to attempt renewal starting 30 days before
+ # expiry -- 37 gives it a week of retries (rate limits, a flaky ACME
+ # challenge, DNS propagation) before the Certificates page calls a cert
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index fed13f9..423d9fd 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -8,7 +8,7 @@ from .auth import login_required
+ from .configstore import (
+     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
+     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
+-    get_show_metadata_card,
++    get_show_metadata_card, get_caddy_log_output_dir,
+ )
+ from .caddyfile import slugify, extract_body, site_addresses_from_textarea
+ from .blocks import (
+@@ -128,7 +128,7 @@ def new_block(block_type):
+     return render_template(
+         "block_form.html", mode="new", block_type=block_type,
+         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
+-        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/"),
++        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+         disabled_toggle_checked=disabled_toggle_checked,
+     )
+ 
+@@ -211,7 +211,7 @@ def edit_block(filename):
+         "block_form.html", mode="edit", block_type=block_type, filename=filename,
+         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
+         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
+-        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_log_dir() or "<logs dir>").rstrip("/"),
++        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+         disabled_toggle_checked=disabled_toggle_checked,
+     )
+ 
+@@ -323,6 +323,12 @@ def settings():
+                 flash("Logging settings updated.", "success")
+                 return redirect(url_for("main.settings"))
+ 
++        elif action == "update_caddy_logging":
++            cfg["caddy_log_output_dir"] = request.form.get("caddy_log_output_dir", "").strip()
++            save_config(cfg)
++            flash("Caddy logging settings updated.", "success")
++            return redirect(url_for("main.settings"))
++
+         elif action == "update_certificates":
+             cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()
+             if not (cert_expiring_soon_days.isdigit() and int(cert_expiring_soon_days) > 0):
+diff --git a/templates/settings.html b/templates/settings.html
+index 8049717..deac1de 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -303,13 +303,25 @@
+         <div id="logs" class="tab-pane">
+           <div class="card-body">
+             <h2 class="mb-4">Caddy Logging</h2>
+-            <h3 class="card-title">XXX</h3>
++            <h3 class="card-title">Log Output Directory</h3>
+             <p class="text-secondary">
+-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+-              alias aliquid
+-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+-              odit.
++              Overrides the directory written into a block's <code>output file</code> line when logging is enabled -- i.e. the path <strong>Caddy itself</strong> will write that block's access log to. This is separate from the Logs directory path in <a href="#directory" data-bs-toggle="tab">Directories</a>, which is where <strong>Caddy Manager</strong> looks to list, tail, and delete log files on its own side. The two normally point at the same place, but can be set differently when Caddy and Caddy Manager don't share the same filesystem view of the logs volume -- for example, if they run in separate containers with that volume mounted at different paths. Leave this blank to keep using the Logs directory path for both.
+             </p>
++            <form method="post" id="caddy-logging-form">
++              <input type="hidden" name="action" value="update_caddy_logging">
++              <div class="mb-0">
++                <label class="form-label">Caddy log output directory <span class="form-hint d-inline">(optional)</span></label>
++                <input type="text" name="caddy_log_output_dir" class="form-control" placeholder="{{ cfg.log_dir or (cfg.root_dir + '/logs' if cfg.root_dir else '') }}"
++                       value="{{ cfg.caddy_log_output_dir or '' }}">
++                <small class="form-hint">Blank defaults to the Logs directory path ({{ cfg.log_dir or (cfg.root_dir + '/logs' if cfg.root_dir else 'root_dir/logs') }}). Existing blocks keep the path they were created with until next edited or re-created.</small>
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++            <script>
++              initFormValidation(document.getElementById('caddy-logging-form'));
++            </script>
+           </div>
+         </div>
+ 
+-- 
+2.43.0
+

@@ -303,13 +303,25 @@
         <div id="logs" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Caddy Logging</h2>
-            <h3 class="card-title">XXX</h3>
+            <h3 class="card-title">Log Output Directory</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Overrides the directory written into a block's <code>output file</code> line when logging is enabled -- i.e. the path <strong>Caddy itself</strong> will write that block's access log to. This is separate from the Logs directory path in <a href="#directory" data-bs-toggle="tab">Directories</a>, which is where <strong>Caddy Manager</strong> looks to list, tail, and delete log files on its own side. The two normally point at the same place, but can be set differently when Caddy and Caddy Manager don't share the same filesystem view of the logs volume -- for example, if they run in separate containers with that volume mounted at different paths. Leave this blank to keep using the Logs directory path for both.
             </p>
+            <form method="post" id="caddy-logging-form">
+              <input type="hidden" name="action" value="update_caddy_logging">
+              <div class="mb-0">
+                <label class="form-label">Caddy log output directory <span class="form-hint d-inline">(optional)</span></label>
+                <input type="text" name="caddy_log_output_dir" class="form-control" placeholder="{{ cfg.log_dir or (cfg.root_dir + '/logs' if cfg.root_dir else '') }}"
+                       value="{{ cfg.caddy_log_output_dir or '' }}">
+                <small class="form-hint">Blank defaults to the Logs directory path ({{ cfg.log_dir or (cfg.root_dir + '/logs' if cfg.root_dir else 'root_dir/logs') }}). Existing blocks keep the path they were created with until next edited or re-created.</small>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('caddy-logging-form'));
+            </script>
           </div>
         </div>
 

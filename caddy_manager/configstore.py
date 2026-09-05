@@ -87,6 +87,25 @@ def get_caddyfile_path():
     return load_config().get("caddyfile_path", "")
 
 
+def get_caddy_log_output_dir():
+    """The directory path written into a block's `output file` line when
+    logging is enabled -- i.e. where Caddy itself will actually write that
+    block's access log, as far as Caddy's own filesystem sees it.
+
+    This is deliberately independent from get_log_dir(), which is where
+    Caddy Manager looks to read/tail/delete/rename log files on its own
+    side. The two normally point at the same directory (this defaults to
+    get_log_dir(), itself root_dir/logs by default), but they can be split
+    apart when Caddy and Caddy Manager don't share the same filesystem
+    view of the logs volume -- for example, each running in its own
+    container with that volume mounted at a different path. Overriding
+    this setting only changes what gets written into newly rendered .conf
+    files; it never affects where Caddy Manager itself looks for logs."""
+    cfg = load_config()
+    value = (cfg.get("caddy_log_output_dir") or "").strip() if cfg else ""
+    return value or get_log_dir()
+
+
 # Caddy's built-in default is to attempt renewal starting 30 days before
 # expiry -- 37 gives it a week of retries (rate limits, a flaky ACME
 # challenge, DNS propagation) before the Certificates page calls a cert

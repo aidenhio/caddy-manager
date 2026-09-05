@@ -19,7 +19,7 @@ from datetime import datetime
 
 from flask import abort
 
-from .configstore import get_conf_dir, get_log_dir
+from .configstore import get_conf_dir, get_log_dir, get_caddy_log_output_dir
 from .caddyfile import (
     site_addresses_from_textarea, site_address_header, slugify,
     join_target, parse_conf_content,
@@ -89,10 +89,30 @@ def safe_log_path(filename):
 def log_path_for(conf_filename):
     """Absolute path of the log file that would correspond to a given
     .conf filename (same base name as its .conf/.metadata sidecar, with a
-    .log extension), or None if no logs directory is configured."""
+    .log extension), or None if no logs directory is configured.
+
+    This is Caddy Manager's own view of where the log file lives, used
+    whenever the app itself reads/tails/deletes/renames a log file. It is
+    NOT necessarily the path Caddy itself writes to -- see
+    caddy_log_path_for() below for that."""
     if not conf_filename:
         return None
     return safe_log_path(block_base_name(conf_filename) + ".log")
+
+
+def caddy_log_path_for(conf_filename):
+    """Absolute path Caddy itself will write conf_filename's access log to,
+    as baked into the block's `output file` directive -- resolved within
+    the configured Caddy log output directory (get_caddy_log_output_dir()),
+    which defaults to the same directory log_path_for() uses but can be
+    overridden separately in Settings > Caddy Settings > Logging. Returns
+    None if no output directory can be determined."""
+    if not conf_filename:
+        return None
+    log_dir = get_caddy_log_output_dir()
+    if not log_dir:
+        return None
+    return os.path.join(os.path.abspath(log_dir), block_base_name(conf_filename) + ".log")
 
 
 def delete_log_file(conf_filename):
@@ -427,7 +447,7 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
         if roll_keep and not (roll_keep.isdigit() and int(roll_keep) > 0):
             log_error = "Rotated files to keep must be a positive whole number."
         else:
-            log_path = log_path_for(log_filename_hint)
+            log_path = caddy_log_path_for(log_filename_hint)
             if not log_path:
                 log_error = "Set a logs directory in Settings before enabling logging."
             else:
