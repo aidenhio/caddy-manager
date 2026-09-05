@@ -31,17 +31,18 @@
             <a href="#user" class="list-group-item list-group-item-action d-flex align-items-center active" data-bs-toggle="tab">User</a>
             <a href="#password" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Password</a>
           </div>
+          <h4 class="card-header subheader mt-4">App Settings</h4>
+          <div>
+            <a href="#general" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">General</a>
+            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>           
+            <a href="#dashboard" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Dashboard</a>
+            <a href="#quick-add" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Quick Add</a>
+          </div>
           <h4 class="card-header subheader mt-4">Caddy Settings</h4>
           <div>            
-            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>
             <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Caddy API</a>
             <a href="#logging" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Logging</a>
             <a href="#certificates" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Certificates</a>
-          </div>
-          <h4 class="card-header subheader mt-4">Other Settings</h4>
-          <div>            
-            <a href="#setting1" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Setting 1</a>
-            <a href="#setting2" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Setting 2</a>
           </div>
         </div>
       
@@ -55,7 +56,7 @@
     <div class="col-12 col-md-9 d-flex flex-column">
       <div class="tab-content">
 
-        <!-- TAB 1: USER --> 
+        <!-- TAB USER --> 
         <div id="user" class="tab-pane active">
           <div class="card-body">
             <h2 class="mb-4">User Settings</h2>
@@ -69,7 +70,7 @@
           </div>
         </div>
 
-        <!-- TAB 2: PASSWORD --> 
+        <!-- TAB PASSWORD --> 
         <div id="password" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Password Settings</h2>
@@ -103,11 +104,25 @@
             </script>
           </div>
         </div>
-        
-        <!-- TAB 3: DIRECTORY --> 
+
+        <!-- TAB GENERAL --> 
+        <div id="general" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">General Settings</h2>
+            <h3 class="card-title">Preview Page Options</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB DIRECTORY --> 
         <div id="directory" class="tab-pane">
           <div class="card-body">
-            <h2 class="mb-4">Caddy Configuration Directories</h2>
+            <h2 class="mb-4">Configuration Directories</h2>
             <h3 class="card-title">Change Directories</h3>
             <p class="text-secondary">
               Ensure all directories exist and have correct permissions.
@@ -143,7 +158,35 @@
           </div>
         </div>
 
-        <!-- TAB 4: API --> 
+        <!-- TAB DASHBOARD -->
+        <div id="dashboard" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Dashboard Settings</h2>
+            <h3 class="card-title">Widgets</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB QUICK ADD--> 
+        <div id="quick-add" class="tab-pane">
+          <div class="card-body">
+            <h2 class="mb-4">Quick Add</h2>
+            <h3 class="card-title">Enable Quick Add</h3>
+            <p class="text-secondary">
+              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+              alias aliquid
+              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+              odit.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB API --> 
         <div id="api" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Caddy API</h2>
@@ -157,7 +200,7 @@
           </div>
         </div>
 
-        <!-- TAB 5: LOGGING -->
+        <!-- TAB LOGGING -->
         <div id="logging" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Caddy Logging</h2>
@@ -184,7 +227,7 @@
           </div>
         </div>
 
-        <!-- TAB 5B: CERTIFICATES -->
+        <!-- TAB CERTIFICATES -->
         <div id="certificates" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Certificate Settings</h2>
@@ -211,33 +254,6 @@
           </div>
         </div>
 
-        <!-- TAB 6 -->
-        <div id="setting1" class="tab-pane">
-          <div class="card-body">
-            <h2 class="mb-4">Setting 1</h2>
-            <h3 class="card-title">Setting</h3>
-            <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
-            </p>
-          </div>
-        </div>
-
-        <!-- TAB 7 --> 
-        <div id="setting2" class="tab-pane">
-          <div class="card-body">
-            <h2 class="mb-4">Setting 2</h2>
-            <h3 class="card-title">Setting</h3>
-            <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
-            </p>
-          </div>
-        </div>
       </div>
 
     </div>
