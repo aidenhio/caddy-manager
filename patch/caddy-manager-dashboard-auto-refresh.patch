@@ -1,0 +1,108 @@
+From fdddd9e20fb5cb2ba65ff9206dc05f1d353f0dc7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 6 Sep 2026 05:04:30 +0000
+Subject: [PATCH] Auto-refresh the Dashboard's Current Requests widget every
+ 60s
+
+Adds a small JSON endpoint (/dashboard/caddy-stats) and
+static/js/dashboard-stats.js, which polls it every 60 seconds to keep
+the Current Requests card current without a full page reload. Only
+this card is refreshed -- it's the one dashboard stat sourced live from
+Caddy's own admin API rather than this app's own files, so it's the one
+that goes stale if the page is left open.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ caddy_manager/views.py       | 15 +++++++++++++++
+ static/js/dashboard-stats.js | 29 +++++++++++++++++++++++++++++
+ templates/home.html          |  4 +++-
+ 3 files changed, 47 insertions(+), 1 deletion(-)
+ create mode 100644 static/js/dashboard-stats.js
+
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 180c07e..c83b4ba 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -47,6 +47,21 @@ def dashboard():
+     )
+ 
+ 
++@bp.route("/dashboard/caddy-stats")
++@login_required
++def dashboard_caddy_stats():
++    """JSON refresh endpoint for the Dashboard's Current Requests card --
++    it's the one dashboard stat sourced live from Caddy's own admin API
++    rather than this app's own files, so it's the one that goes stale if
++    the page is left open (see static/js/dashboard-stats.js)."""
++    caddy_stats = upstream_stats()
++    return jsonify(
++        current_requests=caddy_stats["current_requests"] if caddy_stats else None,
++        upstreams_total=caddy_stats["upstreams_total"] if caddy_stats else None,
++        failed_requests=caddy_stats["failed_requests"] if caddy_stats else None,
++    )
++
++
+ @bp.route("/site-blocks")
+ @login_required
+ def site_blocks():
+diff --git a/static/js/dashboard-stats.js b/static/js/dashboard-stats.js
+new file mode 100644
+index 0000000..6636683
+--- /dev/null
++++ b/static/js/dashboard-stats.js
+@@ -0,0 +1,29 @@
++// BEGIN DASHBOARD STATS AUTO-REFRESH
++// Keeps the Current Requests stat card current without needing a full
++// page reload. It's the one Dashboard stat sourced live from Caddy's own
++// admin API (see caddy_api.py) rather than this app's own files/config,
++// so it's the one that visibly goes stale if the page is left open --
++// Active/Disabled Site Blocks and SSL Certificates only change in
++// response to actions taken through this app itself, so they don't need
++// the same treatment.
++(function () {
++  const valueEl = document.getElementById('current-requests-value');
++  if (!valueEl) return;
++
++  const REFRESH_INTERVAL_MS = 60000;
++
++  function refresh() {
++    fetch('/dashboard/caddy-stats', { headers: { Accept: 'application/json' } })
++      .then((res) => res.json())
++      .then((data) => {
++        valueEl.textContent = typeof data.current_requests === 'number' ? data.current_requests : 'N/A';
++      })
++      .catch(() => {
++        // Leave the last known value showing rather than flashing N/A for
++        // what's likely just a transient network hiccup.
++      });
++  }
++
++  setInterval(refresh, REFRESH_INTERVAL_MS);
++})();
++// END DASHBOARD STATS AUTO-REFRESH
+diff --git a/templates/home.html b/templates/home.html
+index faeb7e5..59c38c9 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -128,7 +128,7 @@
+             </span>
+           </div>
+           <div class="col">
+-            <div class="font-weight-medium">{{ stats.current_requests if stats.current_requests is not none else 'N/A' }} Current Requests</div>
++            <div class="font-weight-medium"><span id="current-requests-value">{{ stats.current_requests if stats.current_requests is not none else 'N/A' }}</span> Current Requests</div>
+           </div>
+         </div>
+       </div>
+@@ -140,5 +140,7 @@
+ <div class="row row-deck row-cards">
+ </div>
+ 
++<script src="{{ url_for('static', filename='js/dashboard-stats.js') }}"></script>
++
+ {% endblock %}
+ <!-- END CONTENT BLOCK -->
+\ No newline at end of file
+-- 
+2.43.0
+

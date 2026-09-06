@@ -106,6 +106,16 @@ def get_caddy_log_output_dir():
     return value or get_log_dir()
 
 
+def get_caddy_admin_api_url():
+    """The address of Caddy's admin API (e.g. "caddy.example.com:2019" or
+    "https://caddy.example.com:2019"), used to read live stats such as
+    reverse-proxy upstream request counts for the Dashboard. Empty string
+    if unset -- this is entirely optional; nothing else in the app
+    depends on it."""
+    cfg = load_config()
+    return (cfg.get("caddy_admin_api_url") or "").strip() if cfg else ""
+
+
 # Caddy's built-in default is to attempt renewal starting 30 days before
 # expiry -- 37 gives it a week of retries (rate limits, a flaky ACME
 # challenge, DNS propagation) before the Certificates page calls a cert

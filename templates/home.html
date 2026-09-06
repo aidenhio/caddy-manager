@@ -128,7 +128,7 @@
             </span>
           </div>
           <div class="col">
-            <div class="font-weight-medium">83 Current Requests</div>
+            <div class="font-weight-medium"><span id="current-requests-value">{{ stats.current_requests if stats.current_requests is not none else 'N/A' }}</span> Current Requests</div>
           </div>
         </div>
       </div>
@@ -139,6 +139,8 @@
 
 <div class="row row-deck row-cards">
 </div>
+
+<script src="{{ url_for('static', filename='js/dashboard-stats.js') }}"></script>
 
 {% endblock %}
 <!-- END CONTENT BLOCK -->

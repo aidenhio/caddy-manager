@@ -285,17 +285,29 @@
           </div>
         </div>
 
-        <!-- TAB API --> 
+        <!-- TAB API -->
         <div id="api" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Caddy API</h2>
             <h3 class="card-title">Connect API</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Lets Caddy Manager read live stats from Caddy's own <a href="https://caddyserver.com/docs/api" target="_blank" rel="noopener">admin API</a> -- currently used to power the <a href="{{ url_for('main.dashboard') }}">Dashboard</a>'s Current Requests widget. Enter the address Caddy's admin API listens on, e.g. <code>caddy.example.com:2019</code> (defaults to <code>http://</code> if no scheme is given). Leave blank to leave that widget unavailable.
             </p>
+            <form method="post" id="caddy-api-form">
+              <input type="hidden" name="action" value="update_caddy_api">
+              <div class="mb-0">
+                <label class="form-label">Caddy admin API URL <span class="form-hint d-inline">(optional)</span></label>
+                <input type="text" name="caddy_admin_api_url" class="form-control" placeholder="caddy.example.com:2019"
+                       value="{{ cfg.caddy_admin_api_url or '' }}">
+                <small class="form-hint">Caddy Manager must be able to reach this address directly -- it must not require authentication, since Caddy's admin API has none of its own.</small>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('caddy-api-form'));
+            </script>
           </div>
         </div>
 

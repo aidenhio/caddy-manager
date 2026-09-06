@@ -10,6 +10,7 @@ from .configstore import (
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
     get_show_metadata_card, get_caddy_log_output_dir,
 )
+from .caddy_api import upstream_stats
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
@@ -30,15 +31,34 @@ def dashboard():
     blocks = list_blocks() if dir_exists else []
     certs_root = certificates_root()
     certs = list_certificates() if certs_root and os.path.isdir(certs_root) else []
+    caddy_stats = upstream_stats()
     stats = {
         "total": len(blocks),
         "enabled": sum(1 for b in blocks if not b["disabled"]),
         "disabled": sum(1 for b in blocks if b["disabled"]),
         **certificate_stats(certs),
+        "current_requests": caddy_stats["current_requests"] if caddy_stats else None,
+        "upstreams_total": caddy_stats["upstreams_total"] if caddy_stats else None,
+        "failed_requests": caddy_stats["failed_requests"] if caddy_stats else None,
     }
     return render_template(
         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
         quick_add_type=get_quick_add_type_dashboard(),
+    )
+
+
+@bp.route("/dashboard/caddy-stats")
+@login_required
+def dashboard_caddy_stats():
+    """JSON refresh endpoint for the Dashboard's Current Requests card --
+    it's the one dashboard stat sourced live from Caddy's own admin API
+    rather than this app's own files, so it's the one that goes stale if
+    the page is left open (see static/js/dashboard-stats.js)."""
+    caddy_stats = upstream_stats()
+    return jsonify(
+        current_requests=caddy_stats["current_requests"] if caddy_stats else None,
+        upstreams_total=caddy_stats["upstreams_total"] if caddy_stats else None,
+        failed_requests=caddy_stats["failed_requests"] if caddy_stats else None,
     )
 
 
@@ -330,6 +350,12 @@ def settings():
             cfg["caddy_log_output_dir"] = request.form.get("caddy_log_output_dir", "").strip()
             save_config(cfg)
             flash("Caddy logging settings updated.", "success")
+            return redirect(url_for("main.settings"))
+
+        elif action == "update_caddy_api":
+            cfg["caddy_admin_api_url"] = request.form.get("caddy_admin_api_url", "").strip()
+            save_config(cfg)
+            flash("Caddy API settings updated.", "success")
             return redirect(url_for("main.settings"))
 
         elif action == "update_certificates":
