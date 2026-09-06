@@ -64,18 +64,26 @@ def fetch_reverse_proxy_upstreams():
 
 def upstream_stats():
     """Summary counts derived from the live /reverse_proxy/upstreams
-    response, ready for the Dashboard's Current Requests widget (and any
-    other upstream-derived widgets added later -- upstreams_total and
-    failed_requests aren't shown yet but are computed here for that).
-    Returns None -- rather than zeroed-out values -- when the API
-    couldn't be reached at all, so the caller can tell "0 requests" apart
-    from "not configured/unreachable"."""
+    response, ready for the Dashboard's Current Requests and Upstream
+    Health widgets. Returns None -- rather than zeroed-out values -- when
+    the API couldn't be reached at all, so the caller can tell "0
+    requests" apart from "not configured/unreachable".
+
+    unique_requested_sites counts distinct upstream addresses that have
+    at least one in-flight request right now -- distinct because the same
+    backend address can appear more than once in the raw response when
+    more than one site/route proxies to it, so a plain count of entries
+    would double-count that backend."""
     upstreams = fetch_reverse_proxy_upstreams()
     if upstreams is None:
         return None
     valid = [u for u in upstreams if isinstance(u, dict)]
+    requested_addresses = {
+        u.get("address") for u in valid if (u.get("num_requests") or 0) > 0
+    }
     return {
         "upstreams_total": len(valid),
         "current_requests": sum((u.get("num_requests") or 0) for u in valid),
         "failed_requests": sum((u.get("fails") or 0) for u in valid),
+        "unique_requested_sites": len(requested_addresses),
     }

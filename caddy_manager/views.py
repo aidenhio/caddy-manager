@@ -44,6 +44,7 @@ def dashboard():
         "current_requests": caddy_stats["current_requests"] if caddy_stats else None,
         "upstreams_total": caddy_stats["upstreams_total"] if caddy_stats else None,
         "failed_requests": caddy_stats["failed_requests"] if caddy_stats else None,
+        "unique_requested_sites": caddy_stats["unique_requested_sites"] if caddy_stats else None,
     }
     # Most recently created blocks first -- created_ts (not updated_ts) so
     # an unrelated edit doesn't bump an old block back to the top.
@@ -57,15 +58,16 @@ def dashboard():
 @bp.route("/dashboard/caddy-stats")
 @login_required
 def dashboard_caddy_stats():
-    """JSON refresh endpoint for the Dashboard's Current Requests card --
-    it's the one dashboard stat sourced live from Caddy's own admin API
-    rather than this app's own files, so it's the one that goes stale if
-    the page is left open (see static/js/dashboard-stats.js)."""
+    """JSON refresh endpoint for the Dashboard's Current Requests and
+    Upstream Health cards -- both are sourced live from Caddy's own admin
+    API rather than this app's own files, so they're the ones that go
+    stale if the page is left open (see static/js/dashboard-stats.js)."""
     caddy_stats = upstream_stats()
     return jsonify(
         current_requests=caddy_stats["current_requests"] if caddy_stats else None,
         upstreams_total=caddy_stats["upstreams_total"] if caddy_stats else None,
         failed_requests=caddy_stats["failed_requests"] if caddy_stats else None,
+        unique_requested_sites=caddy_stats["unique_requested_sites"] if caddy_stats else None,
     )
 
 
