@@ -154,69 +154,72 @@
         </div>
       </div>
       {% if recent_blocks %}
-      <div class="list-group list-group-flush">
-        {% for b in recent_blocks %}
-        {% set row_color = type_color(b.type) %}
-        {% set row_label = 'Reverse Proxy' if b.type == 'reverse_proxy' else ('Redirect' if b.type == 'redirect' else ('Load Balancer' if b.type == 'load_balancer' else ('Static Site' if b.type == 'static_site' else 'Custom'))) %}
-        <div class="list-group-item">
-          <div class="row align-items-center">
-            <div class="col-auto">
-              <span class="avatar avatar bg-{{ row_color }}-lt">
-                {% if b.type == 'reverse_proxy' %}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                  <path d="M9 14l-4 -4l4 -4" />
-                  <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
-                </svg>
-                {% elif b.type == 'redirect' %}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                  <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
-                </svg>
-                {% elif b.type == 'load_balancer' %}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                  <path d="M12 3v18" />
-                  <path d="M16 7l-4 -4l-4 4" />
-                  <path d="M16 11h5v5" />
-                  <path d="M8 11h-5v5" />
-                  <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
-                  <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
-                </svg>
-                {% elif b.type == 'static_site' %}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                  <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
-                </svg>
-                {% else %}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                  <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
-                  <path d="M12 11.875l3 -1.687" />
-                  <path d="M12 11.875v3.375" />
-                  <path d="M12 11.875l-3 -1.687" />
-                  <path d="M12 11.875l3 1.688" />
-                  <path d="M12 8.5v3.375" />
-                  <path d="M12 11.875l-3 1.688" />
-                  <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
-                </svg>
-                {% endif %}
-              </span>
+      <div class="card-body">
+        <ul class="timeline">
+          {% for b in recent_blocks %}
+          {% set row_color = type_color(b.type) %}
+          {% set row_label = 'Reverse Proxy' if b.type == 'reverse_proxy' else ('Redirect' if b.type == 'redirect' else ('Load Balancer' if b.type == 'load_balancer' else ('Static Site' if b.type == 'static_site' else 'Custom'))) %}
+          <li class="timeline-event">
+            <div class="timeline-event-icon bg-{{ row_color }}-lt">
+              {% if b.type == 'reverse_proxy' %}
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M9 14l-4 -4l4 -4" />
+                <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+              </svg>
+              {% elif b.type == 'redirect' %}
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
+              </svg>
+              {% elif b.type == 'load_balancer' %}
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M12 3v18" />
+                <path d="M16 7l-4 -4l-4 4" />
+                <path d="M16 11h5v5" />
+                <path d="M8 11h-5v5" />
+                <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
+                <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
+              </svg>
+              {% elif b.type == 'static_site' %}
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
+              </svg>
+              {% else %}
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
+                <path d="M12 11.875l3 -1.687" />
+                <path d="M12 11.875v3.375" />
+                <path d="M12 11.875l-3 -1.687" />
+                <path d="M12 11.875l3 1.688" />
+                <path d="M12 8.5v3.375" />
+                <path d="M12 11.875l-3 1.688" />
+                <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
+              </svg>
+              {% endif %}
             </div>
-            <div class="col text-truncate">
-              <a href="{{ url_for('main.preview_block', filename=b.filename) }}" class="text-body d-block text-truncate">
-                {{ b.site_addresses[0] if b.site_addresses else b.filename }}
-              </a>
-              <div class="text-secondary text-truncate">{{ row_label }} &middot; {{ b.created }}</div>
+            <div class="card timeline-event-card">
+              <div class="card-body">
+                <div class="text-secondary float-end">{{ b.created }}</div>
+                <h4 class="text-truncate">
+                  <a href="{{ url_for('main.preview_block', filename=b.filename) }}" class="text-body">
+                    {{ b.site_addresses[0] if b.site_addresses else b.filename }}
+                  </a>
+                </h4>
+                <p class="badge bg-{{row_color}}-lt mb-0">
+                  {{ row_label }}
+                  {% if b.disabled %}
+                  <span class="badge bg-muted-lt ms-1">Disabled</span>
+                  {% endif %}
+                </p>
+              </div>
             </div>
-            {% if b.disabled %}
-            <div class="col-auto">
-              <span class="badge bg-muted-lt">Disabled</span>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-        {% endfor %}
+          </li>
+          {% endfor %}
+        </ul>
       </div>
       {% else %}
       <div class="card-body">
