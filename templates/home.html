@@ -28,6 +28,8 @@
 {% block content %}
 <!-- BEGIN STAT CARDS -->
 <div class="row row-cards">
+  {% if dashboard_widgets.quick_glance_row %}
+  <!-- BEGIN QUICK GLANCE ROW -->
   <div class="col-sm-6 col-lg-3">
     <div class="card card-sm">
       <div class="card-body">
@@ -138,7 +140,10 @@
       </div>
     </div>
   </div>
+  <!-- END QUICK GLANCE ROW -->
+  {% endif %}
 
+  {% if dashboard_widgets.recently_added %}
   <!-- BEGIN RECENTLY ADDED CARD -->
   <div class="col-12 col-lg-7">
     <div class="card">
@@ -221,10 +226,13 @@
     </div>
   </div>
   <!-- END RECENTLY ADDED CARD -->
+  {% endif %}
 
+  {% if dashboard_widgets.sites_by_type or dashboard_widgets.certificate_status or dashboard_widgets.upstream_health %}
   <div class="col-12 col-lg-5">
     <div class="row row-cards">
 
+      {% if dashboard_widgets.sites_by_type %}
       <!-- BEGIN SITES BY TYPE CARD -->
       <div class="col-12">
         <div class="card">
@@ -265,7 +273,9 @@
         </div>
       </div>
       <!-- END SITES BY TYPE CARD -->
+      {% endif %}
 
+      {% if dashboard_widgets.certificate_status %}
       <!-- BEGIN CERTIFICATE STATUS CARD -->
       <div class="col-12">
         <div class="card">
@@ -315,7 +325,9 @@
         </div>
       </div>
       <!-- END CERTIFICATE STATUS CARD -->
+      {% endif %}
 
+      {% if dashboard_widgets.upstream_health %}
       <!-- BEGIN UPSTREAM HEALTH CARD -->
       <div class="col-12">
         <div class="card">
@@ -345,9 +357,11 @@
         </div>
       </div>
       <!-- END UPSTREAM HEALTH CARD -->
+      {% endif %}
 
     </div>
   </div>
+  {% endif %}
 
 </div>
 <!-- END STAT CARDS -->

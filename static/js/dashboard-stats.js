@@ -7,17 +7,20 @@
 // Blocks and SSL Certificates only change in response to actions taken
 // through this app itself, so they don't need the same treatment.
 (function () {
+  // Each of these elements can be independently missing from the DOM: the
+  // Current Requests span is only rendered when the Quick Glance Row
+  // widget is turned on (Settings > Dashboard), and the Upstream Health
+  // card's spans only exist when both that widget is turned on and the
+  // Caddy admin API is configured. setValue()/the wrapper check below
+  // just skip updating whichever of these aren't present.
   const currentRequestsEl = document.getElementById('current-requests-value');
-  if (!currentRequestsEl) return;
-
-  // The Upstream Health card's own value spans only exist in the DOM when
-  // the admin API was already configured at page load (see home.html's
-  // Upstream Health card) -- setValue()/the wrapper check below just skip
-  // updating them when that's not the case.
   const upstreamCountEl = document.getElementById('upstream-count-value');
   const requestedSitesEl = document.getElementById('requested-sites-value');
   const failedRequestsEl = document.getElementById('failed-requests-value');
   const failedRequestsWrapper = document.getElementById('failed-requests-wrapper');
+
+  // Nothing on the page needs a live refresh -- both widgets are hidden.
+  if (!currentRequestsEl && !upstreamCountEl && !requestedSitesEl && !failedRequestsEl) return;
 
   const REFRESH_INTERVAL_MS = 60000;
 

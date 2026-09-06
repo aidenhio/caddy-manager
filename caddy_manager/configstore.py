@@ -186,3 +186,32 @@ def get_show_metadata_card():
     if isinstance(value, bool):
         return value
     return DEFAULT_SHOW_METADATA_CARD
+
+
+# The Dashboard's widgets, in the order they're listed in Settings >
+# Dashboard and rendered on the page -- each is a (key, label) pair, where
+# key is what's stored in config.json's dashboard_widgets dict and label is
+# what's shown next to its toggle switch. All five are shown by default.
+DASHBOARD_WIDGETS = (
+    ("quick_glance_row", "Quick Glance Row"),
+    ("recently_added", "Recently Added"),
+    ("sites_by_type", "Site Blocks by Type"),
+    ("certificate_status", "Certificate Status"),
+    ("upstream_health", "Upstream Health"),
+)
+
+
+def get_dashboard_widget_visibility():
+    """Which Dashboard widgets are shown, as a {key: bool} dict covering
+    every key in DASHBOARD_WIDGETS. Defaults every widget to shown (True)
+    -- both when config.json has no dashboard_widgets entry at all (an
+    existing install, or a fresh one before Settings is ever touched) and
+    when a stored value for a given key is missing or malformed, e.g. a
+    widget added after the config was last saved."""
+    cfg = load_config()
+    stored = cfg.get("dashboard_widgets") if cfg else None
+    stored = stored if isinstance(stored, dict) else {}
+    return {
+        key: stored[key] if isinstance(stored.get(key), bool) else True
+        for key, _label in DASHBOARD_WIDGETS
+    }

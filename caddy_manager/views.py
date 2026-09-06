@@ -9,6 +9,7 @@ from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
     get_show_metadata_card, get_caddy_log_output_dir,
+    DASHBOARD_WIDGETS, get_dashboard_widget_visibility,
 )
 from .caddy_api import upstream_stats
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
@@ -52,6 +53,7 @@ def dashboard():
     return render_template(
         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
         recent_blocks=recent_blocks, quick_add_type=get_quick_add_type_dashboard(),
+        dashboard_widgets=get_dashboard_widget_visibility(),
     )
 
 
@@ -383,6 +385,14 @@ def settings():
             flash("Preview page settings updated.", "success")
             return redirect(url_for("main.settings"))
 
+        elif action == "update_dashboard_widgets":
+            cfg["dashboard_widgets"] = {
+                key: request.form.get(key) == "on" for key, _label in DASHBOARD_WIDGETS
+            }
+            save_config(cfg)
+            flash("Dashboard settings updated.", "success")
+            return redirect(url_for("main.settings"))
+
         elif action == "update_quick_add":
             quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")
             quick_add_type_site_blocks = request.form.get("quick_add_type_site_blocks", "")
@@ -412,4 +422,7 @@ def settings():
                 flash("Password updated.", "success")
                 return redirect(url_for("main.settings"))
 
-    return render_template("settings.html", cfg=cfg, error=error)
+    return render_template(
+        "settings.html", cfg=cfg, error=error,
+        dashboard_widgets=get_dashboard_widget_visibility(),
+    )

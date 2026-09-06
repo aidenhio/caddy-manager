@@ -221,11 +221,31 @@
             <h2 class="mb-4">Dashboard Settings</h2>
             <h3 class="card-title">Widgets</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Choose which widgets appear on the <a href="{{ url_for('main.dashboard') }}">Home Dashboard</a>. All widgets are shown by default.
             </p>
+            <form method="post" id="dashboard-widgets-form">
+              <input type="hidden" name="action" value="update_dashboard_widgets">
+              {% for key, label in [
+                ('quick_glance_row', 'Quick Glance Row'),
+                ('recently_added', 'Recently Added'),
+                ('sites_by_type', 'Site Blocks by Type'),
+                ('certificate_status', 'Certificate Status'),
+                ('upstream_health', 'Upstream Health'),
+              ] %}
+              <div class="mb-2">
+                <label class="form-check form-switch">
+                  <input type="checkbox" class="form-check-input" id="dashboard-widget-{{ key }}-input" name="{{ key }}" value="on" {{ 'checked' if dashboard_widgets[key] }}>
+                  <span class="form-check-label">{{ label }}</span>
+                </label>
+              </div>
+              {% endfor %}
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('dashboard-widgets-form'));
+            </script>
           </div>
         </div>
 
