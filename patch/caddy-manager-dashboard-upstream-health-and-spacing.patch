@@ -1,0 +1,72 @@
+From 81d52ac3f1ce58079469403920282fb389fa0c00 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 6 Sep 2026 06:08:34 +0000
+Subject: [PATCH] Add Upstream Health card to Dashboard and fix widget row
+ spacing
+
+The new widgets row was sitting flush against the stat cards row above
+it, so give it top margin (mt-3). Also add an Upstream Health card
+showing the already-provisioned upstreams_total/current_requests/
+failed_requests stats from the Caddy admin API, with a Settings link
+fallback when the admin API isn't configured, and a text-danger
+highlight on the Failed count when nonzero.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GdhKf193j6ggwAGFYCUaJg
+---
+ templates/home.html | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/templates/home.html b/templates/home.html
+index a58fe76..33665b8 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -137,7 +137,7 @@
+ </div>
+ <!-- END STAT CARDS -->
+ 
+-<div class="row row-deck row-cards">
++<div class="row row-deck row-cards mt-3">
+ 
+   <!-- BEGIN RECENTLY ADDED CARD -->
+   <div class="col-12 col-lg-7">
+@@ -316,6 +316,36 @@
+       </div>
+       <!-- END CERTIFICATE STATUS CARD -->
+ 
++      <!-- BEGIN UPSTREAM HEALTH CARD -->
++      <div class="col-12">
++        <div class="card">
++          <div class="card-header">
++            <h3 class="card-title">Upstream Health</h3>
++          </div>
++          <div class="card-body">
++            {% if stats.upstreams_total is not none %}
++            <div class="row text-center">
++              <div class="col-4">
++                <div class="h1 mb-0">{{ stats.upstreams_total }}</div>
++                <div class="text-secondary">Upstreams</div>
++              </div>
++              <div class="col-4">
++                <div class="h1 mb-0">{{ stats.current_requests }}</div>
++                <div class="text-secondary">Requests</div>
++              </div>
++              <div class="col-4">
++                <div class="h1 mb-0 {{ 'text-danger' if stats.failed_requests else '' }}">{{ stats.failed_requests }}</div>
++                <div class="text-secondary">Failed</div>
++              </div>
++            </div>
++            {% else %}
++            <p class="text-secondary mb-0">Set a Caddy admin API URL in <a href="{{ url_for('main.settings') }}">Settings</a> to see upstream health here.</p>
++            {% endif %}
++          </div>
++        </div>
++      </div>
++      <!-- END UPSTREAM HEALTH CARD -->
++
+     </div>
+   </div>
+ 
+-- 
+2.43.0
+

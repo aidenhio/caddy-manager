@@ -32,18 +32,25 @@ def dashboard():
     certs_root = certificates_root()
     certs = list_certificates() if certs_root and os.path.isdir(certs_root) else []
     caddy_stats = upstream_stats()
+    by_type = {t: 0 for t in QUICK_ADD_BLOCK_TYPES}
+    for b in blocks:
+        by_type[b["type"]] = by_type.get(b["type"], 0) + 1
     stats = {
         "total": len(blocks),
         "enabled": sum(1 for b in blocks if not b["disabled"]),
         "disabled": sum(1 for b in blocks if b["disabled"]),
+        "by_type": by_type,
         **certificate_stats(certs),
         "current_requests": caddy_stats["current_requests"] if caddy_stats else None,
         "upstreams_total": caddy_stats["upstreams_total"] if caddy_stats else None,
         "failed_requests": caddy_stats["failed_requests"] if caddy_stats else None,
     }
+    # Most recently created blocks first -- created_ts (not updated_ts) so
+    # an unrelated edit doesn't bump an old block back to the top.
+    recent_blocks = sorted(blocks, key=lambda b: b["created_ts"], reverse=True)[:5]
     return render_template(
         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
-        quick_add_type=get_quick_add_type_dashboard(),
+        recent_blocks=recent_blocks, quick_add_type=get_quick_add_type_dashboard(),
     )
 
 

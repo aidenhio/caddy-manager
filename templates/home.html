@@ -34,7 +34,7 @@
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-green text-white avatar">
+              class="bg-green-lt avatar">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                 class="icon icon-tabler icons-tabler-outline icon-tabler-world-www">
@@ -52,7 +52,8 @@
               </span>
           </div>
           <div class="col">
-            <div class="font-weight-medium">{{ stats.enabled }} Active Site Blocks</div>
+            <div class="subheader">Active Site Blocks</div>
+            <div class="h3 m-0 p-0">{{ stats.enabled }}</div>
           </div>
         </div>
       </div>
@@ -64,7 +65,7 @@
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-red text-white avatar"><!-- Download SVG icon from http://tabler.io/icons/icon/shopping-cart -->
+              class="bg-red-lt avatar"><!-- Download SVG icon from http://tabler.io/icons/icon/shopping-cart -->
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-world-off">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5.657 5.615a9 9 0 1 0 12.717 12.739m1.672 -2.322a9 9 0 0 0 -12.066 -12.084" />
@@ -77,7 +78,8 @@
             </span>
           </div>
           <div class="col">
-            <div class="font-weight-medium">{{ stats.disabled }} Disabled Site Blocks</div>
+            <div class="subheader">Disabled Site Blocks</div>
+            <div class="h3 m-0 p-0">{{ stats.disabled }}</div>
           </div>
         </div>
       </div>
@@ -88,7 +90,7 @@
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
-            <span class="bg-yellow text-white avatar">
+            <span class="bg-yellow-lt avatar">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
               class="icon icon-tabler icons-tabler-outline icon-tabler-certificate">
@@ -103,7 +105,8 @@
             </span>
           </div>
           <div class="col">
-            <div class="font-weight-medium">{{ stats.cert_total }} SSL Certificates</div>
+            <div class="subheader">SSL Certificates</div>
+            <div class="h3 m-0 p-0">{{ stats.cert_total }}</div>
           </div>
         </div>
       </div>
@@ -115,7 +118,7 @@
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-azure text-white avatar">
+              class="bg-azure-lt avatar">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-affiliate">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5.931 6.936l1.275 4.249m5.607 5.609l4.251 1.275" />
@@ -128,17 +131,226 @@
             </span>
           </div>
           <div class="col">
-            <div class="font-weight-medium"><span id="current-requests-value">{{ stats.current_requests if stats.current_requests is not none else 'N/A' }}</span> Current Requests</div>
+            <div class="subheader">Current Requests</div>
+            <div class="h3 m-0 p-0"><span id="current-requests-value">{{ stats.current_requests if stats.current_requests is not none else 'N/A' }}</span></div>
           </div>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- BEGIN RECENTLY ADDED CARD -->
+  <div class="col-12 col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Recently Added</h3>
+        <div class="card-actions">
+          <a href="{{ url_for('main.site_blocks') }}" class="btn">View all</a>
+        </div>
+      </div>
+      {% if recent_blocks %}
+      <div class="list-group list-group-flush">
+        {% for b in recent_blocks %}
+        {% set row_color = type_color(b.type) %}
+        {% set row_label = 'Reverse Proxy' if b.type == 'reverse_proxy' else ('Redirect' if b.type == 'redirect' else ('Load Balancer' if b.type == 'load_balancer' else ('Static Site' if b.type == 'static_site' else 'Custom'))) %}
+        <div class="list-group-item">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <span class="avatar avatar bg-{{ row_color }}-lt">
+                {% if b.type == 'reverse_proxy' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M9 14l-4 -4l4 -4" />
+                  <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+                </svg>
+                {% elif b.type == 'redirect' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
+                </svg>
+                {% elif b.type == 'load_balancer' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M12 3v18" />
+                  <path d="M16 7l-4 -4l-4 4" />
+                  <path d="M16 11h5v5" />
+                  <path d="M8 11h-5v5" />
+                  <path d="M3 11l8.293 8.293c.453 .453 .707 1.067 .707 1.707" />
+                  <path d="M21 11l-8.293 8.293a2.4 2.4 0 0 0 -.707 1.707" />
+                </svg>
+                {% elif b.type == 'static_site' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
+                </svg>
+                {% else %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
+                  <path d="M12 11.875l3 -1.687" />
+                  <path d="M12 11.875v3.375" />
+                  <path d="M12 11.875l-3 -1.687" />
+                  <path d="M12 11.875l3 1.688" />
+                  <path d="M12 8.5v3.375" />
+                  <path d="M12 11.875l-3 1.688" />
+                  <path d="M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2" />
+                </svg>
+                {% endif %}
+              </span>
+            </div>
+            <div class="col text-truncate">
+              <a href="{{ url_for('main.preview_block', filename=b.filename) }}" class="text-body d-block text-truncate">
+                {{ b.site_addresses[0] if b.site_addresses else b.filename }}
+              </a>
+              <div class="text-secondary text-truncate">{{ row_label }} &middot; {{ b.created }}</div>
+            </div>
+            {% if b.disabled %}
+            <div class="col-auto">
+              <span class="badge bg-muted-lt">Disabled</span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card-body">
+        <p class="text-secondary mb-0">No site blocks yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <!-- END RECENTLY ADDED CARD -->
+
+  <div class="col-12 col-lg-5">
+    <div class="row row-cards">
+
+      <!-- BEGIN SITES BY TYPE CARD -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Sites by Type</h3>
+          </div>
+          <div class="card-body">
+            {% set block_type_labels = [
+              ('reverse_proxy', 'Reverse Proxy'),
+              ('redirect', 'Redirect'),
+              ('load_balancer', 'Load Balancer'),
+              ('static_site', 'Static Site'),
+              ('custom', 'Custom'),
+            ] %}
+            {% if stats.total %}
+            <div class="progress progress-sm mb-3">
+              {% for t, label in block_type_labels %}
+                {% set count = stats.by_type[t] %}
+                {% if count %}
+                <div class="progress-bar bg-{{ type_color(t) }}" style="width: {{ (count / stats.total * 100) | round(1) }}%"
+                     role="progressbar" aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="{{ stats.total }}">
+                  <span class="visually-hidden">{{ count }} {{ label }}</span>
+                </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <div class="row">
+              {% for t, label in block_type_labels %}
+              <div class="col-6 mb-2">
+                <span class="status-dot bg-{{ type_color(t) }} me-1"></span>{{ label }} <span class="text-secondary">{{ stats.by_type[t] }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-secondary mb-0">No site blocks yet.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <!-- END SITES BY TYPE CARD -->
+
+      <!-- BEGIN CERTIFICATE STATUS CARD -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Certificate Status</h3>
+            <div class="card-actions">
+              <a href="{{ url_for('main.certificates') }}" class="btn">View all</a>
+            </div>
+          </div>
+          <div class="card-body">
+            {% if stats.cert_total %}
+            <div class="progress progress-sm mb-3">
+              {% if stats.cert_valid %}
+              <div class="progress-bar bg-success" style="width: {{ (stats.cert_valid / stats.cert_total * 100) | round(1) }}%"
+                   role="progressbar" aria-valuenow="{{ stats.cert_valid }}" aria-valuemin="0" aria-valuemax="{{ stats.cert_total }}">
+                <span class="visually-hidden">{{ stats.cert_valid }} valid</span>
+              </div>
+              {% endif %}
+              {% if stats.cert_expiring_soon %}
+              <div class="progress-bar bg-yellow" style="width: {{ (stats.cert_expiring_soon / stats.cert_total * 100) | round(1) }}%"
+                   role="progressbar" aria-valuenow="{{ stats.cert_expiring_soon }}" aria-valuemin="0" aria-valuemax="{{ stats.cert_total }}">
+                <span class="visually-hidden">{{ stats.cert_expiring_soon }} expiring soon</span>
+              </div>
+              {% endif %}
+              {% if stats.cert_expired %}
+              <div class="progress-bar bg-danger" style="width: {{ (stats.cert_expired / stats.cert_total * 100) | round(1) }}%"
+                   role="progressbar" aria-valuenow="{{ stats.cert_expired }}" aria-valuemin="0" aria-valuemax="{{ stats.cert_total }}">
+                <span class="visually-hidden">{{ stats.cert_expired }} expired</span>
+              </div>
+              {% endif %}
+            </div>
+            <div class="row">
+              <div class="col-6 mb-2">
+                <span class="status-dot bg-success me-1"></span>Valid <span class="text-secondary">{{ stats.cert_valid }}</span>
+              </div>
+              <div class="col-6 mb-2">
+                <span class="status-dot bg-yellow me-1"></span>Expiring Soon <span class="text-secondary">{{ stats.cert_expiring_soon }}</span>
+              </div>
+              <div class="col-6">
+                <span class="status-dot bg-danger me-1"></span>Expired <span class="text-secondary">{{ stats.cert_expired }}</span>
+              </div>
+            </div>
+            {% else %}
+            <p class="text-secondary mb-0">No certificates found.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <!-- END CERTIFICATE STATUS CARD -->
+
+      <!-- BEGIN UPSTREAM HEALTH CARD -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Upstream Health</h3>
+          </div>
+          <div class="card-body">
+            {% if stats.upstreams_total is not none %}
+            <div class="row text-center">
+              <div class="col-4">
+                <div class="h1 mb-0">{{ stats.upstreams_total }}</div>
+                <div class="text-secondary">Upstreams</div>
+              </div>
+              <div class="col-4">
+                <div class="h1 mb-0">{{ stats.current_requests }}</div>
+                <div class="text-secondary">Requests</div>
+              </div>
+              <div class="col-4">
+                <div class="h1 mb-0 {{ 'text-danger' if stats.failed_requests else '' }}">{{ stats.failed_requests }}</div>
+                <div class="text-secondary">Failed</div>
+              </div>
+            </div>
+            {% else %}
+            <p class="text-secondary mb-0">Set a Caddy admin API URL in <a href="{{ url_for('main.settings') }}">Settings</a> to see upstream health here.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <!-- END UPSTREAM HEALTH CARD -->
+
+    </div>
+  </div>
+
 </div>
 <!-- END STAT CARDS -->
-
-<div class="row row-deck row-cards">
-</div>
 
 <script src="{{ url_for('static', filename='js/dashboard-stats.js') }}"></script>
 

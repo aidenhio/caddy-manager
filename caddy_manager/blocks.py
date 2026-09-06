@@ -283,6 +283,12 @@ def list_blocks():
         fdate = datetime.fromtimestamp(os.path.getmtime(path))
         meta = read_metadata(fname, path)
         block_type = meta.get("type", "custom")
+        # created_ts is stamped once by write_metadata and carried forward
+        # untouched by later edits (see its docstring) -- falling back to
+        # the .conf's own ctime covers a hand-added file that's never been
+        # through write_metadata yet.
+        created_ts = meta.get("created_ts") or os.path.getctime(path)
+        cdate = datetime.fromtimestamp(created_ts)
 
         if block_type in ("reverse_proxy", "redirect"):
             upstream_sort = meta.get("target", "")
@@ -313,6 +319,8 @@ def list_blocks():
             "log_enabled": meta.get("log_enabled", False),
             "updated": fdate.strftime("%d/%m/%Y %I:%M%p"),
             "updated_ts": os.path.getmtime(path),
+            "created": cdate.strftime("%d/%m/%Y %I:%M%p"),
+            "created_ts": created_ts,
             "upstream_sort": upstream_sort,
         })
     blocks.sort(key=lambda b: b["filename"].lower())
