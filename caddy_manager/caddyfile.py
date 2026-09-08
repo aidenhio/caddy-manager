@@ -228,8 +228,51 @@ def render_static_site(site_header, path, encodings=None, browse=False, index=""
     return render_domain_block(site_header, body)
 
 
-def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", log_lines=None):
+def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", log_lines=None,
+                          lb_retries="", lb_try_duration="", lb_try_interval="",
+                          health_uri="", health_interval="", health_timeout="", health_status="",
+                          health_passes="", health_fails="", insecure_skip_verify=False):
+    """`lb_retries`/`lb_try_duration`/`lb_try_interval` (load-balancing) and
+    `health_uri`/`health_interval`/`health_timeout`/`health_status`/
+    `health_passes`/`health_fails` (active health checking) are all
+    optional Caddy `reverse_proxy` sub-directives -- see
+    https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#load-balancing
+    -- each only rendered when set, so a block with none of them looks
+    exactly like it did before they existed."""
     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
+
+    lb_retries = str(lb_retries or "").strip()
+    lb_try_duration = (lb_try_duration or "").strip()
+    lb_try_interval = (lb_try_interval or "").strip()
+    if lb_retries:
+        inner.append(f"lb_retries {lb_retries}")
+    if lb_try_duration:
+        inner.append(f"lb_try_duration {lb_try_duration}")
+    if lb_try_interval:
+        inner.append(f"lb_try_interval {lb_try_interval}")
+
+    health_uri = (health_uri or "").strip()
+    health_interval = (health_interval or "").strip()
+    health_timeout = (health_timeout or "").strip()
+    health_status = (health_status or "").strip()
+    health_passes = str(health_passes or "").strip()
+    health_fails = str(health_fails or "").strip()
+    if health_uri:
+        inner.append(f"health_uri {health_uri}")
+    if health_interval:
+        inner.append(f"health_interval {health_interval}")
+    if health_timeout:
+        inner.append(f"health_timeout {health_timeout}")
+    if health_status:
+        inner.append(f"health_status {health_status}")
+    if health_passes:
+        inner.append(f"health_passes {health_passes}")
+    if health_fails:
+        inner.append(f"health_fails {health_fails}")
+
+    if insecure_skip_verify:
+        inner += ["transport http {", "    tls_insecure_skip_verify", "}"]
+
     inner += extra_lines(extra_text)
     body = list(log_lines or [])
     body.append(f"reverse_proxy {' '.join(upstreams)} {{")

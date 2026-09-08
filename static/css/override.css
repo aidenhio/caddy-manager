@@ -14,3 +14,7 @@
     --tblr-gray-900: #18181b;
     --tblr-gray-950: #09090b;
 }
+
+.accordion-body {
+  color: unset;
+}

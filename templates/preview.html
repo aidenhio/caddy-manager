@@ -152,6 +152,7 @@
           <div class="text-secondary small mb-1">Upstreams</div>
           {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
           {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
+          {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
         </div>
         {% elif block_type == 'static_site' %}
         <div class="list-group-item">

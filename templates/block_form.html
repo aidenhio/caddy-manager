@@ -192,6 +192,13 @@
               </select>
             </div>
           </div>
+          <div class="mb-3" id="lb-insecure-skip-verify-row" {{ 'hidden' if not (meta.upstreams and meta.upstreams[0].startswith('https://')) }}>
+            <label class="form-check">
+              <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+              <span class="form-check-label">Skip TLS verification (insecure)</span>
+            </label>
+            <span class="form-hint">Adds <code>transport http { tls_insecure_skip_verify }</code> to the block — only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+          </div>
 
           <div class="mb-3">
             <label class="form-label">Upstreams <span class="form-hint d-inline">(at least two)</span></label>
@@ -229,6 +236,60 @@
               </div>
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
+                  <!-- BEGIN RETRY BEHAVIOR OPTIONS -->
+                  <label class="form-label mb-2">Retry behavior <span class="form-hint d-inline">(optional)</span></label>
+                  <div class="row">
+                    <div class="col-md-4 mb-3 mb-md-0">
+                      <label class="form-label">Retries</label>
+                      <input type="number" min="0" step="1" name="lb_retries" class="form-control" value="{{ meta.lb_retries or '' }}" placeholder="0">
+                    </div>
+                    <div class="col-md-4 mb-3 mb-md-0">
+                      <label class="form-label">Try duration</label>
+                      <input type="text" name="lb_try_duration" class="form-control" value="{{ meta.lb_try_duration or '' }}" placeholder="10s">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Try interval</label>
+                      <input type="text" name="lb_try_interval" class="form-control" value="{{ meta.lb_try_interval or '' }}" placeholder="250ms">
+                    </div>
+                  </div>
+                  <!-- END RETRY BEHAVIOR OPTIONS -->
+
+                  <hr class="my-3">
+
+                  <!-- BEGIN HEALTH CHECK OPTIONS -->
+                  <label class="form-label mb-2">Health check <span class="form-hint d-inline">(optional, active health checking)</span></label>
+                  <div class="row">
+                    <div class="col mb-3">
+                      <label class="form-label">Health check URI</label>
+                      <input type="text" name="health_uri" class="form-control" value="{{ meta.health_uri or '' }}" placeholder="/healthz">
+                    </div>
+                  </div>
+                  <div class="row">
+                    <div class="col-sm mb-3">
+                      <label class="form-label">Expected status</label>
+                      <input type="text" name="health_status" class="form-control" value="{{ meta.health_status or '' }}" placeholder="200">
+                    </div>
+                    <div class="col-sm mb-3">
+                      <label class="form-label">Timeout</label>
+                      <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
+                    </div>
+                    <div class="col-sm mb-3 mb-md-0">
+                      <label class="form-label">Interval</label>
+                      <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
+                    </div>
+                    <div class="col-sm mb-3 mb-md-0">
+                      <label class="form-label">Healthy after</label>
+                      <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
+                    </div>
+                    <div class="col-sm">
+                      <label class="form-label">Unhealthy after</label>
+                      <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
+                    </div>
+                  </div>
+                  <!-- END HEALTH CHECK OPTIONS -->
+
+                  <hr class="my-3">
+
                   <div class="mb-0">
                     <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the reverse_proxy block)</span></label>
                     <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>

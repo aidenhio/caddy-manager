@@ -1,0 +1,297 @@
+diff --git a/caddy_manager/blocks.py b/caddy_manager/blocks.py
+index 133ba0e..82132fe 100644
+--- a/caddy_manager/blocks.py
++++ b/caddy_manager/blocks.py
+@@ -22,7 +22,7 @@ from flask import abort
+ from .configstore import get_conf_dir, get_log_dir, get_caddy_log_output_dir
+ from .caddyfile import (
+     site_addresses_from_textarea, site_address_header, slugify,
+-    join_target, parse_conf_content,
++    join_target, split_target, parse_conf_content,
+     render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
+     render_log_block, ENCODE_FORMATS, LOG_LEVELS, LOG_FORMATS,
+ )
+@@ -483,13 +483,35 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
+         upstreams = [u.strip() for u in form.get("upstreams", "").splitlines() if u.strip()]
+         lb_policy = form.get("lb_policy", "").strip()
+         extra = form.get("extra", "").strip()
+-        meta.update(upstreams=upstreams, lb_policy=lb_policy, extra=extra)
++        lb_retries = form.get("lb_retries", "").strip()
++        lb_try_duration = form.get("lb_try_duration", "").strip()
++        lb_try_interval = form.get("lb_try_interval", "").strip()
++        health_uri = form.get("health_uri", "").strip()
++        health_interval = form.get("health_interval", "").strip()
++        health_timeout = form.get("health_timeout", "").strip()
++        health_status = form.get("health_status", "").strip()
++        health_passes = form.get("health_passes", "").strip()
++        health_fails = form.get("health_fails", "").strip()
++        # The Scheme select is shared by every upstream row (see
++        # block-form.js), so -- like reverse_proxy's own checkbox -- the
++        # skip-verify checkbox is only honored server-side when the
++        # upstreams actually are https, regardless of what the client sent.
++        lb_scheme = split_target(upstreams[0])[0] if upstreams else ""
++        insecure_skip_verify = lb_scheme == "https" and form.get("insecure_skip_verify") == "1"
++        meta.update(upstreams=upstreams, lb_policy=lb_policy, extra=extra,
++                    lb_retries=lb_retries, lb_try_duration=lb_try_duration, lb_try_interval=lb_try_interval,
++                    health_uri=health_uri, health_interval=health_interval, health_timeout=health_timeout,
++                    health_status=health_status, health_passes=health_passes, health_fails=health_fails,
++                    insecure_skip_verify=insecure_skip_verify)
+         if not site_addresses:
+             error = "At least one site address is required."
+         elif len(upstreams) < 2:
+             error = "At least two upstreams are required."
+         else:
+-            content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra, log_lines)
++            content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra, log_lines,
++                                            lb_retries, lb_try_duration, lb_try_interval,
++                                            health_uri, health_interval, health_timeout, health_status,
++                                            health_passes, health_fails, insecure_skip_verify)
+             meta.update(type="load_balancer")
+ 
+     elif block_type == "redirect":
+diff --git a/caddy_manager/caddyfile.py b/caddy_manager/caddyfile.py
+index 1977aa3..bada2a1 100644
+--- a/caddy_manager/caddyfile.py
++++ b/caddy_manager/caddyfile.py
+@@ -228,8 +228,51 @@ def render_static_site(site_header, path, encodings=None, browse=False, index=""
+     return render_domain_block(site_header, body)
+ 
+ 
+-def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", log_lines=None):
++def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", log_lines=None,
++                          lb_retries="", lb_try_duration="", lb_try_interval="",
++                          health_uri="", health_interval="", health_timeout="", health_status="",
++                          health_passes="", health_fails="", insecure_skip_verify=False):
++    """`lb_retries`/`lb_try_duration`/`lb_try_interval` (load-balancing) and
++    `health_uri`/`health_interval`/`health_timeout`/`health_status`/
++    `health_passes`/`health_fails` (active health checking) are all
++    optional Caddy `reverse_proxy` sub-directives -- see
++    https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#load-balancing
++    -- each only rendered when set, so a block with none of them looks
++    exactly like it did before they existed."""
+     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
++
++    lb_retries = str(lb_retries or "").strip()
++    lb_try_duration = (lb_try_duration or "").strip()
++    lb_try_interval = (lb_try_interval or "").strip()
++    if lb_retries:
++        inner.append(f"lb_retries {lb_retries}")
++    if lb_try_duration:
++        inner.append(f"lb_try_duration {lb_try_duration}")
++    if lb_try_interval:
++        inner.append(f"lb_try_interval {lb_try_interval}")
++
++    health_uri = (health_uri or "").strip()
++    health_interval = (health_interval or "").strip()
++    health_timeout = (health_timeout or "").strip()
++    health_status = (health_status or "").strip()
++    health_passes = str(health_passes or "").strip()
++    health_fails = str(health_fails or "").strip()
++    if health_uri:
++        inner.append(f"health_uri {health_uri}")
++    if health_interval:
++        inner.append(f"health_interval {health_interval}")
++    if health_timeout:
++        inner.append(f"health_timeout {health_timeout}")
++    if health_status:
++        inner.append(f"health_status {health_status}")
++    if health_passes:
++        inner.append(f"health_passes {health_passes}")
++    if health_fails:
++        inner.append(f"health_fails {health_fails}")
++
++    if insecure_skip_verify:
++        inner += ["transport http {", "    tls_insecure_skip_verify", "}"]
++
+     inner += extra_lines(extra_text)
+     body = list(log_lines or [])
+     body.append(f"reverse_proxy {' '.join(upstreams)} {{")
+diff --git a/static/js/block-form.js b/static/js/block-form.js
+index 6bee71f..0f1058b 100644
+--- a/static/js/block-form.js
++++ b/static/js/block-form.js
+@@ -143,6 +143,26 @@
+ })();
+ // END REVERSE PROXY SCHEME -> INSECURE SKIP VERIFY TOGGLE
+ 
++// BEGIN LOAD BALANCER SCHEME -> INSECURE SKIP VERIFY TOGGLE
++// Mirrors the reverse proxy toggle above: the row's initial shown/hidden
++// state comes from the server-rendered `hidden` attribute (based on
++// meta.upstreams[0]'s scheme), and this listener only needs to react to
++// the visitor changing the Scheme select afterwards -- it deliberately
++// does *not* sync on load, since at that point #lb-scheme still shows its
++// default 'http' option; the LOAD BALANCER UPSTREAM ROWS block below is
++// what corrects #lb-scheme's value to match the loaded upstreams.
++(function () {
++  const schemeSelect = document.getElementById('lb-scheme');
++  const row = document.getElementById('lb-insecure-skip-verify-row');
++  if (!schemeSelect || !row) return;
++
++  schemeSelect.addEventListener('change', () => {
++    row.hidden = schemeSelect.value !== 'https';
++    if (row.hidden) row.querySelector('input[type="checkbox"]').checked = false;
++  });
++})();
++// END LOAD BALANCER SCHEME -> INSECURE SKIP VERIFY TOGGLE
++
+ // BEGIN LOAD BALANCER UPSTREAM ROWS
+ (function () {
+   const schemeSelect = document.getElementById('lb-scheme');
+diff --git a/static/js/tooltips.js b/static/js/tooltips.js
+new file mode 100644
+index 0000000..0a14451
+--- /dev/null
++++ b/static/js/tooltips.js
+@@ -0,0 +1,10 @@
++// BEGIN BOOTSTRAP TOOLTIP INIT
++// Tabler bundles Bootstrap's JS, but tooltips still need to be explicitly
++// instantiated -- this activates every native data-bs-toggle="tooltip"
++// element on the page once it loads. Runs on every page (included from
++// base.html) so any future tooltip trigger just works without each page
++// needing its own init call.
++(function () {
++  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => new bootstrap.Tooltip(el));
++})();
++// END BOOTSTRAP TOOLTIP INIT
+diff --git a/templates/base.html b/templates/base.html
+index 194b8b9..a937983 100644
+--- a/templates/base.html
++++ b/templates/base.html
+@@ -131,6 +131,7 @@
+     <!-- BEGIN PAGE SCRIPTS -->
+     <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
+     <script src="{{ url_for('static', filename='js/data-table.js') }}"></script>
++    <script src="{{ url_for('static', filename='js/tooltips.js') }}"></script>
+     {% block extra_scripts %}{% endblock %}
+     <!-- END PAGE SCRIPTS -->
+ 
+diff --git a/templates/block_form.html b/templates/block_form.html
+index b9c2775..befecf8 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -192,6 +192,16 @@
+               </select>
+             </div>
+           </div>
++          <div class="mb-3" id="lb-insecure-skip-verify-row" {{ 'hidden' if not (meta.upstreams and meta.upstreams[0].startswith('https://')) }}>
++            <label class="form-check">
++              <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
++              <span class="form-check-label">Skip TLS verification (insecure)</span>
++              <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="Turns off TLS certificate verification for the upstream connections. Only use this for upstreams with self-signed or otherwise unverifiable certificates.">
++                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++              </span>
++            </label>
++            <span class="form-hint">Adds <code>transport http { tls_insecure_skip_verify }</code> to the block.</span>
++          </div>
+ 
+           <div class="mb-3">
+             <label class="form-label">Upstreams <span class="form-hint d-inline">(at least two)</span></label>
+@@ -229,6 +239,96 @@
+               </div>
+               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+                 <div class="accordion-body">
++                  <!-- BEGIN RETRY BEHAVIOR OPTIONS -->
++                  <label class="form-label mb-2">Retry behavior <span class="form-hint d-inline">(optional)</span></label>
++                  <div class="row">
++                    <div class="col-md-4 mb-3 mb-md-0">
++                      <label class="form-label">Retries
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="How many times to retry selecting an available backend if the chosen one is unavailable.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="number" min="0" step="1" name="lb_retries" class="form-control" value="{{ meta.lb_retries or '' }}" placeholder="0">
++                    </div>
++                    <div class="col-md-4 mb-3 mb-md-0">
++                      <label class="form-label">Try duration
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="How long to keep trying to select an available backend before giving up.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="text" name="lb_try_duration" class="form-control" value="{{ meta.lb_try_duration or '' }}" placeholder="10s">
++                    </div>
++                    <div class="col-md-4">
++                      <label class="form-label">Try interval
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Delay between retry attempts when selecting a backend. Caddy's default is 250ms.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="text" name="lb_try_interval" class="form-control" value="{{ meta.lb_try_interval or '' }}" placeholder="250ms">
++                    </div>
++                  </div>
++                  <!-- END RETRY BEHAVIOR OPTIONS -->
++
++                  <hr class="my-3">
++
++                  <!-- BEGIN HEALTH CHECK OPTIONS -->
++                  <label class="form-label mb-2">Health check <span class="form-hint d-inline">(optional, active health checking)</span></label>
++                  <div class="row">
++                    <div class="col-md-6 mb-3">
++                      <label class="form-label">Health check URI
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="URI path (and optional query) Caddy requests on each upstream to check its health.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="text" name="health_uri" class="form-control" value="{{ meta.health_uri or '' }}" placeholder="/healthz">
++                    </div>
++                    <div class="col-md-3 mb-3">
++                      <label class="form-label">Expected status
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Expected HTTP status code (e.g. 200 or 2xx) for a healthy backend.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="text" name="health_status" class="form-control" value="{{ meta.health_status or '' }}" placeholder="200">
++                    </div>
++                    <div class="col-md-3 mb-3">
++                      <label class="form-label">Timeout
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="How long to wait for a health check reply before marking the backend down. Caddy's default is 5s.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
++                    </div>
++                  </div>
++                  <div class="row">
++                    <div class="col-md-4 mb-3 mb-md-0">
++                      <label class="form-label">Interval
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="How often Caddy performs active health checks. Caddy's default is 30s.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
++                    </div>
++                    <div class="col-md-4 mb-3 mb-md-0">
++                      <label class="form-label">Healthy after
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Consecutive successful checks required to mark a backend healthy again. Caddy's default is 1.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
++                    </div>
++                    <div class="col-md-4">
++                      <label class="form-label">Unhealthy after
++                        <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Consecutive failed checks required to mark a backend unhealthy. Caddy's default is 1.">
++                          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /><path d="M12 9h.01" /><path d="M11 12h1v4h1" /></svg>
++                        </span>
++                      </label>
++                      <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
++                    </div>
++                  </div>
++                  <!-- END HEALTH CHECK OPTIONS -->
++
++                  <hr class="my-3">
++
+                   <div class="mb-0">
+                     <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the reverse_proxy block)</span></label>
+                     <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
+diff --git a/templates/preview.html b/templates/preview.html
+index 23e2b17..d1878c3 100644
+--- a/templates/preview.html
++++ b/templates/preview.html
+@@ -152,6 +152,7 @@
+           <div class="text-secondary small mb-1">Upstreams</div>
+           {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
+           {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
++          {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
+         </div>
+         {% elif block_type == 'static_site' %}
+         <div class="list-group-item">

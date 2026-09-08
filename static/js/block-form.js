@@ -143,6 +143,26 @@
 })();
 // END REVERSE PROXY SCHEME -> INSECURE SKIP VERIFY TOGGLE
 
+// BEGIN LOAD BALANCER SCHEME -> INSECURE SKIP VERIFY TOGGLE
+// Mirrors the reverse proxy toggle above: the row's initial shown/hidden
+// state comes from the server-rendered `hidden` attribute (based on
+// meta.upstreams[0]'s scheme), and this listener only needs to react to
+// the visitor changing the Scheme select afterwards -- it deliberately
+// does *not* sync on load, since at that point #lb-scheme still shows its
+// default 'http' option; the LOAD BALANCER UPSTREAM ROWS block below is
+// what corrects #lb-scheme's value to match the loaded upstreams.
+(function () {
+  const schemeSelect = document.getElementById('lb-scheme');
+  const row = document.getElementById('lb-insecure-skip-verify-row');
+  if (!schemeSelect || !row) return;
+
+  schemeSelect.addEventListener('change', () => {
+    row.hidden = schemeSelect.value !== 'https';
+    if (row.hidden) row.querySelector('input[type="checkbox"]').checked = false;
+  });
+})();
+// END LOAD BALANCER SCHEME -> INSECURE SKIP VERIFY TOGGLE
+
 // BEGIN LOAD BALANCER UPSTREAM ROWS
 (function () {
   const schemeSelect = document.getElementById('lb-scheme');

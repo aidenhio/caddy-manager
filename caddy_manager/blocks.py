@@ -22,7 +22,7 @@ from flask import abort
 from .configstore import get_conf_dir, get_log_dir, get_caddy_log_output_dir
 from .caddyfile import (
     site_addresses_from_textarea, site_address_header, slugify,
-    join_target, parse_conf_content,
+    join_target, split_target, parse_conf_content,
     render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
     render_log_block, ENCODE_FORMATS, LOG_LEVELS, LOG_FORMATS,
 )
@@ -483,13 +483,35 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
         upstreams = [u.strip() for u in form.get("upstreams", "").splitlines() if u.strip()]
         lb_policy = form.get("lb_policy", "").strip()
         extra = form.get("extra", "").strip()
-        meta.update(upstreams=upstreams, lb_policy=lb_policy, extra=extra)
+        lb_retries = form.get("lb_retries", "").strip()
+        lb_try_duration = form.get("lb_try_duration", "").strip()
+        lb_try_interval = form.get("lb_try_interval", "").strip()
+        health_uri = form.get("health_uri", "").strip()
+        health_interval = form.get("health_interval", "").strip()
+        health_timeout = form.get("health_timeout", "").strip()
+        health_status = form.get("health_status", "").strip()
+        health_passes = form.get("health_passes", "").strip()
+        health_fails = form.get("health_fails", "").strip()
+        # The Scheme select is shared by every upstream row (see
+        # block-form.js), so -- like reverse_proxy's own checkbox -- the
+        # skip-verify checkbox is only honored server-side when the
+        # upstreams actually are https, regardless of what the client sent.
+        lb_scheme = split_target(upstreams[0])[0] if upstreams else ""
+        insecure_skip_verify = lb_scheme == "https" and form.get("insecure_skip_verify") == "1"
+        meta.update(upstreams=upstreams, lb_policy=lb_policy, extra=extra,
+                    lb_retries=lb_retries, lb_try_duration=lb_try_duration, lb_try_interval=lb_try_interval,
+                    health_uri=health_uri, health_interval=health_interval, health_timeout=health_timeout,
+                    health_status=health_status, health_passes=health_passes, health_fails=health_fails,
+                    insecure_skip_verify=insecure_skip_verify)
         if not site_addresses:
             error = "At least one site address is required."
         elif len(upstreams) < 2:
             error = "At least two upstreams are required."
         else:
-            content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra, log_lines)
+            content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra, log_lines,
+                                            lb_retries, lb_try_duration, lb_try_interval,
+                                            health_uri, health_interval, health_timeout, health_status,
+                                            health_passes, health_fails, insecure_skip_verify)
             meta.update(type="load_balancer")
 
     elif block_type == "redirect":
