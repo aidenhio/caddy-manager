@@ -237,7 +237,7 @@
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
                   <!-- BEGIN RETRY BEHAVIOR OPTIONS -->
-                  <div class="subheader mb-3">Retry Behavior</span></div>
+                  <div class="subheader mb-3">Retry Behavior</div>
                   <div class="row">
                     <div class="col-md-4 mb-3">
                       <label class="form-label">Retries</label>
@@ -267,7 +267,12 @@
                   <div class="row">
                     <div class="col-md-4 mb-3">
                       <label class="form-label">Method</label>
-                      <input type="text" name="health_method" class="form-control" value="{{ meta.health_status or '' }}" placeholder="GET">
+                      <select name="health_method" class="form-select">
+                        <option value="" {{ 'selected' if not meta.health_method }}>GET</option>
+                        {% for method in ['POST', 'PUT', 'DELETE', 'PATCH'] %}
+                        <option value="{{ method }}" {{ 'selected' if meta.health_method == method }}>{{ method }}</option>
+                        {% endfor %}
+                      </select>
                     </div>
                     <div class="col-md-4 mb-3">
                       <label class="form-label">Expected status</label>

@@ -230,15 +230,20 @@ def render_static_site(site_header, path, encodings=None, browse=False, index=""
 
 def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", log_lines=None,
                           lb_retries="", lb_try_duration="", lb_try_interval="",
-                          health_uri="", health_interval="", health_timeout="", health_status="",
-                          health_passes="", health_fails="", insecure_skip_verify=False):
+                          health_uri="", health_method="", health_interval="", health_timeout="",
+                          health_status="", health_passes="", health_fails="", insecure_skip_verify=False):
     """`lb_retries`/`lb_try_duration`/`lb_try_interval` (load-balancing) and
-    `health_uri`/`health_interval`/`health_timeout`/`health_status`/
-    `health_passes`/`health_fails` (active health checking) are all
-    optional Caddy `reverse_proxy` sub-directives -- see
+    `health_uri`/`health_method`/`health_interval`/`health_timeout`/
+    `health_status`/`health_passes`/`health_fails` (active health checking)
+    are all optional Caddy `reverse_proxy` sub-directives -- see
     https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#load-balancing
     -- each only rendered when set, so a block with none of them looks
-    exactly like it did before they existed."""
+    exactly like it did before they existed. `health_method` is blank by
+    default (the form's Method dropdown's first option) rather than an
+    explicit "GET", matching every other field here: Caddy's own default
+    for the directive already is GET, so leaving it unset behaves
+    identically and doesn't add a redundant line to blocks that don't use
+    health checks at all."""
     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
 
     lb_retries = str(lb_retries or "").strip()
@@ -252,6 +257,7 @@ def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", lo
         inner.append(f"lb_try_interval {lb_try_interval}")
 
     health_uri = (health_uri or "").strip()
+    health_method = (health_method or "").strip().upper()
     health_interval = (health_interval or "").strip()
     health_timeout = (health_timeout or "").strip()
     health_status = (health_status or "").strip()
@@ -259,6 +265,8 @@ def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", lo
     health_fails = str(health_fails or "").strip()
     if health_uri:
         inner.append(f"health_uri {health_uri}")
+    if health_method:
+        inner.append(f"health_method {health_method}")
     if health_interval:
         inner.append(f"health_interval {health_interval}")
     if health_timeout:

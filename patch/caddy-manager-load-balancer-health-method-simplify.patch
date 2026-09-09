@@ -1,0 +1,15 @@
+diff --git a/templates/block_form.html b/templates/block_form.html
+index b9e86f4..22327ed 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -268,8 +268,8 @@
+                     <div class="col-md-4 mb-3">
+                       <label class="form-label">Method</label>
+                       <select name="health_method" class="form-select">
+-                        <option value="" {{ 'selected' if not meta.health_method }}>GET (default)</option>
+-                        {% for method in ['HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'] %}
++                        <option value="" {{ 'selected' if not meta.health_method }}>GET</option>
++                        {% for method in ['POST', 'PUT', 'DELETE', 'PATCH'] %}
+                         <option value="{{ method }}" {{ 'selected' if meta.health_method == method }}>{{ method }}</option>
+                         {% endfor %}
+                       </select>

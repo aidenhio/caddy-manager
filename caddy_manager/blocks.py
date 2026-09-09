@@ -487,6 +487,11 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
         lb_try_duration = form.get("lb_try_duration", "").strip()
         lb_try_interval = form.get("lb_try_interval", "").strip()
         health_uri = form.get("health_uri", "").strip()
+        # health_method comes from a <select> (see HEALTH_METHODS in
+        # block_form.html) whose first option is blank, matching every
+        # other health_* field here: unset means "let Caddy use its own
+        # default (GET)" rather than writing a redundant explicit line.
+        health_method = form.get("health_method", "").strip().upper()
         health_interval = form.get("health_interval", "").strip()
         health_timeout = form.get("health_timeout", "").strip()
         health_status = form.get("health_status", "").strip()
@@ -500,9 +505,9 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
         insecure_skip_verify = lb_scheme == "https" and form.get("insecure_skip_verify") == "1"
         meta.update(upstreams=upstreams, lb_policy=lb_policy, extra=extra,
                     lb_retries=lb_retries, lb_try_duration=lb_try_duration, lb_try_interval=lb_try_interval,
-                    health_uri=health_uri, health_interval=health_interval, health_timeout=health_timeout,
-                    health_status=health_status, health_passes=health_passes, health_fails=health_fails,
-                    insecure_skip_verify=insecure_skip_verify)
+                    health_uri=health_uri, health_method=health_method, health_interval=health_interval,
+                    health_timeout=health_timeout, health_status=health_status, health_passes=health_passes,
+                    health_fails=health_fails, insecure_skip_verify=insecure_skip_verify)
         if not site_addresses:
             error = "At least one site address is required."
         elif len(upstreams) < 2:
@@ -510,7 +515,7 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
         else:
             content = render_load_balancer(site_address_header(site_addresses), upstreams, lb_policy, extra, log_lines,
                                             lb_retries, lb_try_duration, lb_try_interval,
-                                            health_uri, health_interval, health_timeout, health_status,
+                                            health_uri, health_method, health_interval, health_timeout, health_status,
                                             health_passes, health_fails, insecure_skip_verify)
             meta.update(type="load_balancer")
 
