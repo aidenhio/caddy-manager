@@ -184,7 +184,7 @@
           <!-- BEGIN LOAD BALANCER FIELDS -->
           {% if block_type == 'load_balancer' %}
           <div class="row">
-            <div class="col-md-3 mb-3">
+            <div class="col-md-4 mb-3">
               <label class="form-label">Scheme <span class="form-hint d-inline">(shared by every upstream below)</span></label>
               <select id="lb-scheme" class="form-select">
                 <option value="http">http</option>
@@ -239,15 +239,15 @@
                   <!-- BEGIN RETRY BEHAVIOR OPTIONS -->
                   <label class="form-label mb-2">Retry behavior <span class="form-hint d-inline">(optional)</span></label>
                   <div class="row">
-                    <div class="col-md-4 mb-3 mb-md-0">
+                    <div class="col-md-4 mb-3">
                       <label class="form-label">Retries</label>
                       <input type="number" min="0" step="1" name="lb_retries" class="form-control" value="{{ meta.lb_retries or '' }}" placeholder="0">
                     </div>
-                    <div class="col-md-4 mb-3 mb-md-0">
+                    <div class="col-md-4 mb-3">
                       <label class="form-label">Try duration</label>
                       <input type="text" name="lb_try_duration" class="form-control" value="{{ meta.lb_try_duration or '' }}" placeholder="10s">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-4 mb-3">
                       <label class="form-label">Try interval</label>
                       <input type="text" name="lb_try_interval" class="form-control" value="{{ meta.lb_try_interval or '' }}" placeholder="250ms">
                     </div>
@@ -273,15 +273,15 @@
                       <label class="form-label">Timeout</label>
                       <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
                     </div>
-                    <div class="col-sm mb-3 mb-md-0">
+                    <div class="col-sm mb-3">
                       <label class="form-label">Interval</label>
                       <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
                     </div>
-                    <div class="col-sm mb-3 mb-md-0">
+                    <div class="col-sm mb-3">
                       <label class="form-label">Healthy after</label>
                       <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
                     </div>
-                    <div class="col-sm">
+                    <div class="col-sm mb-3">
                       <label class="form-label">Unhealthy after</label>
                       <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
                     </div>

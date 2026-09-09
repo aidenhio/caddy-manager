@@ -78,7 +78,7 @@
 
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.className = 'btn btn-icon btn-action btn-sm btn-animate-icon btn-animate-icon-rotate p-0 mx-2 lh-1';
+    remove.className = 'btn btn-icon text-secondary link-white btn-sm btn-animate-icon btn-animate-icon-rotate p-0 mx-2 lh-1';
     remove.setAttribute('aria-label', 'Remove site address');
     remove.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>';
     remove.addEventListener('click', (e) => {
@@ -190,7 +190,7 @@
       '  <input type="text" class="form-control upstream-port" placeholder="8080">' +
       '</div>' +
       '<div class="col-auto">' +
-      '  <button type="button" class="btn btn-icon btn-ghost-secondary upstream-remove" aria-label="Remove upstream">' +
+      '  <button type="button" class="btn btn-icon btn-ghost-pink link-white text-secondary btn-animate-icon btn-animate-icon-rotate upstream-remove" aria-label="Remove upstream">' +
       '    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>' +
       '  </button>' +
       '</div>';
