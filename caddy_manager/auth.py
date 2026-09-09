@@ -33,12 +33,28 @@ def setup():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         password2 = request.form.get("password2", "")
-        root_dir = request.form.get("root_dir", "").strip()
-        defaults = default_paths_for_root(root_dir)
-        conf_dir = request.form.get("conf_dir", "").strip() or defaults["conf_dir"]
-        certificate_dir = request.form.get("certificate_dir", "").strip() or defaults["certificate_dir"]
-        log_dir = request.form.get("log_dir", "").strip() or defaults["log_dir"]
-        caddyfile_path = request.form.get("caddyfile_path", "").strip() or defaults["caddyfile_path"]
+
+        # Directories are either fully derived from a Caddy root directory,
+        # or fully custom -- never a mix (matches the Settings Directories
+        # tab). In the custom case root_dir is left None so its nullness is
+        # itself the record of which mode was used, without needing a
+        # separate flag.
+        custom_dirs = request.form.get("custom_dirs") == "1"
+        root_dir = conf_dir = certificate_dir = log_dir = caddyfile_path = None
+
+        if custom_dirs:
+            conf_dir = request.form.get("conf_dir", "").strip()
+            certificate_dir = request.form.get("certificate_dir", "").strip()
+            log_dir = request.form.get("log_dir", "").strip()
+            caddyfile_path = request.form.get("caddyfile_path", "").strip()
+        else:
+            root_dir = request.form.get("root_dir", "").strip()
+            if root_dir:
+                defaults = default_paths_for_root(root_dir)
+                conf_dir = defaults["conf_dir"]
+                certificate_dir = defaults["certificate_dir"]
+                log_dir = defaults["log_dir"]
+                caddyfile_path = defaults["caddyfile_path"]
 
         if not username or not password:
             error = "Username and password are required."
@@ -46,11 +62,14 @@ def setup():
             error = "Passwords do not match."
         elif len(password) < 6:
             error = "Password must be at least 6 characters."
-        elif not root_dir:
+        elif custom_dirs and not conf_dir:
+            error = "Conf directory path is required."
+        elif not custom_dirs and not root_dir:
             error = "Caddy root directory is required."
         else:
             try:
-                os.makedirs(root_dir, exist_ok=True)
+                if root_dir:
+                    os.makedirs(root_dir, exist_ok=True)
                 os.makedirs(conf_dir, exist_ok=True)
             except OSError as e:
                 error = f"Could not create/access that directory: {e}"

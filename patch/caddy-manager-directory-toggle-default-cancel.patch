@@ -1,0 +1,80 @@
+diff --git a/static/js/form-validate.js b/static/js/form-validate.js
+index a959a67..6a55ab3 100644
+--- a/static/js/form-validate.js
++++ b/static/js/form-validate.js
+@@ -18,6 +18,10 @@ function initFormValidation(form, extraValidator) {
+     }
+     form.classList.add("was-validated");
+   });
++  // A <button type="reset"> (e.g. a "Cancel" button) restores field values
++  // but leaves any invalid styling from a previous failed submit attempt in
++  // place -- clear it so a cancelled/reset form looks untouched again.
++  form.addEventListener("reset", () => form.classList.remove("was-validated"));
+ }
+ 
+ // Keeps two password-style fields in sync via the Constraint Validation API:
+@@ -38,6 +42,8 @@ function wireMatchingFields(field, otherField, message) {
+ // path fields live-update from the root directory as it's typed.
+ // `pathSuffixes` maps each path field's id to what it's called under the
+ // root directory (e.g. { conf_dir: 'caddy.d' }).
++const DIRECTORY_TOGGLE_DEFAULT_ROOT = "/etc/caddy";
++
+ function wireDirectoryToggle(formId, rootId, toggleId, pathSuffixes) {
+   const form = document.getElementById(formId);
+   const rootInput = document.getElementById(rootId);
+@@ -61,10 +67,18 @@ function wireDirectoryToggle(formId, rootId, toggleId, pathSuffixes) {
+   function syncToggle() {
+     const custom = toggle.checked;
+     rootInput.disabled = custom;
+-    // Custom directories mean no root directory -- clear it so the field
+-    // (and, once saved, the config) reflects that rather than showing a
+-    // stale value that no longer has any effect.
+-    if (custom) rootInput.value = "";
++    if (custom) {
++      // Custom directories mean no root directory -- clear it so the field
++      // (and, once saved, the config) reflects that rather than showing a
++      // stale value that no longer has any effect.
++      rootInput.value = "";
++    } else if (!rootInput.value.trim()) {
++      // Switching back from custom (where root was null) shouldn't leave
++      // the now-active root field empty -- seed it with a sensible default
++      // so there's immediately something valid to derive paths from.
++      rootInput.value = DIRECTORY_TOGGLE_DEFAULT_ROOT;
++      deriveFromRoot();
++    }
+     Object.values(inputs).forEach((el) => { el.disabled = !custom; });
+   }
+ 
+@@ -78,4 +92,11 @@ function wireDirectoryToggle(formId, rootId, toggleId, pathSuffixes) {
+     rootInput.disabled = false;
+     Object.values(inputs).forEach((el) => { el.disabled = false; });
+   });
++
++  // A reset (e.g. a "Cancel" button) restores field values/checked state as
++  // its default action *after* this event finishes dispatching, so the
++  // toggle's checked state isn't reliably readable yet inside this handler
++  // -- defer the enabled/disabled fixup to the next tick, once the browser
++  // has actually applied the reset.
++  form.addEventListener("reset", () => setTimeout(syncToggle, 0));
+ }
+diff --git a/templates/settings.html b/templates/settings.html
+index 6eb6c40..9afa124 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -205,7 +205,7 @@
+               <input type="hidden" name="action" value="update_dir">
+               <div class="mb-3">
+                 <label class="form-label">Caddy root directory</label>
+-                <input type="text" name="root_dir" id="root_dir" class="form-control" value="{{ cfg.root_dir or '' }}" {{ 'disabled' if custom_dirs }}>
++                <input type="text" name="root_dir" id="root_dir" class="form-control" value="{{ cfg.root_dir or '' }}" placeholder="/etc/caddy" {{ 'disabled' if custom_dirs }}>
+               </div>
+ 
+               <hr class="my-4">
+@@ -236,6 +236,7 @@
+               </div>
+               <div class="form-footer">
+                 <button type="submit" class="btn btn-primary">Update</button>
++                <button type="reset" class="btn">Cancel</button>
+               </div>
+             </form>
+             <script>

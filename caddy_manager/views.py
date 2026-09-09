@@ -9,7 +9,7 @@ from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
     get_show_metadata_card, get_caddy_log_output_dir,
-    DASHBOARD_WIDGETS, get_dashboard_widget_visibility,
+    DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
 )
 from .caddy_api import upstream_stats
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
@@ -326,14 +326,36 @@ def settings():
         action = request.form.get("action")
 
         if action == "update_dir":
-            root_dir = request.form.get("root_dir", "").strip()
-            conf_dir = request.form.get("conf_dir", "").strip()
-            certificate_dir = request.form.get("certificate_dir", "").strip()
-            log_dir = request.form.get("log_dir", "").strip()
-            caddyfile_path = request.form.get("caddyfile_path", "").strip()
-            if not conf_dir:
-                error = "Conf directory path is required."
+            # Directories are either fully derived from the Caddy root
+            # directory, or fully custom -- never a mix of the two. In the
+            # custom case root_dir is cleared to None so the UI (and this
+            # branch, next time) can tell the two modes apart without a
+            # separate flag. The four path fields themselves are only
+            # trusted from the submitted form in custom mode; in root mode
+            # they're recomputed here regardless of what the (disabled,
+            # JS-derived) fields happened to submit.
+            custom_dirs = request.form.get("custom_dirs") == "1"
+            root_dir = conf_dir = certificate_dir = log_dir = caddyfile_path = None
+
+            if custom_dirs:
+                conf_dir = request.form.get("conf_dir", "").strip()
+                certificate_dir = request.form.get("certificate_dir", "").strip()
+                log_dir = request.form.get("log_dir", "").strip()
+                caddyfile_path = request.form.get("caddyfile_path", "").strip()
+                if not conf_dir:
+                    error = "Conf directory path is required."
             else:
+                root_dir = request.form.get("root_dir", "").strip()
+                if not root_dir:
+                    error = "Caddy root directory is required."
+                else:
+                    defaults = default_paths_for_root(root_dir)
+                    conf_dir = defaults["conf_dir"]
+                    certificate_dir = defaults["certificate_dir"]
+                    log_dir = defaults["log_dir"]
+                    caddyfile_path = defaults["caddyfile_path"]
+
+            if not error:
                 try:
                     os.makedirs(conf_dir, exist_ok=True)
                 except OSError as e:
