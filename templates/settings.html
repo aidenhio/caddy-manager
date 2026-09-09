@@ -192,41 +192,98 @@
           </script>
         </div>
 
-        <!-- TAB DIRECTORY --> 
+        <!-- TAB DIRECTORY -->
         <div id="directory" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Configuration Directories</h2>
             <h3 class="card-title">Change Directories</h3>
             <p class="text-secondary">
-              Ensure all directories exist and have correct permissions.
+              By default, the paths below are set automatically from the Caddy root directory using the conventional layout (<code>caddy.d/</code>, <code>data/</code>, <code>logs/</code>, <code>Caddyfile</code>). Turn on "Set custom directories" to choose each path individually instead.
             </p>
             <form method="post" id="directory-form">
               <input type="hidden" name="action" value="update_dir">
               <div class="mb-3">
                 <label class="form-label">Caddy root directory</label>
-                <input type="text" name="root_dir" class="form-control" value="{{ cfg.root_dir or '' }}">
+                <input type="text" name="root_dir" id="root_dir" class="form-control" value="{{ cfg.root_dir or '' }}">
+              </div>
+              
+              <hr class="my-4">
+
+              <div class="mb-3">
+                <label class="form-check form-switch">
+                  <input type="checkbox" class="form-check-input" id="custom-dirs-toggle">
+                  <span class="form-check-label">Set custom directories</span>
+                </label>
+                <span class="form-hint">Lets you set each path below individually instead of deriving them from the root directory.</span>
               </div>
               <div class="mb-3">
                 <label class="form-label">Conf directory path</label>
-                <input type="text" name="conf_dir" class="form-control" value="{{ cfg.conf_dir }}" required>
+                <input type="text" name="conf_dir" id="conf_dir" class="form-control" value="{{ cfg.conf_dir }}" required disabled>
                 <div class="invalid-feedback">Conf directory path is required.</div>
               </div>
               <div class="mb-3">
                 <label class="form-label">Certificate directory path <span class="form-hint d-inline">(Caddy's <a href="https://caddyserver.com/docs/conventions#data-directory" target="_blank" rel="noopener">data directory</a>)</span></label>
-                <input type="text" name="certificate_dir" class="form-control" value="{{ cfg.certificate_dir or '' }}">
+                <input type="text" name="certificate_dir" id="certificate_dir" class="form-control" value="{{ cfg.certificate_dir or '' }}" disabled>
               </div>
               <div class="mb-3">
                 <label class="form-label">Logs directory path</label>
-                <input type="text" name="log_dir" class="form-control" value="{{ cfg.log_dir or '' }}">
+                <input type="text" name="log_dir" id="log_dir" class="form-control" value="{{ cfg.log_dir or '' }}" disabled>
               </div>
               <div class="mb-3">
                 <label class="form-label">Caddyfile path</label>
-                <input type="text" name="caddyfile_path" class="form-control" value="{{ cfg.caddyfile_path or '' }}">
+                <input type="text" name="caddyfile_path" id="caddyfile_path" class="form-control" value="{{ cfg.caddyfile_path or '' }}" disabled>
               </div>
-              <button type="submit" class="btn btn-primary">Update directories</button>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
             </form>
             <script>
               initFormValidation(document.getElementById('directory-form'));
+
+              // BEGIN DIRECTORY ROOT -> DERIVED PATHS TOGGLE
+              (function () {
+                const rootInput = document.getElementById('root_dir');
+                const toggle = document.getElementById('custom-dirs-toggle');
+                const form = document.getElementById('directory-form');
+                const suffixes = {
+                  conf_dir: 'caddy.d',
+                  certificate_dir: 'data',
+                  log_dir: 'logs',
+                  caddyfile_path: 'Caddyfile',
+                };
+                const inputs = Object.fromEntries(
+                  Object.keys(suffixes).map((id) => [id, document.getElementById(id)])
+                );
+
+                // Only fires from user input on root_dir, which is only
+                // reachable when the toggle is off (root_dir disabled while
+                // custom directories are active) -- no need to gate on
+                // toggle.checked here.
+                function deriveFromRoot() {
+                  const root = rootInput.value.trim().replace(/[/\\]+$/, '');
+                  Object.entries(inputs).forEach(([id, el]) => {
+                    el.value = root ? `${root}/${suffixes[id]}` : '';
+                  });
+                }
+
+                function syncToggle() {
+                  const custom = toggle.checked;
+                  rootInput.disabled = custom;
+                  Object.values(inputs).forEach((el) => { el.disabled = !custom; });
+                }
+
+                rootInput.addEventListener('input', deriveFromRoot);
+                toggle.addEventListener('change', syncToggle);
+
+                // Disabled fields are excluded from form submission -- briefly
+                // re-enable everything right before submit so the current
+                // values (root-derived or custom) are sent to the server.
+                form.addEventListener('submit', () => {
+                  rootInput.disabled = false;
+                  Object.values(inputs).forEach((el) => { el.disabled = false; });
+                });
+              })();
+              // END DIRECTORY ROOT -> DERIVED PATHS TOGGLE
             </script>
           </div>
         </div>
