@@ -58,7 +58,7 @@
 
           <!-- BEGIN SITE ADDRESS FIELD -->
           <div class="mb-3">
-            <label class="form-label">Site Addresses <span class="form-hint d-inline">(type a site address, press space or enter to add it — the first, after sorting, names the file)</span></label>
+            <label class="form-label">Site Addresses <span class="form-hint d-inline">(type a site address, press space or enter to add it)</span></label>
             <div class="form-control d-flex flex-wrap align-items-center gap-2" id="site-address-input">
               <input type="text" id="site-address-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
             </div>
@@ -237,7 +237,7 @@
               <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
                 <div class="accordion-body">
                   <!-- BEGIN RETRY BEHAVIOR OPTIONS -->
-                  <label class="form-label mb-2">Retry behavior <span class="form-hint d-inline">(optional)</span></label>
+                  <div class="subheader mb-3">Retry Behavior</span></div>
                   <div class="row">
                     <div class="col-md-4 mb-3">
                       <label class="form-label">Retries</label>
@@ -257,31 +257,37 @@
                   <hr class="my-3">
 
                   <!-- BEGIN HEALTH CHECK OPTIONS -->
-                  <label class="form-label mb-2">Health check <span class="form-hint d-inline">(optional, active health checking)</span></label>
+                  <div class="subheader mb-3">Active Health Check</div>
                   <div class="row">
-                    <div class="col mb-3">
+                    <div class="col-sm mb-3">
                       <label class="form-label">Health check URI</label>
                       <input type="text" name="health_uri" class="form-control" value="{{ meta.health_uri or '' }}" placeholder="/healthz">
                     </div>
                   </div>
                   <div class="row">
-                    <div class="col-sm mb-3">
+                    <div class="col-md-4 mb-3">
+                      <label class="form-label">Method</label>
+                      <input type="text" name="health_method" class="form-control" value="{{ meta.health_status or '' }}" placeholder="GET">
+                    </div>
+                    <div class="col-md-4 mb-3">
                       <label class="form-label">Expected status</label>
                       <input type="text" name="health_status" class="form-control" value="{{ meta.health_status or '' }}" placeholder="200">
                     </div>
-                    <div class="col-sm mb-3">
-                      <label class="form-label">Timeout</label>
-                      <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
-                    </div>
-                    <div class="col-sm mb-3">
+                    <div class="col-md-4 mb-3">
                       <label class="form-label">Interval</label>
                       <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
                     </div>
-                    <div class="col-sm mb-3">
+                  </div>
+                  <div class="row">
+                    <div class="col-md-4 mb-3">
+                      <label class="form-label">Timeout</label>
+                      <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
+                    </div>
+                    <div class="col-md-4 mb-3 mb-md-0">
                       <label class="form-label">Healthy after</label>
                       <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
                     </div>
-                    <div class="col-sm mb-3">
+                    <div class="col-md-4">
                       <label class="form-label">Unhealthy after</label>
                       <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
                     </div>
@@ -291,7 +297,8 @@
                   <hr class="my-3">
 
                   <div class="mb-0">
-                    <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the reverse_proxy block)</span></label>
+                    <div class="subheader mb-3">Extra directives</div>
+                    <label class="form-label">Directives <span class="form-hint d-inline">(added inside the reverse_proxy block)</span></label>
                     <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
                   </div>
                 </div>
@@ -318,9 +325,11 @@
                       <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
                       <span class="form-check-label">Enable logging</span>
                     </label>
-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}</code>.</span>
                   </div>
                   <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+                    <hr class="my-3">
+                    <div class="subheader mb-3">Log Options</div>
                     <div class="row">
                       <div class="col-md-6 mb-3">
                         <label class="form-label">Log level</label>
@@ -337,9 +346,10 @@
                         </select>
                       </div>
                     </div>
-                    <div class="mb-2">
-                      <label class="form-label mb-0">Log rotation <span class="form-hint d-inline">(optional -- Caddy's defaults are 100MiB, 10 files, 2160h/90 days)</span></label>
-                    </div>
+
+                    <hr class="my-3">
+
+                    <div class="subheader mb-3">Log Rotation</div>
                     <div class="row">
                       <div class="col-md-4 mb-3 mb-md-0">
                         <label class="form-label">Max file size</label>
