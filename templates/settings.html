@@ -56,17 +56,33 @@
     <div class="col-12 col-md-9 d-flex flex-column">
       <div class="tab-content">
 
-        <!-- TAB USER --> 
+        <!-- TAB USER -->
         <div id="user" class="tab-pane active">
           <div class="card-body">
             <h2 class="mb-4">User Settings</h2>
             <h3 class="card-title">User Account</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Your login username and, optionally, an email address for account purposes.
             </p>
+            <form method="post" id="user-form">
+              <input type="hidden" name="action" value="update_user">
+              <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" value="{{ cfg.username or '' }}" required>
+                <div class="invalid-feedback">Username is required.</div>
+              </div>
+              <div class="mb-0">
+                <label class="form-label">Email <span class="form-hint d-inline">(optional)</span></label>
+                <input type="email" name="email" class="form-control" value="{{ cfg.email or '' }}" placeholder="you@example.com">
+                <small class="form-hint">Not used anywhere yet -- saved for future use.</small>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('user-form'));
+            </script>
           </div>
         </div>
 

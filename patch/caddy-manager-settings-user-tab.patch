@@ -1,0 +1,76 @@
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 80e9dc5..7493b09 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -1,7 +1,7 @@
+ import os
+ from datetime import datetime
+ 
+-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
++from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify, session
+ from werkzeug.security import generate_password_hash, check_password_hash
+ 
+ from .auth import login_required
+@@ -406,6 +406,19 @@ def settings():
+                 flash("Quick Add settings updated.", "success")
+                 return redirect(url_for("main.settings"))
+ 
++        elif action == "update_user":
++            username = request.form.get("username", "").strip()
++            email = request.form.get("email", "").strip()
++            if not username:
++                error = "Username is required."
++            else:
++                cfg["username"] = username
++                cfg["email"] = email
++                save_config(cfg)
++                session["username"] = username
++                flash("User settings updated.", "success")
++                return redirect(url_for("main.settings"))
++
+         elif action == "change_password":
+             current = request.form.get("current_password", "")
+             new_password = request.form.get("new_password", "")
+diff --git a/templates/settings.html b/templates/settings.html
+index 17630d1..8f3f600 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -56,17 +56,33 @@
+     <div class="col-12 col-md-9 d-flex flex-column">
+       <div class="tab-content">
+ 
+-        <!-- TAB USER --> 
++        <!-- TAB USER -->
+         <div id="user" class="tab-pane active">
+           <div class="card-body">
+             <h2 class="mb-4">User Settings</h2>
+             <h3 class="card-title">User Account</h3>
+             <p class="text-secondary">
+-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
+-              alias aliquid
+-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
+-              odit.
++              Your login username and, optionally, an email address for account purposes.
+             </p>
++            <form method="post" id="user-form">
++              <input type="hidden" name="action" value="update_user">
++              <div class="mb-3">
++                <label class="form-label">Username</label>
++                <input type="text" name="username" class="form-control" value="{{ cfg.username or '' }}" required>
++                <div class="invalid-feedback">Username is required.</div>
++              </div>
++              <div class="mb-0">
++                <label class="form-label">Email <span class="form-hint d-inline">(optional)</span></label>
++                <input type="email" name="email" class="form-control" value="{{ cfg.email or '' }}" placeholder="you@example.com">
++                <small class="form-hint">Not used anywhere yet -- saved for future use.</small>
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++            <script>
++              initFormValidation(document.getElementById('user-form'));
++            </script>
+           </div>
+         </div>
+ 

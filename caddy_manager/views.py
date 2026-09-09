@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from .auth import login_required
@@ -404,6 +404,19 @@ def settings():
                 cfg["quick_add_type_site_blocks"] = quick_add_type_site_blocks
                 save_config(cfg)
                 flash("Quick Add settings updated.", "success")
+                return redirect(url_for("main.settings"))
+
+        elif action == "update_user":
+            username = request.form.get("username", "").strip()
+            email = request.form.get("email", "").strip()
+            if not username:
+                error = "Username is required."
+            else:
+                cfg["username"] = username
+                cfg["email"] = email
+                save_config(cfg)
+                session["username"] = username
+                flash("User settings updated.", "success")
                 return redirect(url_for("main.settings"))
 
         elif action == "change_password":
