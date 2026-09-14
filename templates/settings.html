@@ -7,6 +7,11 @@
 {% block header_actions %}
 {% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/material-darker.css" />
+{% endblock %}
+
 <!---->
 
 {% block content %}
@@ -332,13 +337,92 @@
         <div id="global" class="tab-pane">
           <div class="card-body">
             <h2 class="mb-4">Caddy Global Configuration</h2>
-            <h3 class="card-title">XXX</h3>
+            <h3 class="card-title">Caddyfile</h3>
             <p class="text-secondary">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Adipisci,
-              alias aliquid
-              distinctio dolorem expedita, fugiat hic magni molestiae molestias
-              odit.
+              Edit the main Caddyfile directly{% if cfg.caddyfile_path %} (<code>{{ cfg.caddyfile_path }}</code>){% endif %}.
             </p>
+        
+            <div class="alert alert-warning" role="alert">
+              <div class="alert-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+                  focusable="false" class="icon alert-icon">
+                  <path d="M12 9v4"></path>
+                  <path
+                    d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0">
+                  </path>
+                  <path d="M12 16h.01"></path>
+                </svg>
+              </div>
+              <span>
+                Saving here writes straight to the Caddyfile on disk, outside of Caddy Manager's usual validation. Invalid syntax can stop Caddy from starting or reloading. Every save backs up the file that was on disk beforehand to <code>Caddyfile.bak</code> so you can roll back if something goes wrong.
+              </span>
+            </div>
+        
+            {% if not cfg.caddyfile_path %}
+            <div class="alert alert-danger">No Caddyfile path is configured, please set one in <a href="#directory"
+                data-bs-toggle="tab">Directories</a> first.</div>
+            {% elif caddyfile_read_error %}
+            <div class="alert alert-danger">{{ caddyfile_read_error }}</div>
+            {% else %}
+        
+            <!-- BEGIN CONF IMPORT CHECK -->
+            <div class="mb-2" id="conf-import-check">
+              <span class="badge bg-success-lt" data-state="found" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  class="icon icons-tabler-outline icon-tabler-circle-check">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                  <path d="M9 12l2 2l4 -4" />
+                </svg>
+                Conf directory is imported
+              </span>
+              <span class="badge bg-danger-lt" data-state="missing" hidden>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  class="icon icons-tabler-outline icon-tabler-alert-triangle">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M12 9v4" />
+                  <path
+                    d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />
+                  <path d="M12 16h.01" />
+                </svg>
+                Conf dir not imported, blocks won't be loaded by Caddy Manager
+              </span>
+            </div>
+            <!-- END CONF IMPORT CHECK -->
+        
+            <form method="post" id="global-config-form">
+              <input type="hidden" name="action" value="update_global_config">
+              <div class="mb-3">
+                <textarea name="caddyfile_content" id="caddyfile-content" class="form-control" rows="20"
+                  style="font-family:var(--tblr-font-monospace, monospace)" spellcheck="false"
+                  data-conf-dir="{{ conf_dir }}">{{ caddyfile_content }}</textarea>
+              </div>
+              <div class="form-footer d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save Caddyfile</button>
+                {% if caddyfile_backup_updated %}
+                <button type="submit" form="rollback-global-config-form" class="btn btn-outline-danger">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M9 14l-4 -4l4 -4" />
+                    <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+                  </svg>
+                  <span>Roll back to backup <span class="text-secondary">(saved {{ caddyfile_backup_updated }})</span></span>
+                </button>
+                {% endif %}
+              </div>
+            </form>
+            {% if caddyfile_backup_updated %}
+            <form method="post" id="rollback-global-config-form"
+              onsubmit="return confirm('Roll back to the Caddyfile.bak backup from {{ caddyfile_backup_updated }}? This overwrites the current Caddyfile and cannot be undone.');">
+              <input type="hidden" name="action" value="rollback_global_config">
+            </form>
+            {% endif %}
+            {% endif %}
           </div>
         </div>
 
@@ -402,4 +486,10 @@
   </div>
 </div>
 <!-- END SETTINGS CARD -->
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/nginx/nginx.js"></script>
+<script src="{{ url_for('static', filename='js/global-config.js') }}"></script>
 {% endblock %}

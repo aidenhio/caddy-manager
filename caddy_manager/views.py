@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import datetime
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify, session
@@ -8,7 +9,7 @@ from .auth import login_required
 from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
-    get_show_metadata_card, get_caddy_log_output_dir,
+    get_show_metadata_card, get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
     DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
 )
 from .caddy_api import upstream_stats
@@ -381,6 +382,57 @@ def settings():
                 flash("Logging settings updated.", "success")
                 return redirect(url_for("main.settings"))
 
+        elif action == "update_global_config":
+            caddyfile_path = get_caddyfile_path()
+            if not caddyfile_path:
+                error = "No Caddyfile path is configured. Set one in Directories first."
+            else:
+                content = request.form.get("caddyfile_content", "")
+                # Editors conventionally leave the file ending in exactly one
+                # newline -- match that instead of writing back whatever
+                # trailing whitespace the textarea happened to submit.
+                if content and not content.endswith("\n"):
+                    content += "\n"
+                try:
+                    os.makedirs(os.path.dirname(caddyfile_path), exist_ok=True)
+                    # Snapshot whatever's on disk right now before it's
+                    # overwritten, so a bad edit can be rolled back. Only one
+                    # backup is ever kept -- each save replaces it with the
+                    # version it's about to overwrite, not a history.
+                    if os.path.isfile(caddyfile_path):
+                        shutil.copyfile(caddyfile_path, get_caddyfile_backup_path())
+                    with open(caddyfile_path, "w") as f:
+                        f.write(content)
+                except OSError as e:
+                    error = f"Could not write the Caddyfile: {e}"
+                else:
+                    flash("Caddyfile saved.", "success")
+                    return redirect(url_for("main.settings"))
+
+        elif action == "rollback_global_config":
+            caddyfile_path = get_caddyfile_path()
+            backup_path = get_caddyfile_backup_path()
+            if not caddyfile_path:
+                error = "No Caddyfile path is configured. Set one in Directories first."
+            elif not backup_path or not os.path.isfile(backup_path):
+                error = "No Caddyfile.bak backup was found to roll back to."
+            else:
+                try:
+                    shutil.copyfile(backup_path, caddyfile_path)
+                    # The backup's only purpose was undoing the save it was
+                    # taken before -- once that's done, remove it rather
+                    # than leaving it around to be rolled back to again
+                    # (which would silently re-apply an even older version
+                    # than the person likely intends), and so the button
+                    # itself disappears until the next save creates a fresh
+                    # one.
+                    os.remove(backup_path)
+                except OSError as e:
+                    error = f"Could not roll back the Caddyfile: {e}"
+                else:
+                    flash("Caddyfile rolled back to the last backup.", "success")
+                    return redirect(url_for("main.settings"))
+
         elif action == "update_caddy_logging":
             cfg["caddy_log_output_dir"] = request.form.get("caddy_log_output_dir", "").strip()
             save_config(cfg)
@@ -459,7 +511,34 @@ def settings():
                 flash("Password updated.", "success")
                 return redirect(url_for("main.settings"))
 
+    # The Global Configuration tab always shows either what's currently on
+    # disk, or -- if the save attempt above just failed validation -- what
+    # was submitted, so a rejected save doesn't wipe out the edit.
+    if request.method == "POST" and request.form.get("action") == "update_global_config":
+        caddyfile_content = request.form.get("caddyfile_content", "")
+        caddyfile_read_error = None
+    else:
+        caddyfile_content = ""
+        caddyfile_read_error = None
+        caddyfile_path = get_caddyfile_path()
+        if caddyfile_path and os.path.isfile(caddyfile_path):
+            try:
+                with open(caddyfile_path) as f:
+                    caddyfile_content = f.read()
+            except OSError as e:
+                caddyfile_read_error = f"Could not read the Caddyfile: {e}"
+
+    caddyfile_backup_path = get_caddyfile_backup_path()
+    caddyfile_backup_updated = None
+    if caddyfile_backup_path and os.path.isfile(caddyfile_backup_path):
+        caddyfile_backup_updated = datetime.fromtimestamp(
+            os.path.getmtime(caddyfile_backup_path)
+        ).strftime("%d/%m/%Y %I:%M%p")
+
     return render_template(
         "settings.html", cfg=cfg, error=error,
         dashboard_widgets=get_dashboard_widget_visibility(),
+        conf_dir=get_conf_dir(),
+        caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
+        caddyfile_backup_updated=caddyfile_backup_updated,
     )

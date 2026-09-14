@@ -87,6 +87,18 @@ def get_caddyfile_path():
     return load_config().get("caddyfile_path", "")
 
 
+def get_caddyfile_backup_path():
+    """Where the Global Configuration tab's "back up before saving" and
+    rollback features read/write the Caddyfile's backup -- always named
+    Caddyfile.bak, next to the real Caddyfile, regardless of what the
+    Caddyfile itself happens to be named. None if no Caddyfile path is
+    configured yet."""
+    caddyfile_path = get_caddyfile_path()
+    if not caddyfile_path:
+        return None
+    return os.path.join(os.path.dirname(caddyfile_path), "Caddyfile.bak")
+
+
 def get_caddy_log_output_dir():
     """The directory path written into a block's `output file` line when
     logging is enabled -- i.e. where Caddy itself will actually write that
