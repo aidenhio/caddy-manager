@@ -1,33 +1,95 @@
-{% extends "auth.html" %}
+<!doctype html>
+<html lang="en">
 
-{% block title %}Login - Caddy Manager{% endblock %}
+  <!-- BEGIN HEAD -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Login - Caddy Manager</title>
 
-<!---->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" />
 
-{% block content %}
-<div class="card card-md">
-  <div class="card-body">
-    <h2 class="h2 text-center mb-4">Log in</h2>
-    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-    <form method="post" autocomplete="off" id="login-form">
-      <div class="mb-3">
-        <label class="form-label">Username</label>
-        <input type="text" name="username" class="form-control" required autofocus>
-        <div class="invalid-feedback">Username is required.</div>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/override.css') }}" />
+
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/caddy-favicon.png') }}" />
+
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/form-validate.js') }}"></script>
+
+    {% block extra_head %}{% endblock %}
+
+  </head>
+  <!-- END HEAD -->
+
+  <body class="d-flex flex-column">
+
+    <!-- BEGIN PAGE -->
+    <div class="page page-center">
+      <div class="container container-tight py-4">
+
+        <!-- BEGIN LOGO -->
+        <div class="text-center mb-4">
+          <span class="d-inline-flex align-items-center gap-2 h1">
+            <img class="navbar-brand-image me-2" src="{{ url_for('static', filename='img/caddy.png') }}"></img>Caddy Manager
+          </span>
+        </div>
+        <!-- END LOGO -->
+        
+        <!-- BEGIN ALERTS --> 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        <!-- END ALERTS -->
+
+        <!-- BEGIN PAGE CONTENT --> 
+        <div class="card card-md">
+          <div class="card-body">
+            <h2 class="h2 text-center mb-4">Log in</h2>
+            {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+            <form method="post" autocomplete="off" id="login-form">
+              <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" required autofocus>
+                <div class="invalid-feedback">Username is required.</div>
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" required>
+                <div class="invalid-feedback">Password is required.</div>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary w-100">Log in</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <script>
+          initFormValidation(document.getElementById('login-form'));
+        </script>
+        <!-- END PAGE CONTENT -->
+
       </div>
-      <div class="mb-2">
-        <label class="form-label">Password</label>
-        <input type="password" name="password" class="form-control" required>
-        <div class="invalid-feedback">Password is required.</div>
-      </div>
-      <div class="form-footer">
-        <button type="submit" class="btn btn-primary w-100">Log in</button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
+    <!-- END PAGE -->
 
-<script>
-  initFormValidation(document.getElementById('login-form'));
-</script>
-{% endblock %}
+    <!-- BEGIN PAGE SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
+    {% block extra_scripts %}{% endblock %}
+    <!-- END PAGE SCRIPTS -->
+
+  </body>
+</html>

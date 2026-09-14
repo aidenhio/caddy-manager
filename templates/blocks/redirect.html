@@ -1,0 +1,28 @@
+{% extends "block_form.html" %}
+{% from "macros/block_form.html" import accordion %}
+
+{% block new_title %}Redirect{% endblock %}
+
+{% block type_fields %}
+<!-- BEGIN REDIRECT FIELDS -->
+<div class="mb-3">
+  <label class="form-label">Redirect target</label>
+  <input type="text" name="target" class="form-control" value="{{ meta.target or '' }}" placeholder="https://new.example.com{uri}" required>
+  <div class="invalid-feedback">Redirect target is required.</div>
+</div>
+<div class="mb-3">
+  <label class="form-label">Redirect code</label>
+  <select name="redirect_code" class="form-select">
+    {% for code, label in [('301','301 (Permanent)'), ('302','302 (Temporary)'), ('307','307 (Temporary, preserve method)'), ('308','308 (Permanent, preserve method)')] %}
+    <option value="{{ code }}" {{ 'selected' if (meta.redirect_code or '301') == code }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</div>
+<!-- BEGIN ADVANCED OPTIONS -->
+{% call accordion('advanced-options', 'Advanced options') %}
+<p class="text-secondary mb-0">No advanced options for this block type yet.</p>
+{% endcall %}
+<!-- END ADVANCED OPTIONS -->
+{% include "partials/block_form_logging_options.html" %}
+<!-- END REDIRECT FIELDS -->
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "block_form.html" %}
+{% from "macros/block_form.html" import accordion, skip_tls_verify_row %}
+
+{% block new_title %}Reverse Proxy{% endblock %}
+
+{% block type_fields %}
+<!-- BEGIN REVERSE PROXY FIELDS -->
+<div class="row">
+  <div class="col-md-3 mb-3">
+    <label class="form-label">Scheme</label>
+    <select name="scheme" id="scheme" class="form-select">
+      <option value="http" {{ 'selected' if (meta.scheme or 'http') == 'http' }}>http</option>
+      <option value="https" {{ 'selected' if meta.scheme == 'https' }}>https</option>
+    </select>
+  </div>
+  <div class="col-md-6 mb-3">
+    <label class="form-label">Upstream host</label>
+    <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1" required>
+    <div class="invalid-feedback">Upstream host is required.</div>
+  </div>
+  <div class="col-md-3 mb-3">
+    <label class="form-label">Port</label>
+    <input type="text" name="port" class="form-control" value="{{ meta.port or '' }}" placeholder="8080">
+  </div>
+</div>
+{{ skip_tls_verify_row('insecure-skip-verify-row', (meta.scheme or 'http') != 'https', meta.insecure_skip_verify) }}
+<!-- BEGIN ADVANCED OPTIONS -->
+{% call accordion('advanced-options', 'Advanced options') %}
+<div class="mb-0">
+  <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
+  <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
+</div>
+{% endcall %}
+<!-- END ADVANCED OPTIONS -->
+{% include "partials/block_form_logging_options.html" %}
+<!-- END REVERSE PROXY FIELDS -->
+{% endblock %}

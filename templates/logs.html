@@ -11,6 +11,12 @@
 {% include 'partials/log_tail_modal.html' %}
 {% endblock %}
 
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/data-table.js') }}"></script>
+<script src="{{ url_for('static', filename='js/log-tail-modal.js') }}"></script>
+{% endblock %}
+
+
 <!---->
 
 {% block content %}
@@ -126,8 +132,4 @@
   </div>
   {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/log-tail-modal.js') }}"></script>
 {% endblock %}

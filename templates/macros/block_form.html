@@ -1,0 +1,30 @@
+{% macro accordion(accordion_id, title) %}
+<div class="accordion mb-3" id="{{ accordion_id }}">
+  <div class="accordion-item">
+    <div class="accordion-header">
+      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#{{ accordion_id }}-collapse" aria-expanded="false" aria-controls="{{ accordion_id }}-collapse">
+        {{ title }}
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path d="M6 9l6 6l6 -6" />
+        </svg>
+      </button>
+    </div>
+    <div id="{{ accordion_id }}-collapse" class="accordion-collapse collapse" data-bs-parent="#{{ accordion_id }}">
+      <div class="accordion-body">
+        {{ caller() }}
+      </div>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro skip_tls_verify_row(row_id, hidden, checked) %}
+<div class="mb-3" id="{{ row_id }}" {{ 'hidden' if hidden }}>
+  <label class="form-check">
+    <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if checked }}>
+    <span class="form-check-label">Skip TLS verification (insecure)</span>
+  </label>
+  <span class="form-hint">Only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+</div>
+{% endmacro %}

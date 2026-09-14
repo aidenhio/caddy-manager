@@ -22,6 +22,10 @@
 {% include 'partials/new_block_modal.html' %}
 {% endblock %}
 
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/data-table.js') }}"></script>
+{% endblock %}
+
 <!---->
 
 {% block content %}

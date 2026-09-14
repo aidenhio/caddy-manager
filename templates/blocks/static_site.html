@@ -1,0 +1,45 @@
+{% extends "block_form.html" %}
+{% from "macros/block_form.html" import accordion %}
+
+{% block new_title %}Static Site{% endblock %}
+
+{% block type_fields %}
+<!-- BEGIN STATIC SITE FIELDS -->
+<div class="mb-3">
+  <label class="form-label">File path <span class="form-hint d-inline">(the directory on the Caddy server to serve files from)</span></label>
+  <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" required>
+  <div class="invalid-feedback">File path is required.</div>
+</div>
+<div class="mb-3">
+  <label class="form-label">Encode <span class="form-hint d-inline">(optional)</span></label>
+  <div>
+    {% for fmt in ['gzip', 'zstd', 'br'] %}
+    <label class="form-check form-check-inline">
+      <input type="checkbox" class="form-check-input" name="encode" value="{{ fmt }}" {{ 'checked' if fmt in (meta.encode or []) }}>
+      <span class="form-check-label">{{ fmt }}</span>
+    </label>
+    {% endfor %}
+  </div>
+</div>
+<!-- BEGIN ADVANCED OPTIONS -->
+{% call accordion('advanced-options', 'Advanced options') %}
+<div class="mb-3">
+  <label class="form-label">Hide <span class="form-hint d-inline">(optional, space-separated glob patterns kept out of listings and direct requests)</span></label>
+  <input type="text" name="hide" class="form-control" value="{{ meta.hide or '' }}" placeholder=".git .env">
+</div>
+<div class="mb-3">
+  <label class="form-label">Index files <span class="form-hint d-inline">(optional, space-separated — defaults to index.html/index.txt)</span></label>
+  <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
+</div>
+<div class="mb-0">
+  <label class="form-check">
+    <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
+    <span class="form-check-label">Directory browsing</span>
+  </label>
+  <span class="form-hint">Shows a file listing for directories that have no index file.</span>
+</div>
+{% endcall %}
+<!-- END ADVANCED OPTIONS -->
+{% include "partials/block_form_logging_options.html" %}
+<!-- END STATIC SITE FIELDS -->
+{% endblock %}

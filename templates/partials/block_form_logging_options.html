@@ -1,0 +1,51 @@
+{% from "macros/block_form.html" import accordion %}
+
+<!-- BEGIN LOGGING OPTIONS -->
+{% call accordion('logging-options', 'Logging') %}
+<div class="mb-3">
+  <label class="form-check form-switch">
+    <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+    <span class="form-check-label">Enable logging</span>
+  </label>
+  <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}</code>.</span>
+</div>
+<div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+  <hr class="my-3">
+  <div class="subheader mb-3">Log Options</div>
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Log level</label>
+      <select name="log_level" class="form-select">
+        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+      </select>
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label">Log format</label>
+      <select name="log_format" class="form-select">
+        <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+        <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+      </select>
+    </div>
+  </div>
+
+  <hr class="my-3">
+
+  <div class="subheader mb-3">Log Rotation</div>
+  <div class="row">
+    <div class="col-md-4 mb-3 mb-md-0">
+      <label class="form-label">Max file size</label>
+      <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+    </div>
+    <div class="col-md-4 mb-3 mb-md-0">
+      <label class="form-label">Files to keep</label>
+      <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Keep for</label>
+      <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+    </div>
+  </div>
+</div>
+{% endcall %}
+<!-- END LOGGING OPTIONS -->

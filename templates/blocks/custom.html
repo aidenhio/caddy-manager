@@ -1,0 +1,13 @@
+{% extends "block_form.html" %}
+
+{% block new_title %}Custom Block{% endblock %}
+
+{% block type_fields %}
+<!-- BEGIN CUSTOM FIELDS -->
+<div class="mb-3">
+  <label class="form-label">Block content <span class="form-hint d-inline">(site addresses above are wrapped automatically)</span></label>
+  <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
+  <div class="invalid-feedback">Block content is required.</div>
+</div>
+<!-- END CUSTOM FIELDS -->
+{% endblock %}

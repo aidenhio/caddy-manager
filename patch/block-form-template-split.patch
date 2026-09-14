@@ -1,0 +1,1195 @@
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 3f4322d..dfe7ad3 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -119,7 +119,7 @@ def certificates():
+ @bp.route("/new/<block_type>", methods=["GET", "POST"])
+ @login_required
+ def new_block(block_type):
+-    if block_type not in ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom"):
++    if block_type not in QUICK_ADD_BLOCK_TYPES:
+         abort(404)
+     error = None
+     meta = {}
+@@ -160,7 +160,7 @@ def new_block(block_type):
+     raw_body_text = request.form.get("raw_content", "") if request.method == "POST" and block_type == "custom" else ""
+     disabled_toggle_checked = request.form.get("disabled") == "1" if request.method == "POST" else False
+     return render_template(
+-        "block_form.html", mode="new", block_type=block_type,
++        f"blocks/{block_type}.html", mode="new", block_type=block_type,
+         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
+         raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+         disabled_toggle_checked=disabled_toggle_checked,
+@@ -176,6 +176,8 @@ def edit_block(filename):
+ 
+     meta = read_metadata(filename, path)
+     block_type = meta.get("type", "custom")
++    if block_type not in QUICK_ADD_BLOCK_TYPES:
++        block_type = "custom"
+     old_site_addresses = meta.get("site_addresses", [])
+     previous_log_enabled = meta.get("log_enabled", False)
+     error = None
+@@ -242,7 +244,7 @@ def edit_block(filename):
+         else filename.endswith(".disabled")
+ 
+     return render_template(
+-        "block_form.html", mode="edit", block_type=block_type, filename=filename,
++        f"blocks/{block_type}.html", mode="edit", block_type=block_type, filename=filename,
+         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
+         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
+         error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+diff --git a/templates/block_form.html b/templates/block_form.html
+deleted file mode 100644
+index e086368..0000000
+--- a/templates/block_form.html
++++ /dev/null
+@@ -1,656 +0,0 @@
+-{% extends "base.html" %}
+-
+-{% set type_color = type_color(block_type) %}
+-
+-{% block title %}{% if mode == 'edit' %}Edit {{ site_addresses[0] if site_addresses else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
+-
+-{% block page_pretitle %}{% if mode == 'edit' %}Edit{% else %}New{% endif %}{% endblock %}
+-
+-{% block page_title %}
+-  {% if mode == 'edit' %}
+-    {{ site_addresses[0] if site_addresses else filename }}
+-  {% else %}
+-    {% if block_type == 'reverse_proxy' %}
+-      Reverse Proxy
+-    {% elif block_type == 'redirect' %}
+-      Redirect
+-    {% elif block_type == 'load_balancer' %}
+-      Load Balancer
+-    {% elif block_type == 'static_site' %}
+-      Static Site
+-    {% else %}
+-      Custom Block
+-    {% endif %}
+-  {% endif %}
+-{% endblock %}
+-
+-{% block header_actions %}
+-{% endblock %}
+-
+-<!---->
+-
+-{% block content %}
+-
+-<!-- BEGIN BLOCK FORM CARD -->
+-<div class="row">
+-  <div class="col">
+-    <div class="card rounded-top-0">
+-
+-      <div class="card-status-top bg-{{ type_color }}"></div>
+-
+-      <!-- BEGIN CARD HEADER -->
+-      <div class="card-header">
+-        <h3 class="card-title">
+-          {% if mode == 'edit' %}
+-            Editing <span class="badge bg-lt font-monospace" id="conf-path-badge">{{ conf_path }}</span>
+-          {% else %}
+-            Creating <span class="badge bg-lt font-monospace" id="conf-path-badge"></span>
+-          {% endif %}
+-        </h3>
+-      </div>
+-      <!-- END CARD HEADER -->
+-
+-      <!-- BEGIN CARD BODY -->
+-      <div class="card-body">
+-        {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+-
+-        <form method="post" id="block-form" data-type-color="{{ type_color }}" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
+-
+-          <!-- BEGIN SITE ADDRESS FIELD -->
+-          <div class="mb-3">
+-            <label class="form-label">Site Addresses <span class="form-hint d-inline">(type a site address, press space or enter to add it)</span></label>
+-            <div class="form-control d-flex flex-wrap align-items-center gap-2" id="site-address-input">
+-              <input type="text" id="site-address-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
+-            </div>
+-            <div class="invalid-feedback">At least one site address is required.</div>
+-            <textarea name="site_addresses" id="site-addresses" hidden>{{ site_addresses_text }}</textarea>
+-          </div>
+-          <!-- END SITE ADDRESS FIELD -->
+-
+-          <!-- BEGIN REVERSE PROXY FIELDS -->
+-          {% if block_type == 'reverse_proxy' %}
+-          <div class="row">
+-            <div class="col-md-3 mb-3">
+-              <label class="form-label">Scheme</label>
+-              <select name="scheme" id="scheme" class="form-select">
+-                <option value="http" {{ 'selected' if (meta.scheme or 'http') == 'http' }}>http</option>
+-                <option value="https" {{ 'selected' if meta.scheme == 'https' }}>https</option>
+-              </select>
+-            </div>
+-            <div class="col-md-6 mb-3">
+-              <label class="form-label">Upstream host</label>
+-              <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1" required>
+-              <div class="invalid-feedback">Upstream host is required.</div>
+-            </div>
+-            <div class="col-md-3 mb-3">
+-              <label class="form-label">Port</label>
+-              <input type="text" name="port" class="form-control" value="{{ meta.port or '' }}" placeholder="8080">
+-            </div>
+-          </div>
+-          <div class="mb-3" id="insecure-skip-verify-row" {{ 'hidden' if (meta.scheme or 'http') != 'https' }}>
+-            <label class="form-check">
+-              <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+-              <span class="form-check-label">Skip TLS verification (insecure)</span>
+-            </label>
+-            <span class="form-hint">Adds <code>transport http { tls_insecure_skip_verify }</code> to the block — only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+-          </div>
+-          <!-- BEGIN ADVANCED OPTIONS -->
+-          <div class="accordion mb-3" id="advanced-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+-                  Advanced options
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+-                <div class="accordion-body">
+-                  <div class="mb-0">
+-                    <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
+-                    <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
+-                  </div>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END ADVANCED OPTIONS -->
+-          <!-- BEGIN LOGGING OPTIONS -->
+-          <div class="accordion mb-3" id="logging-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+-                  Logging
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+-                <div class="accordion-body">
+-                  <div class="mb-3">
+-                    <label class="form-check form-switch">
+-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+-                      <span class="form-check-label">Enable logging</span>
+-                    </label>
+-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+-                  </div>
+-                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+-                    <hr class="my-3">
+-                    <div class="subheader mb-3">Log Options</div>
+-                    <div class="row">
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log level</label>
+-                        <select name="log_level" class="form-select">
+-                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+-                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+-                        </select>
+-                      </div>
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log format</label>
+-                        <select name="log_format" class="form-select">
+-                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+-                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+-                        </select>
+-                      </div>
+-                    </div>
+-
+-                    <hr class="my-3">
+-
+-                    <div class="subheader mb-3">Log Rotation</div>
+-                    <div class="row">
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Max file size</label>
+-                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+-                      </div>
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Files to keep</label>
+-                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+-                      </div>
+-                      <div class="col-md-4">
+-                        <label class="form-label">Keep for</label>
+-                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+-                      </div>
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END LOGGING OPTIONS -->
+-          {% endif %}
+-          <!-- END REVERSE PROXY FIELDS -->
+-
+-          <!-- BEGIN LOAD BALANCER FIELDS -->
+-          {% if block_type == 'load_balancer' %}
+-          <div class="row">
+-            <div class="col-md-4 mb-3">
+-              <label class="form-label">Scheme <span class="form-hint d-inline">(shared by every upstream below)</span></label>
+-              <select id="lb-scheme" class="form-select">
+-                <option value="http">http</option>
+-                <option value="https">https</option>
+-              </select>
+-            </div>
+-          </div>
+-          <div class="mb-3" id="lb-insecure-skip-verify-row" {{ 'hidden' if not (meta.upstreams and meta.upstreams[0].startswith('https://')) }}>
+-            <label class="form-check">
+-              <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+-              <span class="form-check-label">Skip TLS verification (insecure)</span>
+-            </label>
+-            <span class="form-hint">Adds <code>transport http { tls_insecure_skip_verify }</code> to the block — only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+-          </div>
+-
+-          <div class="mb-3">
+-            <label class="form-label">Upstreams <span class="form-hint d-inline">(at least two)</span></label>
+-            <div id="upstream-rows"></div>
+-            <button type="button" id="add-upstream-btn" class="btn btn-outline-{{ type_color }} btn-sm mt-1">
+-              <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                <path d="M12 5l0 14" />
+-                <path d="M5 12l14 0" />
+-              </svg>
+-              Add upstream
+-            </button>
+-          </div>
+-          <textarea name="upstreams" id="upstreams" hidden>{{ upstreams_text }}</textarea>
+-
+-          <div class="mb-3">
+-            <label class="form-label">Load balancing policy</label>
+-            <select name="lb_policy" class="form-select">
+-              {% for policy in ['round_robin', 'least_conn', 'random', 'ip_hash', 'uri_hash', 'header', 'first'] %}
+-              <option value="{{ policy }}" {{ 'selected' if meta.lb_policy == policy }}>{{ policy }}</option>
+-              {% endfor %}
+-            </select>
+-          </div>
+-          <!-- BEGIN ADVANCED OPTIONS -->
+-          <div class="accordion mb-3" id="advanced-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+-                  Advanced options
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+-                <div class="accordion-body">
+-                  <!-- BEGIN RETRY BEHAVIOR OPTIONS -->
+-                  <div class="subheader mb-3">Retry Behavior</div>
+-                  <div class="row">
+-                    <div class="col-md-4 mb-3">
+-                      <label class="form-label">Retries</label>
+-                      <input type="number" min="0" step="1" name="lb_retries" class="form-control" value="{{ meta.lb_retries or '' }}" placeholder="0">
+-                    </div>
+-                    <div class="col-md-4 mb-3">
+-                      <label class="form-label">Try duration</label>
+-                      <input type="text" name="lb_try_duration" class="form-control" value="{{ meta.lb_try_duration or '' }}" placeholder="10s">
+-                    </div>
+-                    <div class="col-md-4 mb-3">
+-                      <label class="form-label">Try interval</label>
+-                      <input type="text" name="lb_try_interval" class="form-control" value="{{ meta.lb_try_interval or '' }}" placeholder="250ms">
+-                    </div>
+-                  </div>
+-                  <!-- END RETRY BEHAVIOR OPTIONS -->
+-
+-                  <hr class="my-3">
+-
+-                  <!-- BEGIN HEALTH CHECK OPTIONS -->
+-                  <div class="subheader mb-3">Active Health Check</div>
+-                  <div class="row">
+-                    <div class="col-sm mb-3">
+-                      <label class="form-label">Health check URI</label>
+-                      <input type="text" name="health_uri" class="form-control" value="{{ meta.health_uri or '' }}" placeholder="/healthz">
+-                    </div>
+-                  </div>
+-                  <div class="row">
+-                    <div class="col-md-4 mb-3">
+-                      <label class="form-label">Method</label>
+-                      <select name="health_method" class="form-select">
+-                        <option value="" {{ 'selected' if not meta.health_method }}>GET</option>
+-                        {% for method in ['POST', 'PUT', 'DELETE', 'PATCH'] %}
+-                        <option value="{{ method }}" {{ 'selected' if meta.health_method == method }}>{{ method }}</option>
+-                        {% endfor %}
+-                      </select>
+-                    </div>
+-                    <div class="col-md-4 mb-3">
+-                      <label class="form-label">Expected status</label>
+-                      <input type="text" name="health_status" class="form-control" value="{{ meta.health_status or '' }}" placeholder="200">
+-                    </div>
+-                    <div class="col-md-4 mb-3">
+-                      <label class="form-label">Interval</label>
+-                      <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
+-                    </div>
+-                  </div>
+-                  <div class="row">
+-                    <div class="col-md-4 mb-3">
+-                      <label class="form-label">Timeout</label>
+-                      <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
+-                    </div>
+-                    <div class="col-md-4 mb-3 mb-md-0">
+-                      <label class="form-label">Healthy after</label>
+-                      <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
+-                    </div>
+-                    <div class="col-md-4">
+-                      <label class="form-label">Unhealthy after</label>
+-                      <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
+-                    </div>
+-                  </div>
+-                  <!-- END HEALTH CHECK OPTIONS -->
+-
+-                  <hr class="my-3">
+-
+-                  <div class="mb-0">
+-                    <div class="subheader mb-3">Extra directives</div>
+-                    <label class="form-label">Directives <span class="form-hint d-inline">(added inside the reverse_proxy block)</span></label>
+-                    <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
+-                  </div>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END ADVANCED OPTIONS -->
+-          <!-- BEGIN LOGGING OPTIONS -->
+-          <div class="accordion mb-3" id="logging-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+-                  Logging
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+-                <div class="accordion-body">
+-                  <div class="mb-3">
+-                    <label class="form-check form-switch">
+-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+-                      <span class="form-check-label">Enable logging</span>
+-                    </label>
+-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}</code>.</span>
+-                  </div>
+-                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+-                    <hr class="my-3">
+-                    <div class="subheader mb-3">Log Options</div>
+-                    <div class="row">
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log level</label>
+-                        <select name="log_level" class="form-select">
+-                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+-                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+-                        </select>
+-                      </div>
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log format</label>
+-                        <select name="log_format" class="form-select">
+-                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+-                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+-                        </select>
+-                      </div>
+-                    </div>
+-
+-                    <hr class="my-3">
+-
+-                    <div class="subheader mb-3">Log Rotation</div>
+-                    <div class="row">
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Max file size</label>
+-                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+-                      </div>
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Files to keep</label>
+-                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+-                      </div>
+-                      <div class="col-md-4">
+-                        <label class="form-label">Keep for</label>
+-                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+-                      </div>
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END LOGGING OPTIONS -->
+-          {% endif %}
+-          <!-- END LOAD BALANCER FIELDS -->
+-
+-          <!-- BEGIN REDIRECT FIELDS -->
+-          {% if block_type == 'redirect' %}
+-          <div class="mb-3">
+-            <label class="form-label">Redirect target</label>
+-            <input type="text" name="target" class="form-control" value="{{ meta.target or '' }}" placeholder="https://new.example.com{uri}" required>
+-            <div class="invalid-feedback">Redirect target is required.</div>
+-          </div>
+-          <div class="mb-3">
+-            <label class="form-label">Redirect code</label>
+-            <select name="redirect_code" class="form-select">
+-              {% for code, label in [('301','301 (Permanent)'), ('302','302 (Temporary)'), ('307','307 (Temporary, preserve method)'), ('308','308 (Permanent, preserve method)')] %}
+-              <option value="{{ code }}" {{ 'selected' if (meta.redirect_code or '301') == code }}>{{ label }}</option>
+-              {% endfor %}
+-            </select>
+-          </div>
+-          <!-- BEGIN ADVANCED OPTIONS -->
+-          <div class="accordion mb-3" id="advanced-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+-                  Advanced options
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+-                <div class="accordion-body">
+-                  <p class="text-secondary mb-0">No advanced options for this block type yet.</p>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END ADVANCED OPTIONS -->
+-          <!-- BEGIN LOGGING OPTIONS -->
+-          <div class="accordion mb-3" id="logging-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+-                  Logging
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+-                <div class="accordion-body">
+-                  <div class="mb-3">
+-                    <label class="form-check form-switch">
+-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+-                      <span class="form-check-label">Enable logging</span>
+-                    </label>
+-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+-                  </div>
+-                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+-                    <hr class="my-3">
+-                    <div class="subheader mb-3">Log Options</div>
+-                    <div class="row">
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log level</label>
+-                        <select name="log_level" class="form-select">
+-                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+-                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+-                        </select>
+-                      </div>
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log format</label>
+-                        <select name="log_format" class="form-select">
+-                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+-                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+-                        </select>
+-                      </div>
+-                    </div>
+-
+-                    <hr class="my-3">
+-
+-                    <div class="subheader mb-3">Log Rotation</div>
+-                    <div class="row">
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Max file size</label>
+-                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+-                      </div>
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Files to keep</label>
+-                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+-                      </div>
+-                      <div class="col-md-4">
+-                        <label class="form-label">Keep for</label>
+-                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+-                      </div>
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END LOGGING OPTIONS -->
+-          {% endif %}
+-          <!-- END REDIRECT FIELDS -->
+-
+-          <!-- BEGIN STATIC SITE FIELDS -->
+-          {% if block_type == 'static_site' %}
+-          <div class="mb-3">
+-            <label class="form-label">File path <span class="form-hint d-inline">(the directory on the Caddy server to serve files from)</span></label>
+-            <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" required>
+-            <div class="invalid-feedback">File path is required.</div>
+-          </div>
+-          <div class="mb-3">
+-            <label class="form-label">Encode <span class="form-hint d-inline">(optional)</span></label>
+-            <div>
+-              {% for fmt in ['gzip', 'zstd', 'br'] %}
+-              <label class="form-check form-check-inline">
+-                <input type="checkbox" class="form-check-input" name="encode" value="{{ fmt }}" {{ 'checked' if fmt in (meta.encode or []) }}>
+-                <span class="form-check-label">{{ fmt }}</span>
+-              </label>
+-              {% endfor %}
+-            </div>
+-          </div>
+-          <!-- BEGIN ADVANCED OPTIONS -->
+-          <div class="accordion mb-3" id="advanced-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advanced-options-collapse" aria-expanded="false" aria-controls="advanced-options-collapse">
+-                  Advanced options
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="advanced-options-collapse" class="accordion-collapse collapse" data-bs-parent="#advanced-options">
+-                <div class="accordion-body">
+-                  <div class="mb-3">
+-                    <label class="form-label">Hide <span class="form-hint d-inline">(optional, space-separated glob patterns kept out of listings and direct requests)</span></label>
+-                    <input type="text" name="hide" class="form-control" value="{{ meta.hide or '' }}" placeholder=".git .env">
+-                  </div>
+-                  <div class="mb-3">
+-                    <label class="form-label">Index files <span class="form-hint d-inline">(optional, space-separated — defaults to index.html/index.txt)</span></label>
+-                    <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
+-                  </div>
+-                  <div class="mb-0">
+-                    <label class="form-check">
+-                      <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
+-                      <span class="form-check-label">Directory browsing</span>
+-                    </label>
+-                    <span class="form-hint">Shows a file listing for directories that have no index file.</span>
+-                  </div>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END ADVANCED OPTIONS -->
+-          <!-- BEGIN LOGGING OPTIONS -->
+-          <div class="accordion mb-3" id="logging-options">
+-            <div class="accordion-item">
+-              <div class="accordion-header">
+-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#logging-options-collapse" aria-expanded="false" aria-controls="logging-options-collapse">
+-                  Logging
+-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                    <path d="M6 9l6 6l6 -6" />
+-                  </svg>
+-                </button>
+-              </div>
+-              <div id="logging-options-collapse" class="accordion-collapse collapse" data-bs-parent="#logging-options">
+-                <div class="accordion-body">
+-                  <div class="mb-3">
+-                    <label class="form-check form-switch">
+-                      <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
+-                      <span class="form-check-label">Enable logging</span>
+-                    </label>
+-                    <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
+-                  </div>
+-                  <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+-                    <hr class="my-3">
+-                    <div class="subheader mb-3">Log Options</div>
+-                    <div class="row">
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log level</label>
+-                        <select name="log_level" class="form-select">
+-                          <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+-                          <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+-                        </select>
+-                      </div>
+-                      <div class="col-md-6 mb-3">
+-                        <label class="form-label">Log format</label>
+-                        <select name="log_format" class="form-select">
+-                          <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+-                          <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+-                        </select>
+-                      </div>
+-                    </div>
+-
+-                    <hr class="my-3">
+-
+-                    <div class="subheader mb-3">Log Rotation</div>
+-                    <div class="row">
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Max file size</label>
+-                        <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+-                      </div>
+-                      <div class="col-md-4 mb-3 mb-md-0">
+-                        <label class="form-label">Files to keep</label>
+-                        <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+-                      </div>
+-                      <div class="col-md-4">
+-                        <label class="form-label">Keep for</label>
+-                        <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+-                      </div>
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
+-            </div>
+-          </div>
+-          <!-- END LOGGING OPTIONS -->
+-          {% endif %}
+-          <!-- END STATIC SITE FIELDS -->
+-
+-          <!-- BEGIN CUSTOM FIELDS -->
+-          {% if block_type == 'custom' %}
+-          <div class="mb-3">
+-            <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the site addresses above are wrapped around it automatically)</span></label>
+-            <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
+-            <div class="invalid-feedback">Block content is required.</div>
+-          </div>
+-          {% endif %}
+-          <!-- END CUSTOM FIELDS -->
+-
+-          <!-- BEGIN DISABLE TOGGLE -->
+-          <div class="mb-3">
+-            <label class="form-check form-switch">
+-              <input type="checkbox" class="form-check-input" id="block-disabled-input" name="disabled" value="1" {{ 'checked' if disabled_toggle_checked }} onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+-              <span class="form-check-label">{{ 'Create disabled' if mode == 'new' else 'Disable this block' }}</span>
+-            </label>
+-            {% if mode == 'new' %}
+-            <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
+-            {% else %}
+-            <span class="form-hint">Renames <code>{{ filename }}</code> with a <code>.disabled</code> suffix on save, so Caddy skips it until you re-enable it.</span>
+-            {% endif %}
+-          </div>
+-          <!-- END DISABLE TOGGLE -->
+-
+-          <!-- BEGIN FORM ACTIONS -->
+-          <div class="form-footer d-flex gap-2">
+-            <button type="submit" class="btn btn-{{ type_color }}">
+-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler dropdown-item-icon icons-tabler-outline icon-tabler-device-floppy">
+-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+-                <path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" />
+-                <path d="M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+-                <path d="M14 4l0 4l-6 0l0 -4" />
+-              </svg>
+-              Save</button>
+-            <a href="{{ url_for('main.site_blocks') }}" class="btn">Cancel</a>
+-          </div>
+-          <!-- END FORM ACTIONS -->
+-
+-        </form>
+-
+-      </div>
+-      <!-- END CARD BODY -->
+-    </div>
+-  </div>
+-</div>
+-<!-- END BLOCK FORM CARD -->
+-
+-{% endblock %}
+-
+-{% block extra_scripts %}
+-<script src="{{ url_for('static', filename='js/block-form.js') }}"></script>
+-{% endblock %}
+diff --git a/templates/blocks/_base.html b/templates/blocks/_base.html
+new file mode 100644
+index 0000000..52ee9bd
+--- /dev/null
++++ b/templates/blocks/_base.html
+@@ -0,0 +1,70 @@
++{% extends "base.html" %}
++
++{% set type_color = type_color(block_type) %}
++
++{% block title %}{% if mode == 'edit' %}Edit {{ site_addresses[0] if site_addresses else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
++
++{% block page_pretitle %}{% if mode == 'edit' %}Edit{% else %}New{% endif %}{% endblock %}
++
++{% block page_title %}
++  {% if mode == 'edit' %}
++    {{ site_addresses[0] if site_addresses else filename }}
++  {% else %}
++    {% block new_title %}Custom Block{% endblock %}
++  {% endif %}
++{% endblock %}
++
++{% block header_actions %}
++{% endblock %}
++
++<!---->
++
++{% block content %}
++
++<!-- BEGIN BLOCK FORM CARD -->
++<div class="row">
++  <div class="col">
++    <div class="card rounded-top-0">
++
++      <div class="card-status-top bg-{{ type_color }}"></div>
++
++      <!-- BEGIN CARD HEADER -->
++      <div class="card-header">
++        <h3 class="card-title">
++          {% if mode == 'edit' %}
++            Editing <span class="badge bg-lt font-monospace" id="conf-path-badge">{{ conf_path }}</span>
++          {% else %}
++            Creating <span class="badge bg-lt font-monospace" id="conf-path-badge"></span>
++          {% endif %}
++        </h3>
++      </div>
++      <!-- END CARD HEADER -->
++
++      <!-- BEGIN CARD BODY -->
++      <div class="card-body">
++        {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
++
++        <form method="post" id="block-form" data-type-color="{{ type_color }}" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
++
++          {% include "partials/block_form_site_address_field.html" %}
++
++          {% block type_fields %}{% endblock %}
++
++          {% include "partials/block_form_disable_toggle.html" %}
++
++          {% include "partials/block_form_form_actions.html" %}
++
++        </form>
++
++      </div>
++      <!-- END CARD BODY -->
++    </div>
++  </div>
++</div>
++<!-- END BLOCK FORM CARD -->
++
++{% endblock %}
++
++{% block extra_scripts %}
++<script src="{{ url_for('static', filename='js/block-form.js') }}"></script>
++{% endblock %}
+diff --git a/templates/blocks/custom.html b/templates/blocks/custom.html
+new file mode 100644
+index 0000000..d45a8bc
+--- /dev/null
++++ b/templates/blocks/custom.html
+@@ -0,0 +1,13 @@
++{% extends "blocks/_base.html" %}
++
++{% block new_title %}Custom Block{% endblock %}
++
++{% block type_fields %}
++<!-- BEGIN CUSTOM FIELDS -->
++<div class="mb-3">
++  <label class="form-label">Block content <span class="form-hint d-inline">(just the content between the braces — the site addresses above are wrapped around it automatically)</span></label>
++  <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" required>{{ raw_body_text }}</textarea>
++  <div class="invalid-feedback">Block content is required.</div>
++</div>
++<!-- END CUSTOM FIELDS -->
++{% endblock %}
+diff --git a/templates/blocks/load_balancer.html b/templates/blocks/load_balancer.html
+new file mode 100644
+index 0000000..2f98ff5
+--- /dev/null
++++ b/templates/blocks/load_balancer.html
+@@ -0,0 +1,117 @@
++{% extends "blocks/_base.html" %}
++{% from "partials/block_form_macros.html" import accordion, skip_tls_verify_row %}
++
++{% block new_title %}Load Balancer{% endblock %}
++
++{% block type_fields %}
++<!-- BEGIN LOAD BALANCER FIELDS -->
++<div class="row">
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Scheme <span class="form-hint d-inline">(shared by every upstream below)</span></label>
++    <select id="lb-scheme" class="form-select">
++      <option value="http">http</option>
++      <option value="https">https</option>
++    </select>
++  </div>
++</div>
++{{ skip_tls_verify_row('lb-insecure-skip-verify-row', not (meta.upstreams and meta.upstreams[0].startswith('https://')), meta.insecure_skip_verify) }}
++
++<div class="mb-3">
++  <label class="form-label">Upstreams <span class="form-hint d-inline">(at least two)</span></label>
++  <div id="upstream-rows"></div>
++  <button type="button" id="add-upstream-btn" class="btn btn-outline-{{ type_color }} btn-sm mt-1">
++    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
++      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++      <path d="M12 5l0 14" />
++      <path d="M5 12l14 0" />
++    </svg>
++    Add upstream
++  </button>
++</div>
++<textarea name="upstreams" id="upstreams" hidden>{{ upstreams_text }}</textarea>
++
++<div class="mb-3">
++  <label class="form-label">Load balancing policy</label>
++  <select name="lb_policy" class="form-select">
++    {% for policy in ['round_robin', 'least_conn', 'random', 'ip_hash', 'uri_hash', 'header', 'first'] %}
++    <option value="{{ policy }}" {{ 'selected' if meta.lb_policy == policy }}>{{ policy }}</option>
++    {% endfor %}
++  </select>
++</div>
++<!-- BEGIN ADVANCED OPTIONS -->
++{% call accordion('advanced-options', 'Advanced options') %}
++<!-- BEGIN RETRY BEHAVIOR OPTIONS -->
++<div class="subheader mb-3">Retry Behavior</div>
++<div class="row">
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Retries</label>
++    <input type="number" min="0" step="1" name="lb_retries" class="form-control" value="{{ meta.lb_retries or '' }}" placeholder="0">
++  </div>
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Try duration</label>
++    <input type="text" name="lb_try_duration" class="form-control" value="{{ meta.lb_try_duration or '' }}" placeholder="10s">
++  </div>
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Try interval</label>
++    <input type="text" name="lb_try_interval" class="form-control" value="{{ meta.lb_try_interval or '' }}" placeholder="250ms">
++  </div>
++</div>
++<!-- END RETRY BEHAVIOR OPTIONS -->
++
++<hr class="my-3">
++
++<!-- BEGIN HEALTH CHECK OPTIONS -->
++<div class="subheader mb-3">Active Health Check</div>
++<div class="row">
++  <div class="col-sm mb-3">
++    <label class="form-label">Health check URI</label>
++    <input type="text" name="health_uri" class="form-control" value="{{ meta.health_uri or '' }}" placeholder="/healthz">
++  </div>
++</div>
++<div class="row">
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Method</label>
++    <select name="health_method" class="form-select">
++      <option value="" {{ 'selected' if not meta.health_method }}>GET</option>
++      {% for method in ['POST', 'PUT', 'DELETE', 'PATCH'] %}
++      <option value="{{ method }}" {{ 'selected' if meta.health_method == method }}>{{ method }}</option>
++      {% endfor %}
++    </select>
++  </div>
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Expected status</label>
++    <input type="text" name="health_status" class="form-control" value="{{ meta.health_status or '' }}" placeholder="200">
++  </div>
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Interval</label>
++    <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
++  </div>
++</div>
++<div class="row">
++  <div class="col-md-4 mb-3">
++    <label class="form-label">Timeout</label>
++    <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
++  </div>
++  <div class="col-md-4 mb-3 mb-md-0">
++    <label class="form-label">Healthy after</label>
++    <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
++  </div>
++  <div class="col-md-4">
++    <label class="form-label">Unhealthy after</label>
++    <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
++  </div>
++</div>
++<!-- END HEALTH CHECK OPTIONS -->
++
++<hr class="my-3">
++
++<div class="mb-0">
++  <div class="subheader mb-3">Extra directives</div>
++  <label class="form-label">Directives <span class="form-hint d-inline">(added inside the reverse_proxy block)</span></label>
++  <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
++</div>
++{% endcall %}
++<!-- END ADVANCED OPTIONS -->
++{% include "partials/block_form_logging_options.html" %}
++<!-- END LOAD BALANCER FIELDS -->
++{% endblock %}
+diff --git a/templates/blocks/redirect.html b/templates/blocks/redirect.html
+new file mode 100644
+index 0000000..6a3841d
+--- /dev/null
++++ b/templates/blocks/redirect.html
+@@ -0,0 +1,28 @@
++{% extends "blocks/_base.html" %}
++{% from "partials/block_form_macros.html" import accordion %}
++
++{% block new_title %}Redirect{% endblock %}
++
++{% block type_fields %}
++<!-- BEGIN REDIRECT FIELDS -->
++<div class="mb-3">
++  <label class="form-label">Redirect target</label>
++  <input type="text" name="target" class="form-control" value="{{ meta.target or '' }}" placeholder="https://new.example.com{uri}" required>
++  <div class="invalid-feedback">Redirect target is required.</div>
++</div>
++<div class="mb-3">
++  <label class="form-label">Redirect code</label>
++  <select name="redirect_code" class="form-select">
++    {% for code, label in [('301','301 (Permanent)'), ('302','302 (Temporary)'), ('307','307 (Temporary, preserve method)'), ('308','308 (Permanent, preserve method)')] %}
++    <option value="{{ code }}" {{ 'selected' if (meta.redirect_code or '301') == code }}>{{ label }}</option>
++    {% endfor %}
++  </select>
++</div>
++<!-- BEGIN ADVANCED OPTIONS -->
++{% call accordion('advanced-options', 'Advanced options') %}
++<p class="text-secondary mb-0">No advanced options for this block type yet.</p>
++{% endcall %}
++<!-- END ADVANCED OPTIONS -->
++{% include "partials/block_form_logging_options.html" %}
++<!-- END REDIRECT FIELDS -->
++{% endblock %}
+diff --git a/templates/blocks/reverse_proxy.html b/templates/blocks/reverse_proxy.html
+new file mode 100644
+index 0000000..9298e56
+--- /dev/null
++++ b/templates/blocks/reverse_proxy.html
+@@ -0,0 +1,37 @@
++{% extends "blocks/_base.html" %}
++{% from "partials/block_form_macros.html" import accordion, skip_tls_verify_row %}
++
++{% block new_title %}Reverse Proxy{% endblock %}
++
++{% block type_fields %}
++<!-- BEGIN REVERSE PROXY FIELDS -->
++<div class="row">
++  <div class="col-md-3 mb-3">
++    <label class="form-label">Scheme</label>
++    <select name="scheme" id="scheme" class="form-select">
++      <option value="http" {{ 'selected' if (meta.scheme or 'http') == 'http' }}>http</option>
++      <option value="https" {{ 'selected' if meta.scheme == 'https' }}>https</option>
++    </select>
++  </div>
++  <div class="col-md-6 mb-3">
++    <label class="form-label">Upstream host</label>
++    <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1" required>
++    <div class="invalid-feedback">Upstream host is required.</div>
++  </div>
++  <div class="col-md-3 mb-3">
++    <label class="form-label">Port</label>
++    <input type="text" name="port" class="form-control" value="{{ meta.port or '' }}" placeholder="8080">
++  </div>
++</div>
++{{ skip_tls_verify_row('insecure-skip-verify-row', (meta.scheme or 'http') != 'https', meta.insecure_skip_verify) }}
++<!-- BEGIN ADVANCED OPTIONS -->
++{% call accordion('advanced-options', 'Advanced options') %}
++<div class="mb-0">
++  <label class="form-label">Extra directives <span class="form-hint d-inline">(optional, one per line, inside the block)</span></label>
++  <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
++</div>
++{% endcall %}
++<!-- END ADVANCED OPTIONS -->
++{% include "partials/block_form_logging_options.html" %}
++<!-- END REVERSE PROXY FIELDS -->
++{% endblock %}
+diff --git a/templates/blocks/static_site.html b/templates/blocks/static_site.html
+new file mode 100644
+index 0000000..200db9c
+--- /dev/null
++++ b/templates/blocks/static_site.html
+@@ -0,0 +1,45 @@
++{% extends "blocks/_base.html" %}
++{% from "partials/block_form_macros.html" import accordion %}
++
++{% block new_title %}Static Site{% endblock %}
++
++{% block type_fields %}
++<!-- BEGIN STATIC SITE FIELDS -->
++<div class="mb-3">
++  <label class="form-label">File path <span class="form-hint d-inline">(the directory on the Caddy server to serve files from)</span></label>
++  <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" required>
++  <div class="invalid-feedback">File path is required.</div>
++</div>
++<div class="mb-3">
++  <label class="form-label">Encode <span class="form-hint d-inline">(optional)</span></label>
++  <div>
++    {% for fmt in ['gzip', 'zstd', 'br'] %}
++    <label class="form-check form-check-inline">
++      <input type="checkbox" class="form-check-input" name="encode" value="{{ fmt }}" {{ 'checked' if fmt in (meta.encode or []) }}>
++      <span class="form-check-label">{{ fmt }}</span>
++    </label>
++    {% endfor %}
++  </div>
++</div>
++<!-- BEGIN ADVANCED OPTIONS -->
++{% call accordion('advanced-options', 'Advanced options') %}
++<div class="mb-3">
++  <label class="form-label">Hide <span class="form-hint d-inline">(optional, space-separated glob patterns kept out of listings and direct requests)</span></label>
++  <input type="text" name="hide" class="form-control" value="{{ meta.hide or '' }}" placeholder=".git .env">
++</div>
++<div class="mb-3">
++  <label class="form-label">Index files <span class="form-hint d-inline">(optional, space-separated — defaults to index.html/index.txt)</span></label>
++  <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
++</div>
++<div class="mb-0">
++  <label class="form-check">
++    <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
++    <span class="form-check-label">Directory browsing</span>
++  </label>
++  <span class="form-hint">Shows a file listing for directories that have no index file.</span>
++</div>
++{% endcall %}
++<!-- END ADVANCED OPTIONS -->
++{% include "partials/block_form_logging_options.html" %}
++<!-- END STATIC SITE FIELDS -->
++{% endblock %}
+diff --git a/templates/partials/block_form_disable_toggle.html b/templates/partials/block_form_disable_toggle.html
+new file mode 100644
+index 0000000..baf78f5
+--- /dev/null
++++ b/templates/partials/block_form_disable_toggle.html
+@@ -0,0 +1,13 @@
++<!-- BEGIN DISABLE TOGGLE -->
++<div class="mb-3">
++  <label class="form-check form-switch">
++    <input type="checkbox" class="form-check-input" id="block-disabled-input" name="disabled" value="1" {{ 'checked' if disabled_toggle_checked }} onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
++    <span class="form-check-label">{{ 'Create disabled' if mode == 'new' else 'Disable this block' }}</span>
++  </label>
++  {% if mode == 'new' %}
++  <span class="form-hint">The block is written to disk straight away with a <code>.disabled</code> suffix, so it won't be picked up by Caddy until you enable it.</span>
++  {% else %}
++  <span class="form-hint">Renames <code>{{ filename }}</code> with a <code>.disabled</code> suffix on save, so Caddy skips it until you re-enable it.</span>
++  {% endif %}
++</div>
++<!-- END DISABLE TOGGLE -->
+diff --git a/templates/partials/block_form_form_actions.html b/templates/partials/block_form_form_actions.html
+new file mode 100644
+index 0000000..394d16a
+--- /dev/null
++++ b/templates/partials/block_form_form_actions.html
+@@ -0,0 +1,13 @@
++<!-- BEGIN FORM ACTIONS -->
++<div class="form-footer d-flex gap-2">
++  <button type="submit" class="btn btn-{{ type_color }}">
++    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler dropdown-item-icon icons-tabler-outline icon-tabler-device-floppy">
++      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++      <path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2" />
++      <path d="M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
++      <path d="M14 4l0 4l-6 0l0 -4" />
++    </svg>
++    Save</button>
++  <a href="{{ url_for('main.site_blocks') }}" class="btn">Cancel</a>
++</div>
++<!-- END FORM ACTIONS -->
+diff --git a/templates/partials/block_form_logging_options.html b/templates/partials/block_form_logging_options.html
+new file mode 100644
+index 0000000..7d18b91
+--- /dev/null
++++ b/templates/partials/block_form_logging_options.html
+@@ -0,0 +1,51 @@
++{% from "partials/block_form_macros.html" import accordion %}
++
++<!-- BEGIN LOGGING OPTIONS -->
++{% call accordion('logging-options', 'Logging') %}
++<div class="mb-3">
++  <label class="form-check form-switch">
++    <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
++    <span class="form-check-label">Enable logging</span>
++  </label>
++  <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}/&lt;filename&gt;.log</code>.</span>
++</div>
++<div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
++  <hr class="my-3">
++  <div class="subheader mb-3">Log Options</div>
++  <div class="row">
++    <div class="col-md-6 mb-3">
++      <label class="form-label">Log level</label>
++      <select name="log_level" class="form-select">
++        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
++        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
++      </select>
++    </div>
++    <div class="col-md-6 mb-3">
++      <label class="form-label">Log format</label>
++      <select name="log_format" class="form-select">
++        <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
++        <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
++      </select>
++    </div>
++  </div>
++
++  <hr class="my-3">
++
++  <div class="subheader mb-3">Log Rotation</div>
++  <div class="row">
++    <div class="col-md-4 mb-3 mb-md-0">
++      <label class="form-label">Max file size</label>
++      <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
++    </div>
++    <div class="col-md-4 mb-3 mb-md-0">
++      <label class="form-label">Files to keep</label>
++      <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
++    </div>
++    <div class="col-md-4">
++      <label class="form-label">Keep for</label>
++      <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
++    </div>
++  </div>
++</div>
++{% endcall %}
++<!-- END LOGGING OPTIONS -->
+diff --git a/templates/partials/block_form_macros.html b/templates/partials/block_form_macros.html
+new file mode 100644
+index 0000000..cdbf2c0
+--- /dev/null
++++ b/templates/partials/block_form_macros.html
+@@ -0,0 +1,30 @@
++{% macro accordion(accordion_id, title) %}
++<div class="accordion mb-3" id="{{ accordion_id }}">
++  <div class="accordion-item">
++    <div class="accordion-header">
++      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#{{ accordion_id }}-collapse" aria-expanded="false" aria-controls="{{ accordion_id }}-collapse">
++        {{ title }}
++        <svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
++          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++          <path d="M6 9l6 6l6 -6" />
++        </svg>
++      </button>
++    </div>
++    <div id="{{ accordion_id }}-collapse" class="accordion-collapse collapse" data-bs-parent="#{{ accordion_id }}">
++      <div class="accordion-body">
++        {{ caller() }}
++      </div>
++    </div>
++  </div>
++</div>
++{% endmacro %}
++
++{% macro skip_tls_verify_row(row_id, hidden, checked) %}
++<div class="mb-3" id="{{ row_id }}" {{ 'hidden' if hidden }}>
++  <label class="form-check">
++    <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if checked }}>
++    <span class="form-check-label">Skip TLS verification (insecure)</span>
++  </label>
++  <span class="form-hint">Adds <code>transport http { tls_insecure_skip_verify }</code> to the block — only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
++</div>
++{% endmacro %}
+diff --git a/templates/partials/block_form_site_address_field.html b/templates/partials/block_form_site_address_field.html
+new file mode 100644
+index 0000000..e722310
+--- /dev/null
++++ b/templates/partials/block_form_site_address_field.html
+@@ -0,0 +1,10 @@
++<!-- BEGIN SITE ADDRESS FIELD -->
++<div class="mb-3">
++  <label class="form-label">Site Addresses <span class="form-hint d-inline">(type a site address, press space or enter to add it)</span></label>
++  <div class="form-control d-flex flex-wrap align-items-center gap-2" id="site-address-input">
++    <input type="text" id="site-address-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
++  </div>
++  <div class="invalid-feedback">At least one site address is required.</div>
++  <textarea name="site_addresses" id="site-addresses" hidden>{{ site_addresses_text }}</textarea>
++</div>
++<!-- END SITE ADDRESS FIELD -->

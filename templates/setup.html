@@ -1,90 +1,151 @@
-{% extends "auth.html" %}
+<!doctype html>
+<html lang="en">
 
-{% block title %}Initial Setup - Caddy Manager{% endblock %}
+  <!-- BEGIN HEAD -->
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Initial Setup - Caddy Manager</title>
 
-<!---->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" />
 
-{% block content %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
 
-<div class="card card-md">
-  <div class="card-body">
-    <h2 class="h2 text-center mb-4">Initial Setup</h2>
-    <p class="text-secondary text-center mb-4">Create your admin account and point this app at your Caddy root directory.</p>
-    {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-    <form method="post" autocomplete="off" id="setup-form">
-      <div class="mb-3">
-        <label class="form-label">Admin username</label>
-        <input type="text" name="username" class="form-control" required autofocus>
-        <div class="invalid-feedback">Username is required.</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Password</label>
-        <input type="password" name="password" id="password" class="form-control" required minlength="6">
-        <div class="invalid-feedback">Password must be at least 6 characters.</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Confirm password</label>
-        <input type="password" name="password2" id="password2" class="form-control" required minlength="6">
-        <div class="invalid-feedback">Passwords do not match.</div>
-      </div>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/override.css') }}" />
 
-      <hr class="my-4">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/caddy-favicon.png') }}" />
 
-      <h3 class="card-title">Caddy Directories</h3>
-      <p class="text-secondary">
-        Either set a Caddy root directory and this app derives the paths below from it automatically using the conventional layout (<code>caddy.d/</code>, <code>data/</code>, <code>logs/</code>, <code>Caddyfile</code>), or turn on "Set custom directories" to choose each path individually instead. Only the conf directory (where this app's <code>.conf</code> blocks live) is created automatically if it doesn't exist.
-      </p>
-      <div class="mb-3">
-        <label class="form-label">Caddy root directory</label>
-        <input type="text" name="root_dir" id="root_dir" class="form-control" placeholder="/etc/caddy">
-      </div>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/form-validate.js') }}"></script>
 
-      <hr class="my-4">
+    {% block extra_head %}{% endblock %}
 
-      <div class="mb-3">
-        <label class="form-check form-switch">
-          <input type="checkbox" class="form-check-input" id="custom-dirs-toggle" name="custom_dirs" value="1">
-          <span class="form-check-label">Set custom directories</span>
-        </label>
-        <span class="form-hint">Lets you set each path below individually instead of deriving them from the root directory.</span>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Conf directory path</label>
-        <input type="text" name="conf_dir" id="conf_dir" class="form-control" placeholder="/etc/caddy/caddy.d" required disabled>
-        <div class="invalid-feedback">Conf directory path is required.</div>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Certificate directory path <span class="form-hint d-inline">(Caddy's <a href="https://caddyserver.com/docs/conventions#data-directory" target="_blank" rel="noopener">data directory</a>)</span></label>
-        <input type="text" name="certificate_dir" id="certificate_dir" class="form-control" placeholder="/etc/caddy/data" disabled>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Logs directory path</label>
-        <input type="text" name="log_dir" id="log_dir" class="form-control" placeholder="/etc/caddy/logs" disabled>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Caddyfile path</label>
-        <input type="text" name="caddyfile_path" id="caddyfile_path" class="form-control" placeholder="/etc/caddy/Caddyfile" disabled>
-      </div>
+  </head>
+  <!-- END HEAD -->
 
-      <div class="form-footer">
-        <button type="submit" class="btn btn-primary w-100">Complete setup</button>
-      </div>
-    </form>
-  </div>
-</div>
+  <body class="d-flex flex-column">
 
-<script>
-  wireMatchingFields(
-    document.getElementById('password2'),
-    document.getElementById('password'),
-    'Passwords do not match.'
-  );
-  initFormValidation(document.getElementById('setup-form'));
-  wireDirectoryToggle('setup-form', 'root_dir', 'custom-dirs-toggle', {
-    conf_dir: 'caddy.d',
-    certificate_dir: 'data',
-    log_dir: 'logs',
-    caddyfile_path: 'Caddyfile',
-  });
-</script>
-{% endblock %}
+    <!-- BEGIN PAGE -->
+    <div class="page">
+      <div class="container container-tight py-4">
+
+        <!-- BEGIN LOGO -->
+        <div class="text-center mb-4">
+          <span class="d-inline-flex align-items-center gap-2 h1">
+            <img class="navbar-brand-image me-2" src="{{ url_for('static', filename='img/caddy.png') }}"></img>Caddy Manager
+          </span>
+        </div>
+        <!-- END LOGO -->
+        
+        <!-- BEGIN ALERTS --> 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        <!-- END ALERTS -->
+
+        <!-- BEGIN PAGE CONTENT --> 
+        <div class="card card-md">
+          <div class="card-body">
+            <h2 class="h2 text-center mb-4">Initial Setup</h2>
+            <p class="text-secondary text-center mb-4">Create your admin account and point this app at your Caddy root directory.</p>
+            {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+            <form method="post" autocomplete="off" id="setup-form">
+              <div class="mb-3">
+                <label class="form-label">Admin username</label>
+                <input type="text" name="username" class="form-control" required autofocus>
+                <div class="invalid-feedback">Username is required.</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" id="password" class="form-control" required minlength="6">
+                <div class="invalid-feedback">Password must be at least 6 characters.</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Confirm password</label>
+                <input type="password" name="password2" id="password2" class="form-control" required minlength="6">
+                <div class="invalid-feedback">Passwords do not match.</div>
+              </div>
+
+              <hr class="my-4">
+
+              <h3 class="card-title">Caddy Directories</h3>
+              <p class="text-secondary">
+                Either set a Caddy root directory and this app derives the paths below from it automatically using the conventional layout (<code>caddy.d/</code>, <code>data/</code>, <code>logs/</code>, <code>Caddyfile</code>), or turn on "Set custom directories" to choose each path individually instead. Only the conf directory (where this app's <code>.conf</code> blocks live) is created automatically if it doesn't exist.
+              </p>
+              <div class="mb-3">
+                <label class="form-label">Caddy root directory</label>
+                <input type="text" name="root_dir" id="root_dir" class="form-control" placeholder="/etc/caddy">
+              </div>
+
+              <hr class="my-4">
+
+              <div class="mb-3">
+                <label class="form-check form-switch">
+                  <input type="checkbox" class="form-check-input" id="custom-dirs-toggle" name="custom_dirs" value="1">
+                  <span class="form-check-label">Set custom directories</span>
+                </label>
+                <span class="form-hint">Lets you set each path below individually instead of deriving them from the root directory.</span>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Conf directory path</label>
+                <input type="text" name="conf_dir" id="conf_dir" class="form-control" placeholder="/etc/caddy/caddy.d" required disabled>
+                <div class="invalid-feedback">Conf directory path is required.</div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Certificate directory path <span class="form-hint d-inline">(Caddy's <a href="https://caddyserver.com/docs/conventions#data-directory" target="_blank" rel="noopener">data directory</a>)</span></label>
+                <input type="text" name="certificate_dir" id="certificate_dir" class="form-control" placeholder="/etc/caddy/data" disabled>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Logs directory path</label>
+                <input type="text" name="log_dir" id="log_dir" class="form-control" placeholder="/etc/caddy/logs" disabled>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Caddyfile path</label>
+                <input type="text" name="caddyfile_path" id="caddyfile_path" class="form-control" placeholder="/etc/caddy/Caddyfile" disabled>
+              </div>
+
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary w-100">Complete setup</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <script>
+          wireMatchingFields(
+            document.getElementById('password2'),
+            document.getElementById('password'),
+            'Passwords do not match.'
+          );
+          initFormValidation(document.getElementById('setup-form'));
+          wireDirectoryToggle('setup-form', 'root_dir', 'custom-dirs-toggle', {
+            conf_dir: 'caddy.d',
+            certificate_dir: 'data',
+            log_dir: 'logs',
+            caddyfile_path: 'Caddyfile',
+          });
+        </script>
+        <!-- END PAGE CONTENT -->
+
+      </div>
+    </div>
+    <!-- END PAGE -->
+
+    <!-- BEGIN PAGE SCRIPTS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
+    {% block extra_scripts %}{% endblock %}
+    <!-- END PAGE SCRIPTS -->
+
+  </body>
+</html>

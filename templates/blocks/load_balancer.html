@@ -1,0 +1,117 @@
+{% extends "block_form.html" %}
+{% from "macros/block_form.html" import accordion, skip_tls_verify_row %}
+
+{% block new_title %}Load Balancer{% endblock %}
+
+{% block type_fields %}
+<!-- BEGIN LOAD BALANCER FIELDS -->
+<div class="row">
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Scheme <span class="form-hint d-inline">(shared by every upstream below)</span></label>
+    <select id="lb-scheme" class="form-select">
+      <option value="http">http</option>
+      <option value="https">https</option>
+    </select>
+  </div>
+</div>
+{{ skip_tls_verify_row('lb-insecure-skip-verify-row', not (meta.upstreams and meta.upstreams[0].startswith('https://')), meta.insecure_skip_verify) }}
+
+<div class="mb-3">
+  <label class="form-label">Upstreams <span class="form-hint d-inline">(at least two)</span></label>
+  <div id="upstream-rows"></div>
+  <button type="button" id="add-upstream-btn" class="btn btn-outline-{{ type_color }} btn-sm mt-1">
+    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 5l0 14" />
+      <path d="M5 12l14 0" />
+    </svg>
+    Add upstream
+  </button>
+</div>
+<textarea name="upstreams" id="upstreams" hidden>{{ upstreams_text }}</textarea>
+
+<div class="mb-3">
+  <label class="form-label">Load balancing policy</label>
+  <select name="lb_policy" class="form-select">
+    {% for policy in ['round_robin', 'least_conn', 'random', 'ip_hash', 'uri_hash', 'header', 'first'] %}
+    <option value="{{ policy }}" {{ 'selected' if meta.lb_policy == policy }}>{{ policy }}</option>
+    {% endfor %}
+  </select>
+</div>
+<!-- BEGIN ADVANCED OPTIONS -->
+{% call accordion('advanced-options', 'Advanced options') %}
+<!-- BEGIN RETRY BEHAVIOR OPTIONS -->
+<div class="subheader mb-3">Retry Behavior</div>
+<div class="row">
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Retries</label>
+    <input type="number" min="0" step="1" name="lb_retries" class="form-control" value="{{ meta.lb_retries or '' }}" placeholder="0">
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Try duration</label>
+    <input type="text" name="lb_try_duration" class="form-control" value="{{ meta.lb_try_duration or '' }}" placeholder="10s">
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Try interval</label>
+    <input type="text" name="lb_try_interval" class="form-control" value="{{ meta.lb_try_interval or '' }}" placeholder="250ms">
+  </div>
+</div>
+<!-- END RETRY BEHAVIOR OPTIONS -->
+
+<hr class="my-3">
+
+<!-- BEGIN HEALTH CHECK OPTIONS -->
+<div class="subheader mb-3">Active Health Check</div>
+<div class="row">
+  <div class="col-sm mb-3">
+    <label class="form-label">Health check URI</label>
+    <input type="text" name="health_uri" class="form-control" value="{{ meta.health_uri or '' }}" placeholder="/healthz">
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Method</label>
+    <select name="health_method" class="form-select">
+      <option value="" {{ 'selected' if not meta.health_method }}>GET</option>
+      {% for method in ['POST', 'PUT', 'DELETE', 'PATCH'] %}
+      <option value="{{ method }}" {{ 'selected' if meta.health_method == method }}>{{ method }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Expected status</label>
+    <input type="text" name="health_status" class="form-control" value="{{ meta.health_status or '' }}" placeholder="200">
+  </div>
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Interval</label>
+    <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-4 mb-3">
+    <label class="form-label">Timeout</label>
+    <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
+  </div>
+  <div class="col-md-4 mb-3 mb-md-0">
+    <label class="form-label">Healthy after</label>
+    <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Unhealthy after</label>
+    <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
+  </div>
+</div>
+<!-- END HEALTH CHECK OPTIONS -->
+
+<hr class="my-3">
+
+<div class="mb-0">
+  <div class="subheader mb-3">Extra directives</div>
+  <label class="form-label">Directives <span class="form-hint d-inline">(added inside the reverse proxy block)</span></label>
+  <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)">{{ meta.extra or '' }}</textarea>
+</div>
+{% endcall %}
+<!-- END ADVANCED OPTIONS -->
+{% include "partials/block_form_logging_options.html" %}
+<!-- END LOAD BALANCER FIELDS -->
+{% endblock %}

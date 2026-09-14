@@ -119,7 +119,7 @@ def certificates():
 @bp.route("/new/<block_type>", methods=["GET", "POST"])
 @login_required
 def new_block(block_type):
-    if block_type not in ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom"):
+    if block_type not in QUICK_ADD_BLOCK_TYPES:
         abort(404)
     error = None
     meta = {}
@@ -160,7 +160,7 @@ def new_block(block_type):
     raw_body_text = request.form.get("raw_content", "") if request.method == "POST" and block_type == "custom" else ""
     disabled_toggle_checked = request.form.get("disabled") == "1" if request.method == "POST" else False
     return render_template(
-        "block_form.html", mode="new", block_type=block_type,
+        f"blocks/{block_type}.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
         raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
         disabled_toggle_checked=disabled_toggle_checked,
@@ -176,6 +176,8 @@ def edit_block(filename):
 
     meta = read_metadata(filename, path)
     block_type = meta.get("type", "custom")
+    if block_type not in QUICK_ADD_BLOCK_TYPES:
+        block_type = "custom"
     old_site_addresses = meta.get("site_addresses", [])
     previous_log_enabled = meta.get("log_enabled", False)
     error = None
@@ -242,7 +244,7 @@ def edit_block(filename):
         else filename.endswith(".disabled")
 
     return render_template(
-        "block_form.html", mode="edit", block_type=block_type, filename=filename,
+        f"blocks/{block_type}.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
         error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
