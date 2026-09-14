@@ -74,7 +74,6 @@
               <div class="mb-0">
                 <label class="form-label">Email <span class="form-hint d-inline">(optional)</span></label>
                 <input type="email" name="email" class="form-control" value="{{ cfg.email or '' }}" placeholder="you@example.com">
-                <small class="form-hint">Not used anywhere yet -- saved for future use.</small>
               </div>
               <div class="form-footer">
                 <button type="submit" class="btn btn-primary">Update</button>
@@ -91,6 +90,9 @@
           <div class="card-body">
             <h2 class="mb-4">Password Settings</h2>
             <h3 class="card-title">Change Password</h3>
+            <p class="text-secondary">
+              Enter a new password to below. You'll use this password to login to Caddy Manager.
+            </p>
             <form method="post" autocomplete="off" id="password-form">
               <input type="hidden" name="action" value="change_password">
               <div class="mb-3">
@@ -138,7 +140,6 @@
                   <input type="checkbox" class="form-check-input" id="show-metadata-card-input" name="show_metadata_card" value="on" {{ 'checked' if show_metadata_card }}>
                   <span class="form-check-label">Show Metadata card</span>
                 </label>
-                <span class="form-hint">Displays the raw metadata sidecar file alongside the Caddy config on a block's Preview page.</span>
               </div>
               <div class="form-footer">
                 <button type="submit" class="btn btn-primary">Update</button>
@@ -157,8 +158,8 @@
                 <label class="form-label">Log tail length <span class="form-hint d-inline">(lines)</span></label>
                 <input type="number" min="1" max="2000" step="1" name="log_tail_lines" class="form-control" style="max-width: 12rem"
                        value="{{ cfg.log_tail_lines or 20 }}" required>
+                <small class="form-hint">Capped at 2000 lines regardless of this setting.</small>
                 <div class="invalid-feedback">Must be a positive whole number of lines.</div>
-                <small class="form-hint">Read fresh from the file each time -- capped at 2000 lines regardless of this setting.</small>
               </div>
               <div class="form-footer">
                 <button type="submit" class="btn btn-primary">Update</button>
@@ -177,8 +178,8 @@
                 <label class="form-label">Expiring soon threshold <span class="form-hint d-inline">(days before expiry)</span></label>
                 <input type="number" min="1" step="1" name="cert_expiring_soon_days" class="form-control" style="max-width: 12rem"
                        value="{{ cfg.cert_expiring_soon_days or 37 }}" required>
+                <small class="form-hint">Caddy attempts renewal starting 30 days before expiry by default.</small>
                 <div class="invalid-feedback">Must be a positive whole number of days.</div>
-                <small class="form-hint">Caddy attempts renewal starting 30 days before expiry by default -- the default here (37) gives it a week of retries before flagging a cert, so "Expiring soon" tends to mean renewal needs attention rather than just "due soon."</small>
               </div>
               <div class="form-footer">
                 <button type="submit" class="btn btn-primary">Update</button>
@@ -291,7 +292,7 @@
             <h2 class="mb-4">Quick Add</h2>
             <h3 class="card-title">Quick Add Button</h3>
             <p class="text-secondary">
-              Adds a one-click shortcut button to the header of the <a href="{{ url_for('main.dashboard') }}">Home Dashboard</a> and/or <a href="{{ url_for('main.site_blocks') }}">Site Blocks</a> page that jumps straight to a chosen block type's form, skipping the "New Site Block" type picker. Each page can be configured with a different type, or left at "None" to leave that page's header unchanged.
+              Adds a one-click shortcut button to the header of the <a href="{{ url_for('main.dashboard') }}">Home Dashboard</a> and/or <a href="{{ url_for('main.site_blocks') }}">Site Blocks</a> page that jumps straight to a chosen block type's form, skipping the "New Site Block" type picker.
             </p>
             <form method="post" id="quick-add-form">
               <input type="hidden" name="action" value="update_quick_add">
@@ -355,7 +356,7 @@
                 <label class="form-label">Caddy admin API URL <span class="form-hint d-inline">(optional)</span></label>
                 <input type="text" name="caddy_admin_api_url" class="form-control" placeholder="caddy.example.com:2019"
                        value="{{ cfg.caddy_admin_api_url or '' }}">
-                <small class="form-hint">Caddy Manager must be able to reach this address directly -- it must not require authentication, since Caddy's admin API has none of its own.</small>
+                <small class="form-hint">Caddy Manager must be able to reach this address directly.</small>
               </div>
               <div class="form-footer">
                 <button type="submit" class="btn btn-primary">Update</button>
@@ -373,7 +374,7 @@
             <h2 class="mb-4">Caddy Logging</h2>
             <h3 class="card-title">Log Output Directory</h3>
             <p class="text-secondary">
-              Overrides the directory written into a block's <code>output file</code> line when logging is enabled -- i.e. the path <strong>Caddy itself</strong> will write that block's access log to. This is separate from the Logs directory path in <a href="#directory" data-bs-toggle="tab">Directories</a>, which is where <strong>Caddy Manager</strong> looks to list, tail, and delete log files on its own side. The two normally point at the same place, but can be set differently when Caddy and Caddy Manager don't share the same filesystem view of the logs volume -- for example, if they run in separate containers with that volume mounted at different paths. Leave this blank to keep using the Logs directory path for both.
+              Overrides the directory written into a block's <code>output file</code> line when logging is enabled, the path <strong>Caddy itself</strong> will write that block's access log to. This is separate from the Logs directory path in <a href="#directory" data-bs-toggle="tab">Directories</a>, which is where <strong>Caddy Manager</strong> looks to list, tail, and delete log files on its own side. Use this option to set different paths when Caddy and Caddy Manager don't share the same filesystem view of the logs volume. Leave this blank to keep using the Logs directory path for both.
             </p>
             <form method="post" id="caddy-logging-form">
               <input type="hidden" name="action" value="update_caddy_logging">
