@@ -339,7 +339,7 @@
             <h2 class="mb-4">Caddy Global Configuration</h2>
             <h3 class="card-title">Caddyfile</h3>
             <p class="text-secondary">
-              Edit the main Caddyfile directly{% if cfg.caddyfile_path %} (<code>{{ cfg.caddyfile_path }}</code>){% endif %}.
+              Edit the main Caddyfile{% if cfg.caddyfile_path %} (<code>{{ cfg.caddyfile_path }}</code>){% endif %} directly.
             </p>
         
             <div class="alert alert-warning" role="alert">
@@ -396,7 +396,7 @@
             <form method="post" id="global-config-form">
               <input type="hidden" name="action" value="update_global_config">
               <div class="mb-3">
-                <textarea name="caddyfile_content" id="caddyfile-content" class="form-control" rows="20"
+                <textarea name="caddyfile_content" id="caddyfile-content" class="form-control" rows="25"
                   style="font-family:var(--tblr-font-monospace, monospace)" spellcheck="false"
                   data-conf-dir="{{ conf_dir }}">{{ caddyfile_content }}</textarea>
               </div>

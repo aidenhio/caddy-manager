@@ -46,6 +46,23 @@
     missingBadge.hidden = found;
   }
 
+  // How many lines tall the editor should be -- CodeMirror's own default is
+  // a fixed 300px (~15 lines), so this needs setting explicitly. Computed
+  // from the theme's actual per-line height (defaultTextHeight()) rather
+  // than a hardcoded pixel value, so it stays exactly VISIBLE_LINES even if
+  // the theme or font size ever changes; +8 accounts for the editor's own
+  // top+bottom content padding (4px each). cm.setSize() sets the height of
+  // the outer wrapper, which is what actually clips the visible area --
+  // CodeMirror's inner .CodeMirror-scroll element is deliberately taller
+  // than that (it hides the browser's native scrollbar with a
+  // negative-margin trick), so it's not something to size against or
+  // measure the visible line count from.
+  const VISIBLE_LINES = 25;
+
+  function sizeEditor(cm) {
+    cm.setSize(null, cm.defaultTextHeight() * VISIBLE_LINES + 8);
+  }
+
   let cm = null;
   if (typeof CodeMirror !== "undefined") {
     const isDark = document.documentElement.getAttribute("data-bs-theme") === "dark";
@@ -58,15 +75,20 @@
       tabSize: 2,
     });
     cm.on("change", () => updateImportCheck(cm.getValue()));
+    sizeEditor(cm);
 
     // The Global Configuration tab starts hidden -- Settings opens on the
     // User tab -- and CodeMirror measures a 0-width/height container when
-    // initialized while hidden, leaving the editor visually broken until
-    // something forces a re-layout. Refresh it once its tab is actually
-    // shown to fix that.
+    // initialized while hidden, leaving the editor visually broken (and
+    // defaultTextHeight() reporting an unreliable guess, throwing off the
+    // size set above) until something forces a re-layout. Refresh and
+    // re-size once its tab is actually shown to fix that.
     const tabLink = document.querySelector('a[href="#global"][data-bs-toggle="tab"]');
     if (tabLink) {
-      tabLink.addEventListener("shown.bs.tab", () => cm.refresh());
+      tabLink.addEventListener("shown.bs.tab", () => {
+        cm.refresh();
+        sizeEditor(cm);
+      });
     }
   } else {
     // CodeMirror failed to load (e.g. offline/CDN blocked) -- the plain
