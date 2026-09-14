@@ -33,21 +33,21 @@
         <div class="list-group list-group-transparent">
           <h4 class="card-header subheader">Account Settings</h4>
           <div>
-            <a href="#user" class="list-group-item list-group-item-action d-flex align-items-center active" data-bs-toggle="tab">User</a>
-            <a href="#password" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Password</a>
+            <a href="#user" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'user' %} active{% endif %}" data-bs-toggle="tab">User</a>
+            <a href="#password" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'password' %} active{% endif %}" data-bs-toggle="tab">Password</a>
           </div>
           <h4 class="card-header subheader mt-4">App Settings</h4>
           <div>
-            <a href="#general" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">General</a>
-            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Directories</a>
-            <a href="#dashboard" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Dashboard</a>
-            <a href="#quick-add" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Quick Add</a>
+            <a href="#general" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'general' %} active{% endif %}" data-bs-toggle="tab">General</a>
+            <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'directory' %} active{% endif %}" data-bs-toggle="tab">Directories</a>
+            <a href="#dashboard" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'dashboard' %} active{% endif %}" data-bs-toggle="tab">Dashboard</a>
+            <a href="#quick-add" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'quick-add' %} active{% endif %}" data-bs-toggle="tab">Quick Add</a>
           </div>
           <h4 class="card-header subheader mt-4">Caddy Settings</h4>
           <div>
-            <a href="#global" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Global Configuration</a>
-            <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Caddy API</a>
-            <a href="#logs" class="list-group-item list-group-item-action d-flex align-items-center" data-bs-toggle="tab">Logging</a>
+            <a href="#global" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'global' %} active{% endif %}" data-bs-toggle="tab">Global Configuration</a>
+            <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab">Caddy API</a>
+            <a href="#logs" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'logs' %} active{% endif %}" data-bs-toggle="tab">Logging</a>
           </div>
         </div>
       
@@ -62,7 +62,7 @@
       <div class="tab-content">
 
         <!-- TAB USER -->
-        <div id="user" class="tab-pane active">
+        <div id="user" class="tab-pane{% if active_tab == 'user' %} active{% endif %}">
           <div class="card-body">
             <h2 class="mb-4">User Settings</h2>
             <h3 class="card-title">User Account</h3>
@@ -91,7 +91,7 @@
         </div>
 
         <!-- TAB PASSWORD --> 
-        <div id="password" class="tab-pane">
+        <div id="password" class="tab-pane{% if active_tab == 'password' %} active{% endif %}">
           <div class="card-body">
             <h2 class="mb-4">Password Settings</h2>
             <h3 class="card-title">Change Password</h3>
@@ -129,7 +129,7 @@
         </div>
 
         <!-- TAB GENERAL -->
-        <div id="general" class="tab-pane">
+        <div id="general" class="tab-pane{% if active_tab == 'general' %} active{% endif %}">
           {% set show_metadata_card = cfg.show_metadata_card if cfg.show_metadata_card is defined else true %}
           <div class="card-body">
             <h2 class="mb-4">General Settings</h2>
@@ -199,7 +199,7 @@
         </div>
 
         <!-- TAB DIRECTORY -->
-        <div id="directory" class="tab-pane">
+        <div id="directory" class="tab-pane{% if active_tab == 'directory' %} active{% endif %}">
           {% set custom_dirs = not cfg.root_dir %}
           <div class="card-body">
             <h2 class="mb-4">Configuration Directories</h2>
@@ -258,7 +258,7 @@
         </div>
 
         <!-- TAB DASHBOARD -->
-        <div id="dashboard" class="tab-pane">
+        <div id="dashboard" class="tab-pane{% if active_tab == 'dashboard' %} active{% endif %}">
           <div class="card-body">
             <h2 class="mb-4">Dashboard Settings</h2>
             <h3 class="card-title">Widgets</h3>
@@ -292,7 +292,7 @@
         </div>
 
         <!-- TAB QUICK ADD-->
-        <div id="quick-add" class="tab-pane">
+        <div id="quick-add" class="tab-pane{% if active_tab == 'quick-add' %} active{% endif %}">
           <div class="card-body">
             <h2 class="mb-4">Quick Add</h2>
             <h3 class="card-title">Quick Add Button</h3>
@@ -334,7 +334,7 @@
         </div>
 
         <!-- TAB GLOBAL -->
-        <div id="global" class="tab-pane">
+        <div id="global" class="tab-pane{% if active_tab == 'global' %} active{% endif %}">
           <div class="card-body">
             <h2 class="mb-4">Caddy Global Configuration</h2>
             <h3 class="card-title">Caddyfile</h3>
@@ -427,7 +427,7 @@
         </div>
 
         <!-- TAB API -->
-        <div id="api" class="tab-pane">
+        <div id="api" class="tab-pane{% if active_tab == 'api' %} active{% endif %}">
           <div class="card-body">
             <h2 class="mb-4">Caddy API</h2>
             <h3 class="card-title">Connect API</h3>
@@ -453,7 +453,7 @@
         </div>
 
         <!-- TAB LOGS -->
-        <div id="logs" class="tab-pane">
+        <div id="logs" class="tab-pane{% if active_tab == 'logs' %} active{% endif %}">
           <div class="card-body">
             <h2 class="mb-4">Caddy Logging</h2>
             <h3 class="card-title">Log Output Directory</h3>

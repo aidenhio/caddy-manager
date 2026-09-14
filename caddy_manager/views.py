@@ -319,6 +319,30 @@ def delete_block(filename):
     return redirect(url_for("main.site_blocks"))
 
 
+# Which Settings tab-pane each form's "action" belongs to, and the full set
+# of valid tab ids -- both drive keeping the page on the tab a form was
+# submitted from, instead of always bouncing back to the first tab (User)
+# after any save. A GET's ?tab= query param is checked against TAB_IDS
+# before being trusted, so an unrecognized/missing value just falls back to
+# the default tab rather than rendering a Jinja block that doesn't exist.
+TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "api", "logs")
+DEFAULT_TAB = "user"
+ACTION_TAB = {
+    "update_user": "user",
+    "change_password": "password",
+    "update_preview": "general",
+    "update_logging": "general",
+    "update_certificates": "general",
+    "update_dir": "directory",
+    "update_dashboard_widgets": "dashboard",
+    "update_quick_add": "quick-add",
+    "update_global_config": "global",
+    "rollback_global_config": "global",
+    "update_caddy_api": "api",
+    "update_caddy_logging": "logs",
+}
+
+
 @bp.route("/settings", methods=["GET", "POST"])
 @login_required
 def settings():
@@ -370,7 +394,7 @@ def settings():
                     )
                     save_config(cfg)
                     flash("Directories updated.", "success")
-                    return redirect(url_for("main.settings"))
+                    return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_logging":
             log_tail_lines = request.form.get("log_tail_lines", "").strip()
@@ -380,7 +404,7 @@ def settings():
                 cfg["log_tail_lines"] = int(log_tail_lines)
                 save_config(cfg)
                 flash("Logging settings updated.", "success")
-                return redirect(url_for("main.settings"))
+                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_global_config":
             caddyfile_path = get_caddyfile_path()
@@ -407,7 +431,7 @@ def settings():
                     error = f"Could not write the Caddyfile: {e}"
                 else:
                     flash("Caddyfile saved.", "success")
-                    return redirect(url_for("main.settings"))
+                    return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "rollback_global_config":
             caddyfile_path = get_caddyfile_path()
@@ -431,19 +455,19 @@ def settings():
                     error = f"Could not roll back the Caddyfile: {e}"
                 else:
                     flash("Caddyfile rolled back to the last backup.", "success")
-                    return redirect(url_for("main.settings"))
+                    return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_caddy_logging":
             cfg["caddy_log_output_dir"] = request.form.get("caddy_log_output_dir", "").strip()
             save_config(cfg)
             flash("Caddy logging settings updated.", "success")
-            return redirect(url_for("main.settings"))
+            return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_caddy_api":
             cfg["caddy_admin_api_url"] = request.form.get("caddy_admin_api_url", "").strip()
             save_config(cfg)
             flash("Caddy API settings updated.", "success")
-            return redirect(url_for("main.settings"))
+            return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_certificates":
             cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()
@@ -453,13 +477,13 @@ def settings():
                 cfg["cert_expiring_soon_days"] = int(cert_expiring_soon_days)
                 save_config(cfg)
                 flash("Certificate settings updated.", "success")
-                return redirect(url_for("main.settings"))
+                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_preview":
             cfg["show_metadata_card"] = request.form.get("show_metadata_card") == "on"
             save_config(cfg)
             flash("Preview page settings updated.", "success")
-            return redirect(url_for("main.settings"))
+            return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_dashboard_widgets":
             cfg["dashboard_widgets"] = {
@@ -467,7 +491,7 @@ def settings():
             }
             save_config(cfg)
             flash("Dashboard settings updated.", "success")
-            return redirect(url_for("main.settings"))
+            return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_quick_add":
             quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")
@@ -480,7 +504,7 @@ def settings():
                 cfg["quick_add_type_site_blocks"] = quick_add_type_site_blocks
                 save_config(cfg)
                 flash("Quick Add settings updated.", "success")
-                return redirect(url_for("main.settings"))
+                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_user":
             username = request.form.get("username", "").strip()
@@ -493,7 +517,7 @@ def settings():
                 save_config(cfg)
                 session["username"] = username
                 flash("User settings updated.", "success")
-                return redirect(url_for("main.settings"))
+                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "change_password":
             current = request.form.get("current_password", "")
@@ -509,7 +533,7 @@ def settings():
                 cfg["password_hash"] = generate_password_hash(new_password)
                 save_config(cfg)
                 flash("Password updated.", "success")
-                return redirect(url_for("main.settings"))
+                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
     # The Global Configuration tab always shows either what's currently on
     # disk, or -- if the save attempt above just failed validation -- what
@@ -535,10 +559,24 @@ def settings():
             os.path.getmtime(caddyfile_backup_path)
         ).strftime("%d/%m/%Y %I:%M%p")
 
+    # Which tab-pane to render as active. A POST that fell through to here
+    # (i.e. failed validation, so none of the branches above returned)
+    # re-shows the tab the failed form lives on, from its action. A GET is
+    # the page reload after a successful save's redirect above, which
+    # passes the tab along as a query param -- falling back to the default
+    # tab for a plain, tab-less visit to /settings, or an unrecognized
+    # value.
+    if request.method == "POST":
+        active_tab = ACTION_TAB.get(action, DEFAULT_TAB)
+    else:
+        requested_tab = request.args.get("tab", "")
+        active_tab = requested_tab if requested_tab in TAB_IDS else DEFAULT_TAB
+
     return render_template(
         "settings.html", cfg=cfg, error=error,
         dashboard_widgets=get_dashboard_widget_visibility(),
         conf_dir=get_conf_dir(),
         caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
         caddyfile_backup_updated=caddyfile_backup_updated,
+        active_tab=active_tab,
     )
