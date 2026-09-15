@@ -209,10 +209,10 @@
                     {{ b.site_addresses[0] if b.site_addresses else b.filename }}
                   </a>
                 </h4>
-                <p class="badge bg-{{row_color}}-lt mb-0">
+                <p class="tag bg-{{row_color}}-lt mb-0">
                   {{ row_label }}
                   {% if b.disabled %}
-                  <span class="badge bg-muted-lt ms-1">Disabled</span>
+                  <span class="tag bg-muted-lt ms-1">Disabled</span>
                   {% endif %}
                 </p>
               </div>

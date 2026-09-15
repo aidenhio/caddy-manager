@@ -53,7 +53,7 @@
       </div>
       <div class="ms-auto col-auto" data-bs-auto-close="outside">
         <a href="#" class="btn dropdown-toggle d-none d-sm-inline-block" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-adjustments-horizontal">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icons-tabler-outline icon-tabler-adjustments-horizontal">
             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
             <path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
             <path d="M4 6l8 0" />
@@ -79,7 +79,7 @@
           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="type" value="custom"> Custom</label>
           <div class="dropdown-divider"></div>
           <a class="dropdown-item text-danger" href="#" data-dt-clear-filters>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon  icon-tabler icons-tabler-outline icon-tabler-x text-danger">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icons-tabler-outline icon-tabler-x text-danger">
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M18 6l-12 12" />
               <path d="M6 6l12 12" />
@@ -116,7 +116,7 @@
       <thead>
         <tr>
           <th>
-            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="status" data-sort-type="text">
+            <button type="button" class="table-sort justify-content-between" data-sort-key="status" data-sort-type="text">
             </button>
           </th>
           <th>
@@ -172,8 +172,8 @@
           </td>
           <td>
             {% if b.type == 'reverse_proxy' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-arrow-back-up">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M9 14l-4 -4l4 -4" />
                   <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
@@ -181,16 +181,16 @@
                 Reverse Proxy
               </span>
             {% elif b.type == 'redirect' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-corner-up-right">
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-corner-up-right">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
                 </svg>
                 Redirect
               </span>
             {% elif b.type == 'load_balancer' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-fork-triple">
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-arrow-fork-triple">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M12 3v18" />
                   <path d="M16 7l-4 -4l-4 4" />
@@ -202,16 +202,16 @@
                 Load Balancer
               </span>  
             {% elif b.type == 'static_site' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-folder">
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-folder">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
                 </svg>
                 Static Site
               </span>
             {% else %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-code-asterisk">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
                   <path d="M12 11.875l3 -1.687" />
@@ -231,10 +231,10 @@
             {% if b.site_addresses %}
               {{ b.site_addresses[0] }}
               {% if b.site_addresses | length > 1 %}
-                <span class="badge bg-{{ row_color }}-lt" title="{{ b.site_addresses[1:] | join(', ') }}">+{{ b.site_addresses | length - 1 }}</span>
+                <span class="tag bg-{{ row_color }}-lt" title="{{ b.site_addresses[1:] | join(', ') }}">+{{ b.site_addresses | length - 1 }}</span>
               {% endif %}
             {% else %}
-              <span class="badge bg-danger-lt" title="No site address configured">
+              <span class="tag bg-danger-lt" title="No site address configured">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icons-tabler-outline icon-tabler-alert-triangle">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                   <path d="M12 9v4" />
@@ -249,19 +249,19 @@
           <!-- BEGIN UPSTREAM/TARGET CELL -->
           <td>
             {% if b.type == 'reverse_proxy' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.host or '—' }}</span>
-               {% if b.port %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.port }}</span>{% endif %}
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.host or '—' }}</span>
+               {% if b.port %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.port }}</span>{% endif %}
             {% elif b.type == 'redirect' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.target or '—' }}</span>
-              {% if b.redirect_code %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.redirect_code }}</span>{% endif %}
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.target or '—' }}</span>
+              {% if b.redirect_code %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.redirect_code }}</span>{% endif %}
             {% elif b.type == 'load_balancer' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.upstreams | length }} upstreams</span>
-              {% if b.lb_policy %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.upstreams | length }} upstreams</span>
+              {% if b.lb_policy %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
             {% elif b.type == 'static_site' %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.path or '—' }}</span>
-              {% if b.encode %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.encode | join(', ') }}</span>{% endif %}
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.path or '—' }}</span>
+              {% if b.encode %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.encode | join(', ') }}</span>{% endif %}
             {% else %}
-              <span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">custom</span>
+              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">custom</span>
             {% endif %}
           </td>
           <!-- END UPSTREAM/TARGET CELL -->

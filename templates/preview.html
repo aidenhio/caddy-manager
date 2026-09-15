@@ -71,8 +71,8 @@
           <div class="text-secondary small mb-1">Type</div>
 
           {% if block_type == 'reverse_proxy' %}
-          <span class="badge bg-{{ type_color }}-lt">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+          <span class="tag bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-arrow-back-up">
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M9 14l-4 -4l4 -4" />
               <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
@@ -80,16 +80,16 @@
             {{ type_label }}
           </span>
           {% elif block_type == 'redirect' %}
-          <span class="badge bg-{{ type_color }}-lt">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-corner-up-right">
+          <span class="tag bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-corner-up-right">
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4" />
             </svg>
             {{ type_label }}
           </span>
           {% elif block_type == 'load_balancer' %}
-          <span class="badge bg-{{ type_color }}-lt">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-fork-triple">
+          <span class="tag bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-arrow-fork-triple">
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M12 3v18" />
               <path d="M16 7l-4 -4l-4 4" />
@@ -101,16 +101,16 @@
             {{ type_label }}
           </span>
           {% elif block_type == 'static_site' %}
-          <span class="badge bg-{{ type_color }}-lt">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-folder">
+          <span class="tag bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-folder">
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M5 4h4l3 3h7a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-12a1 1 0 0 1 1 -1" />
             </svg>
             {{ type_label }}
           </span>
           {% else %}
-          <span class="badge bg-{{ type_color }}-lt">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-code-asterisk">
+          <span class="tag bg-{{ type_color }}-lt">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon tag-icon text-reset icons-tabler-outline icon-tabler-code-asterisk">
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2" />
               <path d="M12 11.875l3 -1.687" />
