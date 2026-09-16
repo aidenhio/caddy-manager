@@ -40,6 +40,7 @@
           <div>
             <a href="#global" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'global' %} active{% endif %}" data-bs-toggle="tab">Global Configuration</a>
             <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab">Caddy API</a>
+            <a href="#servers" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab">Caddy Servers</a>
             <a href="#logs" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'logs' %} active{% endif %}" data-bs-toggle="tab">Logging</a>
           </div>
         </div>
@@ -425,7 +426,7 @@
             <h2 class="mb-4">Caddy API</h2>
             <h3 class="card-title">Connect API</h3>
             <p class="text-secondary">
-              Lets Caddy Manager read live stats from Caddy's own <a href="https://caddyserver.com/docs/api" target="_blank" rel="noopener">admin API</a> -- currently used to power the <a href="{{ url_for('main.dashboard') }}">Dashboard</a>'s Current Requests widget. Enter the address Caddy's admin API listens on, e.g. <code>caddy.example.com:2019</code> (defaults to <code>http://</code> if no scheme is given). Leave blank to leave that widget unavailable.
+              Lets Caddy Manager read live stats from Caddy's own <a href="https://caddyserver.com/docs/api" target="_blank" rel="noopener">admin API</a>. Enter the address Caddy's admin API listens on, e.g. <code>caddy.example.com:2019</code> (defaults to <code>http://</code> if no scheme is given).
             </p>
             <form method="post" id="caddy-api-form">
               <input type="hidden" name="action" value="update_caddy_api">
@@ -442,6 +443,17 @@
             <script>
               initFormValidation(document.getElementById('caddy-api-form'));
             </script>
+          </div>
+        </div>
+
+        <!-- TAB SERVERS -->
+        <div id="servers" class="tab-pane{% if active_tab == 'servers' %} active{% endif %}">
+          <div class="card-body">
+            <h2 class="mb-4">Caddy Servers</h2>
+            <h3 class="card-title">Connect Servers</h3>
+            <p class="text-secondary">
+              Lets Caddy Manager show a live ping status for your Caddy server. Enter the IP address or hostname of the Caddy server. Leave blank to leave that widget unavailable.
+            </p>
           </div>
         </div>
 
