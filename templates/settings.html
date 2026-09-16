@@ -40,7 +40,7 @@
           <div>
             <a href="#global" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'global' %} active{% endif %}" data-bs-toggle="tab">Global Configuration</a>
             <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab">Caddy API</a>
-            <a href="#servers" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab">Caddy Servers</a>
+            <a href="#servers" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'servers' %} active{% endif %}" data-bs-toggle="tab">Caddy Servers</a>
             <a href="#logs" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'logs' %} active{% endif %}" data-bs-toggle="tab">Logging</a>
           </div>
         </div>
@@ -452,8 +452,66 @@
             <h2 class="mb-4">Caddy Servers</h2>
             <h3 class="card-title">Connect Servers</h3>
             <p class="text-secondary">
-              Lets Caddy Manager show a live ping status for your Caddy server. Enter the IP address or hostname of the Caddy server. Leave blank to leave that widget unavailable.
+              Lets Caddy Manager show a live ping status tag for up to two Caddy servers in the navbar. Give each one a display name and its IP address or hostname; leave both fields blank to leave a slot unused.
             </p>
+            <form method="post" id="caddy-servers-form">
+              <input type="hidden" name="action" value="update_caddy_servers">
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Server 1 display name</label>
+                  <input type="text" name="server1_display_name" class="form-control" placeholder="net01"
+                         value="{{ caddy_servers_padded[0].display_name }}">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Server 1 IP or hostname</label>
+                  <input type="text" name="server1_host" class="form-control" placeholder="10.0.0.10"
+                         value="{{ caddy_servers_padded[0].host }}">
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Server 2 display name</label>
+                  <input type="text" name="server2_display_name" class="form-control" placeholder="net02"
+                         value="{{ caddy_servers_padded[1].display_name }}">
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Server 2 IP or hostname</label>
+                  <input type="text" name="server2_host" class="form-control" placeholder="192.168.0.10"
+                         value="{{ caddy_servers_padded[1].host }}">
+                </div>
+              </div>
+
+              <hr class="my-3">
+
+              <div class="subheader mb-3">Ping Monitor</div>
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Ping interval <span class="form-hint d-inline">(seconds)</span></label>
+                  <input type="number" min="10" step="1" name="ping_interval_seconds" class="form-control"
+                         value="{{ caddy_server_form.ping_interval }}">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Warning after <span class="form-hint d-inline">(missed pings)</span></label>
+                  <input type="number" min="1" step="1" name="warning_after_misses" class="form-control"
+                         value="{{ caddy_server_form.warning_after }}">
+                  <small class="form-hint">Status tag turns yellow once this many pings in a row go unanswered.</small>
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Offline after <span class="form-hint d-inline">(missed pings)</span></label>
+                  <input type="number" min="1" step="1" name="danger_after_misses" class="form-control"
+                         value="{{ caddy_server_form.danger_after }}">
+                  <small class="form-hint">Status tag turns red once this many pings in a row go unanswered.</small>
+                </div>
+              </div>
+
+              <div class="form-footer">
+                <button type="submit" class="btn btn-primary">Update</button>
+              </div>
+            </form>
+            <script>
+              initFormValidation(document.getElementById('caddy-servers-form'));
+            </script>
           </div>
         </div>
 

@@ -5,6 +5,7 @@ from flask import Flask
 
 from .configstore import BASE_DIR, load_config
 from .colors import type_color
+from .server_monitor import get_server_statuses
 
 
 def create_app():
@@ -16,7 +17,12 @@ def create_app():
         static_folder=os.path.join(BASE_DIR, "static"),
     )
 
-    app.context_processor(lambda: dict(type_color=type_color))
+    # nav_caddy_servers is read fresh on every request (Flask calls this
+    # lambda per-render) so the navbar's server-rendered status tags --
+    # see templates/partials/header_nav_bar.html -- always start from the
+    # ping monitor's current state, without every view function needing
+    # to pass it through individually.
+    app.context_processor(lambda: dict(type_color=type_color, nav_caddy_servers=get_server_statuses()))
 
     # A random placeholder so the session/flash machinery always has a
     # usable key -- even on the very first request Flask ever handles,

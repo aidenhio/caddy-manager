@@ -213,6 +213,81 @@ DASHBOARD_WIDGETS = (
 )
 
 
+
+# "Caddy Servers" (Settings -> Caddy Servers): up to this many servers can
+# be ping-monitored, each showing a live status tag in the navbar (see
+# server_monitor.py). Two, to match the navbar layout the app's design
+# was already stubbed in with.
+MAX_CADDY_SERVERS = 2
+
+DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS = 60
+# A shorter interval than this risks queuing pings faster than they can
+# resolve -- server_monitor.PING_TIMEOUT_SECONDS is comfortably under it,
+# but a much shorter interval than that would leave no real gap between
+# checks. Enforced by the Caddy Servers settings form, not here, but the
+# constant lives here so the getter and the form validation can't drift
+# apart.
+MIN_CADDY_SERVER_PING_INTERVAL_SECONDS = 10
+DEFAULT_CADDY_SERVER_WARNING_AFTER_MISSES = 3
+DEFAULT_CADDY_SERVER_DANGER_AFTER_MISSES = 5
+
+
+def get_caddy_servers():
+    """Up to MAX_CADDY_SERVERS configured Caddy servers to ping-monitor,
+    each as {"display_name": str, "host": str} -- both always non-empty,
+    since the settings form itself rejects (and never saves) a
+    partially-filled slot. Empty list if none are configured."""
+    cfg = load_config()
+    stored = cfg.get("caddy_servers") if cfg else None
+    if not isinstance(stored, list):
+        return []
+    servers = []
+    for entry in stored[:MAX_CADDY_SERVERS]:
+        if not isinstance(entry, dict):
+            continue
+        display_name = (entry.get("display_name") or "").strip()
+        host = (entry.get("host") or "").strip()
+        if display_name and host:
+            servers.append({"display_name": display_name, "host": host})
+    return servers
+
+
+def get_caddy_server_ping_interval_seconds():
+    cfg = load_config()
+    value = cfg.get("caddy_server_ping_interval_seconds") if cfg else None
+    try:
+        seconds = int(value)
+        if seconds >= MIN_CADDY_SERVER_PING_INTERVAL_SECONDS:
+            return seconds
+    except (TypeError, ValueError):
+        pass
+    return DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS
+
+
+def get_caddy_server_warning_after_misses():
+    cfg = load_config()
+    value = cfg.get("caddy_server_warning_after_misses") if cfg else None
+    try:
+        misses = int(value)
+        if misses > 0:
+            return misses
+    except (TypeError, ValueError):
+        pass
+    return DEFAULT_CADDY_SERVER_WARNING_AFTER_MISSES
+
+
+def get_caddy_server_danger_after_misses():
+    cfg = load_config()
+    value = cfg.get("caddy_server_danger_after_misses") if cfg else None
+    try:
+        misses = int(value)
+        if misses > 0:
+            return misses
+    except (TypeError, ValueError):
+        pass
+    return DEFAULT_CADDY_SERVER_DANGER_AFTER_MISSES
+
+
 def get_dashboard_widget_visibility():
     """Which Dashboard widgets are shown, as a {key: bool} dict covering
     every key in DASHBOARD_WIDGETS. Defaults every widget to shown (True)

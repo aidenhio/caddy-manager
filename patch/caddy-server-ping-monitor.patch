@@ -1,0 +1,669 @@
+diff --git a/app.py b/app.py
+index e67a39d..e25991f 100644
+--- a/app.py
++++ b/app.py
+@@ -1,9 +1,22 @@
+ import os
+ 
+ from caddy_manager import create_app
++from caddy_manager.server_monitor import start_server_monitor
+ 
+ app = create_app()
+ 
+ if __name__ == "__main__":
+     port = int(os.environ.get("PORT", 5000))
+-    app.run(host="0.0.0.0", port=port, debug=True)
++    debug = True
++    # Flask's reloader (implied by debug=True) re-executes this whole
++    # module in a child worker process it spawns to actually serve
++    # requests, after first running it once in a parent process that
++    # only watches for file changes and never serves anything --
++    # WERKZEUG_RUN_MAIN is set only in that child. Gating the ping
++    # monitor's startup on it (or starting unconditionally whenever the
++    # reloader isn't in play at all, i.e. debug is off) avoids running a
++    # second, orphaned copy of the background thread in the parent
++    # watcher process.
++    if not debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
++        start_server_monitor()
++    app.run(host="0.0.0.0", port=port, debug=debug)
+diff --git a/caddy_manager/__init__.py b/caddy_manager/__init__.py
+index f5b403d..9e0f081 100644
+--- a/caddy_manager/__init__.py
++++ b/caddy_manager/__init__.py
+@@ -5,6 +5,7 @@ from flask import Flask
+ 
+ from .configstore import BASE_DIR, load_config
+ from .colors import type_color
++from .server_monitor import get_server_statuses
+ 
+ 
+ def create_app():
+@@ -16,7 +17,12 @@ def create_app():
+         static_folder=os.path.join(BASE_DIR, "static"),
+     )
+ 
+-    app.context_processor(lambda: dict(type_color=type_color))
++    # nav_caddy_servers is read fresh on every request (Flask calls this
++    # lambda per-render) so the navbar's server-rendered status tags --
++    # see templates/partials/header_nav_bar.html -- always start from the
++    # ping monitor's current state, without every view function needing
++    # to pass it through individually.
++    app.context_processor(lambda: dict(type_color=type_color, nav_caddy_servers=get_server_statuses()))
+ 
+     # A random placeholder so the session/flash machinery always has a
+     # usable key -- even on the very first request Flask ever handles,
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index a324d58..45c8128 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -213,6 +213,81 @@ DASHBOARD_WIDGETS = (
+ )
+ 
+ 
++
++# "Caddy Servers" (Settings -> Caddy Servers): up to this many servers can
++# be ping-monitored, each showing a live status tag in the navbar (see
++# server_monitor.py). Two, to match the navbar layout the app's design
++# was already stubbed in with.
++MAX_CADDY_SERVERS = 2
++
++DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS = 60
++# A shorter interval than this risks queuing pings faster than they can
++# resolve -- server_monitor.PING_TIMEOUT_SECONDS is comfortably under it,
++# but a much shorter interval than that would leave no real gap between
++# checks. Enforced by the Caddy Servers settings form, not here, but the
++# constant lives here so the getter and the form validation can't drift
++# apart.
++MIN_CADDY_SERVER_PING_INTERVAL_SECONDS = 10
++DEFAULT_CADDY_SERVER_WARNING_AFTER_MISSES = 3
++DEFAULT_CADDY_SERVER_DANGER_AFTER_MISSES = 5
++
++
++def get_caddy_servers():
++    """Up to MAX_CADDY_SERVERS configured Caddy servers to ping-monitor,
++    each as {"display_name": str, "host": str} -- both always non-empty,
++    since the settings form itself rejects (and never saves) a
++    partially-filled slot. Empty list if none are configured."""
++    cfg = load_config()
++    stored = cfg.get("caddy_servers") if cfg else None
++    if not isinstance(stored, list):
++        return []
++    servers = []
++    for entry in stored[:MAX_CADDY_SERVERS]:
++        if not isinstance(entry, dict):
++            continue
++        display_name = (entry.get("display_name") or "").strip()
++        host = (entry.get("host") or "").strip()
++        if display_name and host:
++            servers.append({"display_name": display_name, "host": host})
++    return servers
++
++
++def get_caddy_server_ping_interval_seconds():
++    cfg = load_config()
++    value = cfg.get("caddy_server_ping_interval_seconds") if cfg else None
++    try:
++        seconds = int(value)
++        if seconds >= MIN_CADDY_SERVER_PING_INTERVAL_SECONDS:
++            return seconds
++    except (TypeError, ValueError):
++        pass
++    return DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS
++
++
++def get_caddy_server_warning_after_misses():
++    cfg = load_config()
++    value = cfg.get("caddy_server_warning_after_misses") if cfg else None
++    try:
++        misses = int(value)
++        if misses > 0:
++            return misses
++    except (TypeError, ValueError):
++        pass
++    return DEFAULT_CADDY_SERVER_WARNING_AFTER_MISSES
++
++
++def get_caddy_server_danger_after_misses():
++    cfg = load_config()
++    value = cfg.get("caddy_server_danger_after_misses") if cfg else None
++    try:
++        misses = int(value)
++        if misses > 0:
++            return misses
++    except (TypeError, ValueError):
++        pass
++    return DEFAULT_CADDY_SERVER_DANGER_AFTER_MISSES
++
++
+ def get_dashboard_widget_visibility():
+     """Which Dashboard widgets are shown, as a {key: bool} dict covering
+     every key in DASHBOARD_WIDGETS. Defaults every widget to shown (True)
+diff --git a/caddy_manager/server_monitor.py b/caddy_manager/server_monitor.py
+new file mode 100644
+index 0000000..f583715
+--- /dev/null
++++ b/caddy_manager/server_monitor.py
+@@ -0,0 +1,175 @@
++"""Background ping monitor for the "Caddy Servers" configured in Settings
++-> Caddy Servers -- shows a live status tag for each one in the navbar
++(see templates/partials/header_nav_bar.html and static/js/nav-status.js),
++independent of whichever page happens to be open.
++
++A single background thread (started once from app.py, not from
++create_app() itself -- see the comment there for why) pings every
++configured server on a loop, tracking a simple consecutive-misses count
++per host in memory. Request handlers only ever read that in-memory
++state -- nothing in a request ever blocks on a live ping, since a real
++ICMP round-trip (or an unreachable host timing out) can take seconds,
++far too slow for a page render or a frequent navbar-refresh poll.
++
++State deliberately lives in a plain module-level dict guarded by a lock
++rather than anywhere in configstore's config.json: ping results are
++transient/observational, not configuration, and persisting them would
++mean stale data survives an app restart (a server that was Offline when
++the app stopped would still show Offline for up to a full ping interval
++after it restarts, before the first fresh check completes) -- a
++"Checking" state that resolves within moments of startup is the more
++honest UI for status that's inherently only as fresh as the last check.
++"""
++import subprocess
++import threading
++
++from .configstore import (
++    get_caddy_servers, get_caddy_server_ping_interval_seconds,
++    get_caddy_server_warning_after_misses, get_caddy_server_danger_after_misses,
++)
++
++# How long a single ping is allowed to take before it's counted as a miss.
++# Comfortably under configstore.MIN_CADDY_SERVER_PING_INTERVAL_SECONDS so
++# pinging every configured server (there are at most two) never runs long
++# enough to meaningfully delay the next scheduled check.
++PING_TIMEOUT_SECONDS = 3
++
++# status -> the Tabler tag background class, the status-dot modifier
++# class, and the one-word label the tooltip uses (e.g. "Online
++# (10.0.0.10)"). Shared by the navbar's initial server-rendered tags
++# (via get_server_statuses(), read through the nav_caddy_servers context
++# processor in __init__.py) and the live JSON refresh endpoint
++# (nav_server_status() in views.py) so the two can never drift out of
++# sync with each other or with static/js/nav-status.js.
++STATUS_DISPLAY = {
++    "online": {"bg_class": "bg-success-lt", "dot_class": "status-success", "label": "Online"},
++    "warning": {"bg_class": "bg-warning-lt", "dot_class": "status-warning", "label": "Unavailable"},
++    "danger": {"bg_class": "bg-danger-lt", "dot_class": "status-danger", "label": "Offline"},
++    # Shown only in the brief window before a server's very first ping
++    # completes -- right after it's newly configured, or right after the
++    # app starts. The monitor thread checks every configured server
++    # immediately on startup and again immediately whenever the Caddy
++    # Servers settings are saved (see notify_config_changed()), so this
++    # normally clears within a second or two, not a full ping interval.
++    "pending": {"bg_class": "bg-secondary-lt", "dot_class": "status-secondary", "label": "Checking"},
++}
++
++_lock = threading.Lock()
++_state = {}  # host -> {"consecutive_misses": int, "checked": bool}
++_wake_event = threading.Event()
++_started = False
++
++
++def _ping_once(host):
++    """True if `host` replied to a single ICMP echo request within
++    PING_TIMEOUT_SECONDS, False otherwise -- no reply, an unresolvable
++    hostname, the `ping` binary itself missing, or anything else going
++    wrong all collapse to the same "treat it as a miss" outcome, rather
++    than raising and taking the monitor thread down.
++
++    Shells out to the system `ping` command (`-c 1` = a single echo
++    request) instead of a raw ICMP socket, since sending/receiving raw
++    ICMP packets from Python normally needs root or CAP_NET_RAW -- not
++    something this app should require just to show a status tag. The
++    timeout is enforced by subprocess itself (`timeout=`) rather than
++    ping's own per-platform timeout flag (`-W` means seconds on Linux,
++    milliseconds on macOS/BSD), so behavior doesn't depend on which
++    platform this happens to run on.
++    """
++    if not host:
++        return False
++    try:
++        result = subprocess.run(
++            ["ping", "-c", "1", host],
++            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
++            timeout=PING_TIMEOUT_SECONDS,
++        )
++    except (subprocess.TimeoutExpired, OSError):
++        return False
++    return result.returncode == 0
++
++
++def _check_all(servers):
++    for server in servers:
++        host = server["host"]
++        success = _ping_once(host)
++        with _lock:
++            entry = _state.setdefault(host, {"consecutive_misses": 0, "checked": False})
++            entry["checked"] = True
++            entry["consecutive_misses"] = 0 if success else entry["consecutive_misses"] + 1
++
++
++def _monitor_loop():
++    while True:
++        _check_all(get_caddy_servers())
++        interval = get_caddy_server_ping_interval_seconds()
++        # wait() returns early (and the flag is cleared right after) if
++        # notify_config_changed() fires in the meantime, so a server just
++        # added or edited in Settings resolves within moments instead of
++        # waiting out whatever's left of the previous interval.
++        _wake_event.wait(timeout=interval)
++        _wake_event.clear()
++
++
++def notify_config_changed():
++    """Called after a successful Caddy Servers settings save so a newly
++    added or edited server's status resolves quickly instead of sitting
++    at "Checking" (or showing a stale previous host's status) for up to a
++    full ping interval."""
++    _wake_event.set()
++
++
++def start_server_monitor():
++    """Starts the background ping thread, if it isn't already running.
++    Safe to call more than once -- only the first call actually starts
++    anything.
++
++    Deliberately not called from create_app() itself: every test in this
++    project's suite calls create_app() directly against its own
++    throwaway config, and starting a real background ping thread per
++    test would leak threads across the whole suite for no benefit. See
++    app.py for where this is actually invoked, and why."""
++    global _started
++    with _lock:
++        if _started:
++            return
++        _started = True
++    threading.Thread(target=_monitor_loop, daemon=True, name="caddy-server-monitor").start()
++
++
++def get_server_statuses():
++    """The current status of every configured Caddy server, ready for
++    both the navbar's server-rendered tags (via the nav_caddy_servers
++    context processor in __init__.py) and the JSON refresh endpoint
++    (nav_server_status() in views.py) -- each entry: display_name, host,
++    status ("online", "warning", "danger", or "pending" -- see
++    STATUS_DISPLAY), and that status's display metadata (bg_class,
++    dot_class, label) so neither the template nor the JS poller needs
++    its own copy of the thresholds-to-status mapping."""
++    servers = get_caddy_servers()
++    warning_after = get_caddy_server_warning_after_misses()
++    danger_after = get_caddy_server_danger_after_misses()
++    results = []
++    with _lock:
++        for server in servers:
++            entry = _state.get(server["host"])
++            if not entry or not entry["checked"]:
++                status = "pending"
++            else:
++                misses = entry["consecutive_misses"]
++                if misses >= danger_after:
++                    status = "danger"
++                elif misses >= warning_after:
++                    status = "warning"
++                else:
++                    status = "online"
++            display = STATUS_DISPLAY[status]
++            results.append({
++                "display_name": server["display_name"],
++                "host": server["host"],
++                "status": status,
++                "bg_class": display["bg_class"],
++                "dot_class": display["dot_class"],
++                "label": display["label"],
++            })
++    return results
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 02f4618..94a43a5 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -11,8 +11,12 @@ from .configstore import (
+     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
+     get_show_metadata_card, get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
+     DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
++    MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS,
++    get_caddy_server_ping_interval_seconds, get_caddy_server_warning_after_misses,
++    get_caddy_server_danger_after_misses,
+ )
+ from .caddy_api import upstream_stats
++from .server_monitor import get_server_statuses, notify_config_changed
+ from .caddyfile import slugify, extract_body, site_addresses_from_textarea
+ from .blocks import (
+     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
+@@ -74,6 +78,17 @@ def dashboard_caddy_stats():
+     )
+ 
+ 
++@bp.route("/nav/server-status")
++@login_required
++def nav_server_status():
++    """JSON refresh endpoint for the navbar's Caddy Server status tags --
++    see static/js/nav-status.js. Reads the background ping monitor's
++    in-memory state (server_monitor.py) rather than pinging live per
++    request, since a real ping round-trip is far too slow for an
++    endpoint every open page polls on a timer."""
++    return jsonify(servers=get_server_statuses())
++
++
+ @bp.route("/site-blocks")
+ @login_required
+ def site_blocks():
+@@ -325,7 +340,7 @@ def delete_block(filename):
+ # after any save. A GET's ?tab= query param is checked against TAB_IDS
+ # before being trusted, so an unrecognized/missing value just falls back to
+ # the default tab rather than rendering a Jinja block that doesn't exist.
+-TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "api", "logs")
++TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "api", "servers", "logs")
+ DEFAULT_TAB = "user"
+ ACTION_TAB = {
+     "update_user": "user",
+@@ -339,6 +354,7 @@ ACTION_TAB = {
+     "update_global_config": "global",
+     "rollback_global_config": "global",
+     "update_caddy_api": "api",
++    "update_caddy_servers": "servers",
+     "update_caddy_logging": "logs",
+ }
+ 
+@@ -469,6 +485,55 @@ def settings():
+             flash("Caddy API settings updated.", "success")
+             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
+ 
++        elif action == "update_caddy_servers":
++            # Two fixed named slots rather than a dynamic add/remove list --
++            # MAX_CADDY_SERVERS is 2, matching the navbar layout this was
++            # designed against, so there's no real list to manage. A slot
++            # is either fully filled in or left fully blank; one field
++            # filled and the other blank is rejected rather than silently
++            # dropped or defaulted, since either guess (drop the slot,
++            # invent a name) could surprise the person configuring it.
++            servers = []
++            for i in range(1, MAX_CADDY_SERVERS + 1):
++                display_name = request.form.get(f"server{i}_display_name", "").strip()
++                host = request.form.get(f"server{i}_host", "").strip()
++                if display_name and host:
++                    servers.append({"display_name": display_name, "host": host})
++                elif display_name or host:
++                    error = f"Server {i} needs both a display name and a host, or leave both blank."
++                    break
++
++            if not error and len(servers) == MAX_CADDY_SERVERS and servers[0]["host"] == servers[1]["host"]:
++                error = "Server 1 and Server 2 must have different hosts."
++
++            ping_interval_raw = request.form.get("ping_interval_seconds", "").strip()
++            warning_raw = request.form.get("warning_after_misses", "").strip()
++            danger_raw = request.form.get("danger_after_misses", "").strip()
++
++            if not error:
++                if not (ping_interval_raw.isdigit() and int(ping_interval_raw) >= MIN_CADDY_SERVER_PING_INTERVAL_SECONDS):
++                    error = f"Ping interval must be a whole number of seconds, at least {MIN_CADDY_SERVER_PING_INTERVAL_SECONDS}."
++                elif not (warning_raw.isdigit() and int(warning_raw) > 0):
++                    error = "Warning threshold must be a positive whole number of missed pings."
++                elif not (danger_raw.isdigit() and int(danger_raw) > 0):
++                    error = "Offline threshold must be a positive whole number of missed pings."
++                elif int(danger_raw) <= int(warning_raw):
++                    error = "Offline threshold must be greater than the warning threshold."
++
++            if not error:
++                cfg["caddy_servers"] = servers
++                cfg["caddy_server_ping_interval_seconds"] = int(ping_interval_raw)
++                cfg["caddy_server_warning_after_misses"] = int(warning_raw)
++                cfg["caddy_server_danger_after_misses"] = int(danger_raw)
++                save_config(cfg)
++                # Wakes the ping monitor thread for an immediate check
++                # rather than leaving a newly added/edited server showing
++                # "Checking" (or a stale previous host's status) for up to
++                # a full ping interval.
++                notify_config_changed()
++                flash("Caddy Servers settings updated.", "success")
++                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
++
+         elif action == "update_certificates":
+             cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()
+             if not (cert_expiring_soon_days.isdigit() and int(cert_expiring_soon_days) > 0):
+@@ -559,6 +624,41 @@ def settings():
+             os.path.getmtime(caddyfile_backup_path)
+         ).strftime("%d/%m/%Y %I:%M%p")
+ 
++    # The Caddy Servers tab always shows either what's currently saved, or
++    # -- if the save attempt above just failed validation -- what was
++    # submitted, the same "don't wipe out a rejected edit" treatment the
++    # Global Configuration tab gets above. caddy_servers_padded always has
++    # exactly MAX_CADDY_SERVERS entries (blank ones for an unconfigured
++    # slot) so the template can index straight into it without checking
++    # length itself.
++    if request.method == "POST" and request.form.get("action") == "update_caddy_servers":
++        caddy_servers_padded = [
++            {
++                "display_name": request.form.get(f"server{i}_display_name", "").strip(),
++                "host": request.form.get(f"server{i}_host", "").strip(),
++            }
++            for i in range(1, MAX_CADDY_SERVERS + 1)
++        ]
++        caddy_server_form = {
++            "ping_interval": request.form.get("ping_interval_seconds", "").strip(),
++            "warning_after": request.form.get("warning_after_misses", "").strip(),
++            "danger_after": request.form.get("danger_after_misses", "").strip(),
++        }
++    else:
++        raw_servers = (cfg.get("caddy_servers") or [])[:MAX_CADDY_SERVERS]
++        caddy_servers_padded = [
++            {
++                "display_name": raw_servers[i].get("display_name", "") if i < len(raw_servers) and isinstance(raw_servers[i], dict) else "",
++                "host": raw_servers[i].get("host", "") if i < len(raw_servers) and isinstance(raw_servers[i], dict) else "",
++            }
++            for i in range(MAX_CADDY_SERVERS)
++        ]
++        caddy_server_form = {
++            "ping_interval": get_caddy_server_ping_interval_seconds(),
++            "warning_after": get_caddy_server_warning_after_misses(),
++            "danger_after": get_caddy_server_danger_after_misses(),
++        }
++
+     # Which tab-pane to render as active. A POST that fell through to here
+     # (i.e. failed validation, so none of the branches above returned)
+     # re-shows the tab the failed form lives on, from its action. A GET is
+@@ -578,5 +678,6 @@ def settings():
+         conf_dir=get_conf_dir(),
+         caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
+         caddyfile_backup_updated=caddyfile_backup_updated,
++        caddy_servers_padded=caddy_servers_padded, caddy_server_form=caddy_server_form,
+         active_tab=active_tab,
+     )
+diff --git a/static/js/nav-status.js b/static/js/nav-status.js
+new file mode 100644
+index 0000000..89ac1a2
+--- /dev/null
++++ b/static/js/nav-status.js
+@@ -0,0 +1,57 @@
++// BEGIN NAVBAR CADDY SERVER STATUS
++// Keeps the Caddy Server status tags in the navbar's right-hand side
++// (see templates/partials/header_nav_bar.html) live across every page,
++// not just while some particular page happens to stay open -- the
++// background ping monitor this polls (server_monitor.py) runs for as
++// long as the app itself is running, independent of any browser tab.
++(function () {
++  const tags = document.querySelectorAll('[data-server-host]');
++  if (!tags.length) return;
++
++  // Independent of the actual ping interval (configurable in Settings,
++  // 60s by default) -- this just refreshes what the navbar shows of
++  // already-known state, so polling more often than pings actually
++  // happen is harmless (the endpoint reads cheap in-memory state, no
++  // live ping triggered per request) and keeps a status change visible
++  // sooner than waiting a full ping interval to notice it.
++  const REFRESH_INTERVAL_MS = 20000;
++
++  const BG_CLASSES = ['bg-success-lt', 'bg-warning-lt', 'bg-danger-lt', 'bg-secondary-lt'];
++  const DOT_CLASSES = ['status-success', 'status-warning', 'status-danger', 'status-secondary'];
++
++  function applyStatus(tag, server) {
++    tag.classList.remove(...BG_CLASSES);
++    tag.classList.add(server.bg_class);
++    const dot = tag.querySelector('.status-dot');
++    if (dot) {
++      dot.classList.remove(...DOT_CLASSES);
++      dot.classList.add(server.dot_class);
++    }
++    // Bootstrap's tooltip re-reads this attribute fresh every time it's
++    // shown (see Tooltip._getTitle() in Tabler's bundled Bootstrap
++    // build) rather than caching the title at init time, so updating it
++    // here is enough -- no need to destroy/recreate the Tooltip
++    // instance Tabler's own bundle already created for this element.
++    tag.setAttribute('data-bs-original-title', server.label + ' (' + server.host + ')');
++  }
++
++  function refresh() {
++    fetch('/nav/server-status', { headers: { Accept: 'application/json' } })
++      .then((res) => res.json())
++      .then((data) => {
++        const byHost = {};
++        (data.servers || []).forEach((server) => { byHost[server.host] = server; });
++        tags.forEach((tag) => {
++          const server = byHost[tag.dataset.serverHost];
++          if (server) applyStatus(tag, server);
++        });
++      })
++      .catch(() => {
++        // Leave the last known status showing rather than flashing
++        // anything for what's likely just a transient network hiccup.
++      });
++  }
++
++  setInterval(refresh, REFRESH_INTERVAL_MS);
++})();
++// END NAVBAR CADDY SERVER STATUS
+diff --git a/templates/partials/header_nav_bar.html b/templates/partials/header_nav_bar.html
+index 11d5c35..fa0fabc 100644
+--- a/templates/partials/header_nav_bar.html
++++ b/templates/partials/header_nav_bar.html
+@@ -169,26 +169,29 @@
+         <!-- END MENU LINKS -->
+ 
+         <!-- START NAV SIDE -->
++        {% if nav_caddy_servers %}
+         <div class="navbar-side">
+           <ul class="navbar-nav">
+-            <li class="nav-item me-1">
+-              <span class="tag bg-success-lt">
+-                <span class="status-dot status-success status-dot-animated"></span>
+-                net01
+-              </span>
+-            </li>
+-            <li class="nav-item">
+-              <span class="tag bg-warning-lt">
+-                <span class="status-dot status-warning status-dot-animated"></span>
+-                net02
++            {% for server in nav_caddy_servers %}
++            <li class="nav-item{{ '' if loop.last else ' me-1' }}">
++              <span class="tag {{ server.bg_class }}" data-bs-toggle="tooltip" data-bs-placement="bottom"
++                    data-bs-original-title="{{ server.label }} ({{ server.host }})" data-server-host="{{ server.host }}">
++                <span class="status-dot {{ server.dot_class }} status-dot-animated"></span>
++                {{ server.display_name }}
+               </span>
+             </li>
++            {% endfor %}
+           </ul>
+         </div>
++        {% endif %}
+         <!-- END NAV SIDE -->
+ 
+       </div>
+     </div>
+   </div>
+ </header>
+-<!-- END NAVBAR MENU -->
+\ No newline at end of file
++<!-- END NAVBAR MENU -->
++
++<!-- BEGIN NAVBAR CADDY SERVER STATUS SCRIPT -->
++<script src="{{ url_for('static', filename='js/nav-status.js') }}"></script>
++<!-- END NAVBAR CADDY SERVER STATUS SCRIPT -->
+\ No newline at end of file
+diff --git a/templates/settings.html b/templates/settings.html
+index f4e7ffa..8678cfb 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -40,7 +40,7 @@
+           <div>
+             <a href="#global" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'global' %} active{% endif %}" data-bs-toggle="tab">Global Configuration</a>
+             <a href="#api" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab">Caddy API</a>
+-            <a href="#servers" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'api' %} active{% endif %}" data-bs-toggle="tab">Caddy Servers</a>
++            <a href="#servers" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'servers' %} active{% endif %}" data-bs-toggle="tab">Caddy Servers</a>
+             <a href="#logs" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'logs' %} active{% endif %}" data-bs-toggle="tab">Logging</a>
+           </div>
+         </div>
+@@ -452,8 +452,66 @@
+             <h2 class="mb-4">Caddy Servers</h2>
+             <h3 class="card-title">Connect Servers</h3>
+             <p class="text-secondary">
+-              Lets Caddy Manager show a live ping status for your Caddy server. Enter the IP address or hostname of the Caddy server. Leave blank to leave that widget unavailable.
++              Lets Caddy Manager show a live ping status tag for up to two Caddy servers in the navbar. Give each one a display name and its IP address or hostname; leave both fields blank to leave a slot unused.
+             </p>
++            <form method="post" id="caddy-servers-form">
++              <input type="hidden" name="action" value="update_caddy_servers">
++
++              <div class="row">
++                <div class="col-md-6 mb-3">
++                  <label class="form-label">Server 1 display name</label>
++                  <input type="text" name="server1_display_name" class="form-control" placeholder="net01"
++                         value="{{ caddy_servers_padded[0].display_name }}">
++                </div>
++                <div class="col-md-6 mb-3">
++                  <label class="form-label">Server 1 IP or hostname</label>
++                  <input type="text" name="server1_host" class="form-control" placeholder="10.0.0.10"
++                         value="{{ caddy_servers_padded[0].host }}">
++                </div>
++              </div>
++              <div class="row">
++                <div class="col-md-6 mb-3">
++                  <label class="form-label">Server 2 display name</label>
++                  <input type="text" name="server2_display_name" class="form-control" placeholder="net02"
++                         value="{{ caddy_servers_padded[1].display_name }}">
++                </div>
++                <div class="col-md-6 mb-3">
++                  <label class="form-label">Server 2 IP or hostname</label>
++                  <input type="text" name="server2_host" class="form-control" placeholder="192.168.0.10"
++                         value="{{ caddy_servers_padded[1].host }}">
++                </div>
++              </div>
++
++              <hr class="my-3">
++
++              <div class="subheader mb-3">Ping Monitor</div>
++              <div class="row">
++                <div class="col-md-4 mb-3">
++                  <label class="form-label">Ping interval <span class="form-hint d-inline">(seconds)</span></label>
++                  <input type="number" min="10" step="1" name="ping_interval_seconds" class="form-control"
++                         value="{{ caddy_server_form.ping_interval }}">
++                </div>
++                <div class="col-md-4 mb-3">
++                  <label class="form-label">Warning after <span class="form-hint d-inline">(missed pings)</span></label>
++                  <input type="number" min="1" step="1" name="warning_after_misses" class="form-control"
++                         value="{{ caddy_server_form.warning_after }}">
++                  <small class="form-hint">Status tag turns yellow once this many pings in a row go unanswered.</small>
++                </div>
++                <div class="col-md-4 mb-3">
++                  <label class="form-label">Offline after <span class="form-hint d-inline">(missed pings)</span></label>
++                  <input type="number" min="1" step="1" name="danger_after_misses" class="form-control"
++                         value="{{ caddy_server_form.danger_after }}">
++                  <small class="form-hint">Status tag turns red once this many pings in a row go unanswered.</small>
++                </div>
++              </div>
++
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++            <script>
++              initFormValidation(document.getElementById('caddy-servers-form'));
++            </script>
+           </div>
+         </div>
+ 

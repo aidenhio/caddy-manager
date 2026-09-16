@@ -169,22 +169,21 @@
         <!-- END MENU LINKS -->
 
         <!-- START NAV SIDE -->
+        {% if nav_caddy_servers %}
         <div class="navbar-side">
           <ul class="navbar-nav">
-            <li class="nav-item me-1">
-              <span class="tag bg-success-lt">
-                <span class="status-dot status-success status-dot-animated"></span>
-                net01
+            {% for server in nav_caddy_servers %}
+            <li class="nav-item{{ '' if loop.last else ' me-1' }}">
+              <span class="tag {{ server.bg_class }}" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    data-bs-original-title="{{ server.label }} ({{ server.host }})" data-server-host="{{ server.host }}">
+                <span class="status-dot {{ server.dot_class }} status-dot-animated"></span>
+                {{ server.display_name }}
               </span>
             </li>
-            <li class="nav-item">
-              <span class="tag bg-warning-lt">
-                <span class="status-dot status-warning status-dot-animated"></span>
-                net02
-              </span>
-            </li>
+            {% endfor %}
           </ul>
         </div>
+        {% endif %}
         <!-- END NAV SIDE -->
 
       </div>
@@ -192,3 +191,7 @@
   </div>
 </header>
 <!-- END NAVBAR MENU -->
+
+<!-- BEGIN NAVBAR CADDY SERVER STATUS SCRIPT -->
+<script src="{{ url_for('static', filename='js/nav-status.js') }}"></script>
+<!-- END NAVBAR CADDY SERVER STATUS SCRIPT -->

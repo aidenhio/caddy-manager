@@ -11,8 +11,12 @@ from .configstore import (
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
     get_show_metadata_card, get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
     DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
+    MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS,
+    get_caddy_server_ping_interval_seconds, get_caddy_server_warning_after_misses,
+    get_caddy_server_danger_after_misses,
 )
 from .caddy_api import upstream_stats
+from .server_monitor import get_server_statuses, notify_config_changed
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
 from .blocks import (
     safe_path, meta_path_for, read_metadata, write_metadata, delete_metadata, list_blocks,
@@ -72,6 +76,17 @@ def dashboard_caddy_stats():
         failed_requests=caddy_stats["failed_requests"] if caddy_stats else None,
         unique_requested_sites=caddy_stats["unique_requested_sites"] if caddy_stats else None,
     )
+
+
+@bp.route("/nav/server-status")
+@login_required
+def nav_server_status():
+    """JSON refresh endpoint for the navbar's Caddy Server status tags --
+    see static/js/nav-status.js. Reads the background ping monitor's
+    in-memory state (server_monitor.py) rather than pinging live per
+    request, since a real ping round-trip is far too slow for an
+    endpoint every open page polls on a timer."""
+    return jsonify(servers=get_server_statuses())
 
 
 @bp.route("/site-blocks")
@@ -325,7 +340,7 @@ def delete_block(filename):
 # after any save. A GET's ?tab= query param is checked against TAB_IDS
 # before being trusted, so an unrecognized/missing value just falls back to
 # the default tab rather than rendering a Jinja block that doesn't exist.
-TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "api", "logs")
+TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "api", "servers", "logs")
 DEFAULT_TAB = "user"
 ACTION_TAB = {
     "update_user": "user",
@@ -339,6 +354,7 @@ ACTION_TAB = {
     "update_global_config": "global",
     "rollback_global_config": "global",
     "update_caddy_api": "api",
+    "update_caddy_servers": "servers",
     "update_caddy_logging": "logs",
 }
 
@@ -469,6 +485,55 @@ def settings():
             flash("Caddy API settings updated.", "success")
             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
+        elif action == "update_caddy_servers":
+            # Two fixed named slots rather than a dynamic add/remove list --
+            # MAX_CADDY_SERVERS is 2, matching the navbar layout this was
+            # designed against, so there's no real list to manage. A slot
+            # is either fully filled in or left fully blank; one field
+            # filled and the other blank is rejected rather than silently
+            # dropped or defaulted, since either guess (drop the slot,
+            # invent a name) could surprise the person configuring it.
+            servers = []
+            for i in range(1, MAX_CADDY_SERVERS + 1):
+                display_name = request.form.get(f"server{i}_display_name", "").strip()
+                host = request.form.get(f"server{i}_host", "").strip()
+                if display_name and host:
+                    servers.append({"display_name": display_name, "host": host})
+                elif display_name or host:
+                    error = f"Server {i} needs both a display name and a host, or leave both blank."
+                    break
+
+            if not error and len(servers) == MAX_CADDY_SERVERS and servers[0]["host"] == servers[1]["host"]:
+                error = "Server 1 and Server 2 must have different hosts."
+
+            ping_interval_raw = request.form.get("ping_interval_seconds", "").strip()
+            warning_raw = request.form.get("warning_after_misses", "").strip()
+            danger_raw = request.form.get("danger_after_misses", "").strip()
+
+            if not error:
+                if not (ping_interval_raw.isdigit() and int(ping_interval_raw) >= MIN_CADDY_SERVER_PING_INTERVAL_SECONDS):
+                    error = f"Ping interval must be a whole number of seconds, at least {MIN_CADDY_SERVER_PING_INTERVAL_SECONDS}."
+                elif not (warning_raw.isdigit() and int(warning_raw) > 0):
+                    error = "Warning threshold must be a positive whole number of missed pings."
+                elif not (danger_raw.isdigit() and int(danger_raw) > 0):
+                    error = "Offline threshold must be a positive whole number of missed pings."
+                elif int(danger_raw) <= int(warning_raw):
+                    error = "Offline threshold must be greater than the warning threshold."
+
+            if not error:
+                cfg["caddy_servers"] = servers
+                cfg["caddy_server_ping_interval_seconds"] = int(ping_interval_raw)
+                cfg["caddy_server_warning_after_misses"] = int(warning_raw)
+                cfg["caddy_server_danger_after_misses"] = int(danger_raw)
+                save_config(cfg)
+                # Wakes the ping monitor thread for an immediate check
+                # rather than leaving a newly added/edited server showing
+                # "Checking" (or a stale previous host's status) for up to
+                # a full ping interval.
+                notify_config_changed()
+                flash("Caddy Servers settings updated.", "success")
+                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
+
         elif action == "update_certificates":
             cert_expiring_soon_days = request.form.get("cert_expiring_soon_days", "").strip()
             if not (cert_expiring_soon_days.isdigit() and int(cert_expiring_soon_days) > 0):
@@ -559,6 +624,41 @@ def settings():
             os.path.getmtime(caddyfile_backup_path)
         ).strftime("%d/%m/%Y %I:%M%p")
 
+    # The Caddy Servers tab always shows either what's currently saved, or
+    # -- if the save attempt above just failed validation -- what was
+    # submitted, the same "don't wipe out a rejected edit" treatment the
+    # Global Configuration tab gets above. caddy_servers_padded always has
+    # exactly MAX_CADDY_SERVERS entries (blank ones for an unconfigured
+    # slot) so the template can index straight into it without checking
+    # length itself.
+    if request.method == "POST" and request.form.get("action") == "update_caddy_servers":
+        caddy_servers_padded = [
+            {
+                "display_name": request.form.get(f"server{i}_display_name", "").strip(),
+                "host": request.form.get(f"server{i}_host", "").strip(),
+            }
+            for i in range(1, MAX_CADDY_SERVERS + 1)
+        ]
+        caddy_server_form = {
+            "ping_interval": request.form.get("ping_interval_seconds", "").strip(),
+            "warning_after": request.form.get("warning_after_misses", "").strip(),
+            "danger_after": request.form.get("danger_after_misses", "").strip(),
+        }
+    else:
+        raw_servers = (cfg.get("caddy_servers") or [])[:MAX_CADDY_SERVERS]
+        caddy_servers_padded = [
+            {
+                "display_name": raw_servers[i].get("display_name", "") if i < len(raw_servers) and isinstance(raw_servers[i], dict) else "",
+                "host": raw_servers[i].get("host", "") if i < len(raw_servers) and isinstance(raw_servers[i], dict) else "",
+            }
+            for i in range(MAX_CADDY_SERVERS)
+        ]
+        caddy_server_form = {
+            "ping_interval": get_caddy_server_ping_interval_seconds(),
+            "warning_after": get_caddy_server_warning_after_misses(),
+            "danger_after": get_caddy_server_danger_after_misses(),
+        }
+
     # Which tab-pane to render as active. A POST that fell through to here
     # (i.e. failed validation, so none of the branches above returned)
     # re-shows the tab the failed form lives on, from its action. A GET is
@@ -578,5 +678,6 @@ def settings():
         conf_dir=get_conf_dir(),
         caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
         caddyfile_backup_updated=caddyfile_backup_updated,
+        caddy_servers_padded=caddy_servers_padded, caddy_server_form=caddy_server_form,
         active_tab=active_tab,
     )
