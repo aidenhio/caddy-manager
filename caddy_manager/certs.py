@@ -1,26 +1,5 @@
-"""Certificates page: recursively scanning certificate_dir/certificates
-for the leaf certificate Caddy (via its certmagic storage layer) keeps
-per site, and parsing each one (with the `cryptography` library) to
-surface its common name, issuing provider, expiry, and (for the detail
-modal) its full subject/issuer, SANs, serial number, fingerprint, and
-key info. Read-only -- nothing in this module writes to that directory.
-
-Caddy's on-disk layout there is:
-
-    <certificate_dir>/certificates/
-    |- local/                                        -- Caddy's own internal CA
-    |  |- app.example.com/
-    |     |- app.example.com.crt
-    |     |- app.example.com.key
-    |- acme-v02.api.letsencrypt.org-directory/        -- Let's Encrypt (production)
-       |- app2.example.com/
-          |- app2.example.com.crt
-          |- app2.example.com.key
-
-The top-level folder under certificates/ is keyed by issuer (Caddy's
-"local" internal CA, or an ACME CA's directory URL) -- that's what
-determines the Provider column below.
-"""
+"""Certificates page: recursively scans certificate_dir/certificates (Caddy's
+own storage, keyed by issuer folder) and parses each cert. Read-only."""
 import os
 from datetime import datetime, timezone
 
@@ -40,10 +19,8 @@ def certificates_root():
 
 
 def provider_for_issuer_dir(issuer_dir_name):
-    """Human-readable provider name for an issuer folder name, per the
-    layout above. Falls back to showing the raw folder name for an ACME
-    CA this app doesn't specifically recognize, rather than hiding it
-    behind a generic label."""
+    """Human-readable provider name for an issuer folder name. Falls back
+    to the raw folder name for an unrecognized ACME CA."""
     name = (issuer_dir_name or "").lower()
     if name == "local":
         return "Local"
@@ -57,11 +34,8 @@ def provider_for_issuer_dir(issuer_dir_name):
 
 
 def provider_key_for_issuer_dir(issuer_dir_name):
-    """Stable, filterable key for an issuer folder name -- the Provider
-    filter checkboxes' values, so filtering doesn't depend on matching
-    display text (which varies, e.g. "Let's Encrypt (staging)"). An ACME
-    CA this app doesn't specifically recognize still needs to land
-    somewhere in the filter, hence "other" rather than the raw name."""
+    """Stable key for the Provider filter checkboxes, independent of the
+    varying display text. Unrecognized ACME CAs land in "other"."""
     name = (issuer_dir_name or "").lower()
     if name == "local":
         return "local"
@@ -75,10 +49,8 @@ def provider_key_for_issuer_dir(issuer_dir_name):
 
 
 def _leaf_pem_block(content):
-    """The first PEM certificate block in `content` -- a Caddy-written
-    .crt file bundles the leaf certificate together with any
-    intermediates, and only the first (the site's own certificate, i.e.
-    the leaf) is what this module should read from."""
+    """The first PEM block in `content` -- Caddy bundles the leaf cert with
+    any intermediates, and only the leaf (first) is what we want."""
     marker = "-----END CERTIFICATE-----"
     end = content.find(marker)
     if end == -1:
@@ -96,8 +68,7 @@ def _all_dns_names(cert):
 
 def _common_name(cert, dns_names):
     """The certificate's CN, falling back to its first SAN DNS name for
-    a certificate issued without one (increasingly common practice for
-    publicly-trusted certs, which Let's Encrypt/ZeroSSL both do)."""
+    certs issued without one (common for Let's Encrypt/ZeroSSL)."""
     attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     if attrs:
         return attrs[0].value
@@ -105,10 +76,7 @@ def _common_name(cert, dns_names):
 
 
 def _not_valid_after(cert):
-    # not_valid_after_utc/not_valid_before_utc (timezone-aware) are the
-    # non-deprecated accessors on newer `cryptography` releases; fall back
-    # to the naive ones (always UTC per the X.509 spec) for older versions
-    # that don't have them.
+    # Prefer the tz-aware accessor (newer cryptography); fall back to the naive one (always UTC).
     not_after = getattr(cert, "not_valid_after_utc", None)
     return not_after if not_after is not None else cert.not_valid_after.replace(tzinfo=timezone.utc)
 
@@ -138,14 +106,8 @@ def _fingerprint_sha256(cert):
 
 
 def list_certificates():
-    """Every certificate found under certificate_dir/certificates,
-    recursively -- one row per .crt/.pem file that parses successfully.
-    A file that fails to parse (not a certificate, corrupt, mid-write)
-    is silently skipped rather than surfaced as an error, since this is
-    Caddy's own directory and may hold other bookkeeping this app has no
-    business about (*.json metadata, lock files). Returns [] if no
-    certificate directory is configured or certificates/ doesn't exist
-    yet under it."""
+    """Every certificate under certificate_dir/certificates, recursively.
+    A file that fails to parse is silently skipped, not surfaced as an error."""
     certs_root = certificates_root()
     if not certs_root or not os.path.isdir(certs_root):
         return []
@@ -176,8 +138,7 @@ def list_certificates():
             dns_names = _all_dns_names(cert)
             cn = _common_name(cert, dns_names) or fname
 
-            # "Additional names" for the +N SAN badge: every SAN entry other
-            # than the one already shown as the CN, de-duplicated in order.
+            # SAN entries other than the CN, for the +N badge, de-duplicated in order.
             extra_names = []
             for name in dns_names:
                 if name != cn and name not in extra_names:
@@ -216,11 +177,8 @@ def list_certificates():
 
 
 def certificate_stats(certs):
-    """Summary counts for a list of certificates as returned by
-    list_certificates() -- total plus a breakdown by status. Used by the
-    dashboard's SSL Certificates widget; the per-status counts aren't all
-    surfaced there yet but are ready for the dashboard's other planned
-    certificate widgets."""
+    """Total plus a per-status breakdown, for the dashboard's SSL
+    Certificates widget and future certificate widgets."""
     return {
         "cert_total": len(certs),
         "cert_valid": sum(1 for c in certs if c["status"] == "valid"),

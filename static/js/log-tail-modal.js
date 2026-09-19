@@ -1,18 +1,6 @@
 // BEGIN LOG TAIL MODAL
-// Fills the shared #log-tail-modal from whichever row's "More" button
-// triggered it (same one-modal-many-triggers pattern as
-// certificate-detail-modal.js), fetching the tail fresh from the server
-// on every open rather than baking log content into the page up front --
-// log files can be large and change constantly, so a snapshot taken at
-// page load would already be stale by the time someone clicks "More".
-//
-// When every returned line parses as a JSON object -- i.e. the block is
-// using Caddy's `format json` log directive, one JSON object per line --
-// the tail is also rendered as a readable list (time, level, request/msg
-// summary, status, duration), each entry expandable to its raw JSON,
-// with a Formatted/Raw toggle to fall back to the plain-text view. When
-// the lines aren't uniformly JSON (console format, or anything else),
-// only the plain-text view is offered, same as before.
+// Fills the shared modal on open, fetching the tail fresh each time. JSON logs
+// also get a readable, expandable list view with a Formatted/Raw toggle.
 (function () {
   const modal = document.getElementById('log-tail-modal');
   if (!modal) return;
@@ -22,11 +10,8 @@
     fieldEls[el.dataset.field] = el;
   });
 
-  // Single source of truth for "which Tabler color represents this log
-  // level" -- both the level badge (bg-<color>-lt) and the raw-JSON code
-  // block's background (code-<color>-lt, the same convention preview.html
-  // uses for its Caddyfile/metadata <pre> blocks) are derived from this,
-  // so they can never drift apart.
+  // Single source of truth for level -> Tabler color; the badge and raw-JSON
+  // code block background classes both derive from this.
   const LEVEL_COLORS = {
     debug: 'blue',
     info: 'green',
@@ -83,10 +68,7 @@
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
 
-  // Every non-blank line must parse as a JSON object (not an array or
-  // scalar) for the tail to be treated as JSON-formatted -- Caddy's log
-  // format is uniform for a given file, so a single non-JSON line means
-  // this isn't NDJSON and the whole tail falls back to plain text.
+  // Every non-blank line must parse as a JSON object; one non-JSON line falls back to plain text.
   function parseJsonEntries(lines) {
     const entries = [];
     for (const line of lines) {
@@ -126,34 +108,18 @@
 
   const ACCORDION_ID = 'log-json-accordion';
 
-  // Matches the app's own accordion convention (see the "Advanced
-  // options" / "Logging" accordions in setup.html and block_form.html):
-  // Tabler expects an explicit chevron icon carrying the
-  // accordion-button-toggle class inside .accordion-button -- its CSS
-  // rotates that icon on expand -- rather than relying on Bootstrap's
-  // bare ::after chevron.
-  // flex-shrink-0 keeps the chevron at its natural size -- without it,
-  // it's just another flex item competing for space the same as the
-  // (much less important) summary text, and shrinks/squishes right
-  // along with it once the row runs out of room.
+  // Matches the app's accordion convention: Tabler needs an explicit chevron icon
+  // carrying accordion-button-toggle; flex-shrink-0 keeps it from squishing with the row.
   const ACCORDION_TOGGLE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" class="icon accordion-button-toggle flex-shrink-0" ' +
     'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
     '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M6 9l6 6l6 -6" /></svg>';
 
-  // A real Tabler/Bootstrap accordion (accordion-flush, so items sit
-  // edge-to-edge in the modal like a list rather than as boxed cards) --
-  // each entry's header doubles as the accordion-button, so opening one
-  // entry's raw JSON auto-closes whichever other entry was open
-  // (data-bs-parent).
+  // accordion-flush, edge-to-edge; each header doubles as the toggle so opening one entry
+  // (data-bs-parent) auto-closes whichever other was open.
   function buildEntryItem(obj, idx) {
     const headingId = `log-json-heading-${idx}`;
     const collapseId = `log-json-collapse-${idx}`;
-    // Every one of these is fixed-content -- flex-shrink-0 pins them at
-    // their natural size, so the summary span (the only item without it)
-    // is the sole thing that gives up width when a row is too long,
-    // rather than the browser's default flex-shrink:1 spreading the
-    // squeeze evenly across the badges, time, status, duration, size and
-    // chevron too.
+    // flex-shrink-0 on every fixed-content badge so only the summary span gives up width.
     const badges = [];
     if (obj.level !== undefined) {
       badges.push(`<span class="badge ${levelBadgeClass(obj.level)} text-uppercase flex-shrink-0" style="min-width: 3.75rem;">${escapeHtml(obj.level)}</span>`);
@@ -243,9 +209,7 @@
           return;
         }
         if (fieldEls.lines) {
-          // A blank line between each entry makes a dense log tail much
-          // easier to scan, since multi-line entries (stack traces,
-          // wrapped console output) no longer run into the next line.
+          // Blank line between entries so multi-line entries (stack traces) don't run together.
           fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n\n') : '(empty file)';
         }
         if (fieldEls.summary) {

@@ -1,25 +1,5 @@
-"""Background ping monitor for the "Caddy Servers" configured in Settings
--> Caddy Servers -- shows a live status tag for each one in the navbar
-(see templates/partials/header_nav_bar.html and static/js/nav-status.js),
-independent of whichever page happens to be open.
-
-A single background thread (started once from app.py, not from
-create_app() itself -- see the comment there for why) pings every
-configured server on a loop, tracking a simple consecutive-misses count
-per host in memory. Request handlers only ever read that in-memory
-state -- nothing in a request ever blocks on a live ping, since a real
-ICMP round-trip (or an unreachable host timing out) can take seconds,
-far too slow for a page render or a frequent navbar-refresh poll.
-
-State deliberately lives in a plain module-level dict guarded by a lock
-rather than anywhere in configstore's config.json: ping results are
-transient/observational, not configuration, and persisting them would
-mean stale data survives an app restart (a server that was Offline when
-the app stopped would still show Offline for up to a full ping interval
-after it restarts, before the first fresh check completes) -- a
-"Checking" state that resolves within moments of startup is the more
-honest UI for status that's inherently only as fresh as the last check.
-"""
+"""Background ping monitor driving the navbar's live status tags. One thread
+loops into an in-memory dict (not config.json); requests only ever read it."""
 import subprocess
 import threading
 
@@ -28,29 +8,17 @@ from .configstore import (
     get_caddy_server_warning_after_misses, get_caddy_server_danger_after_misses,
 )
 
-# How long a single ping is allowed to take before it's counted as a miss.
-# Comfortably under configstore.MIN_CADDY_SERVER_PING_INTERVAL_SECONDS so
-# pinging every configured server (there are at most two) never runs long
-# enough to meaningfully delay the next scheduled check.
+# Comfortably under MIN_CADDY_SERVER_PING_INTERVAL_SECONDS so pinging both
+# servers never runs long enough to delay the next scheduled check.
 PING_TIMEOUT_SECONDS = 3
 
-# status -> the Tabler tag background class, the status-dot modifier
-# class, and the one-word label the tooltip uses (e.g. "Online
-# (10.0.0.10)"). Shared by the navbar's initial server-rendered tags
-# (via get_server_statuses(), read through the nav_caddy_servers context
-# processor in __init__.py) and the live JSON refresh endpoint
-# (nav_server_status() in views.py) so the two can never drift out of
-# sync with each other or with static/js/nav-status.js.
+# status -> tag background class, status-dot class, one-word tooltip label.
+# Shared by the navbar's server-rendered tags and the JSON refresh endpoint.
 STATUS_DISPLAY = {
     "online": {"bg_class": "bg-success-lt", "dot_class": "status-success", "label": "Online"},
     "warning": {"bg_class": "bg-warning-lt", "dot_class": "status-warning", "label": "Unavailable"},
     "danger": {"bg_class": "bg-danger-lt", "dot_class": "status-danger", "label": "Offline"},
-    # Shown only in the brief window before a server's very first ping
-    # completes -- right after it's newly configured, or right after the
-    # app starts. The monitor thread checks every configured server
-    # immediately on startup and again immediately whenever the Caddy
-    # Servers settings are saved (see notify_config_changed()), so this
-    # normally clears within a second or two, not a full ping interval.
+    # Brief window before a server's first ping completes -- clears within moments, not a full interval.
     "pending": {"bg_class": "bg-secondary-lt", "dot_class": "status-secondary", "label": "Checking"},
 }
 
@@ -61,21 +29,8 @@ _started = False
 
 
 def _ping_once(host):
-    """True if `host` replied to a single ICMP echo request within
-    PING_TIMEOUT_SECONDS, False otherwise -- no reply, an unresolvable
-    hostname, the `ping` binary itself missing, or anything else going
-    wrong all collapse to the same "treat it as a miss" outcome, rather
-    than raising and taking the monitor thread down.
-
-    Shells out to the system `ping` command (`-c 1` = a single echo
-    request) instead of a raw ICMP socket, since sending/receiving raw
-    ICMP packets from Python normally needs root or CAP_NET_RAW -- not
-    something this app should require just to show a status tag. The
-    timeout is enforced by subprocess itself (`timeout=`) rather than
-    ping's own per-platform timeout flag (`-W` means seconds on Linux,
-    milliseconds on macOS/BSD), so behavior doesn't depend on which
-    platform this happens to run on.
-    """
+    """True if `host` replies within PING_TIMEOUT_SECONDS; any failure collapses
+    to False. Shells out to system `ping` rather than a raw socket, to avoid needing root."""
     if not host:
         return False
     try:
@@ -103,32 +58,20 @@ def _monitor_loop():
     while True:
         _check_all(get_caddy_servers())
         interval = get_caddy_server_ping_interval_seconds()
-        # wait() returns early (and the flag is cleared right after) if
-        # notify_config_changed() fires in the meantime, so a server just
-        # added or edited in Settings resolves within moments instead of
-        # waiting out whatever's left of the previous interval.
+        # notify_config_changed() wakes this early so a settings save resolves within moments.
         _wake_event.wait(timeout=interval)
         _wake_event.clear()
 
 
 def notify_config_changed():
-    """Called after a successful Caddy Servers settings save so a newly
-    added or edited server's status resolves quickly instead of sitting
-    at "Checking" (or showing a stale previous host's status) for up to a
-    full ping interval."""
+    """Called after a Caddy Servers settings save so status resolves
+    quickly instead of sitting stale for up to a full ping interval."""
     _wake_event.set()
 
 
 def start_server_monitor():
-    """Starts the background ping thread, if it isn't already running.
-    Safe to call more than once -- only the first call actually starts
-    anything.
-
-    Deliberately not called from create_app() itself: every test in this
-    project's suite calls create_app() directly against its own
-    throwaway config, and starting a real background ping thread per
-    test would leak threads across the whole suite for no benefit. See
-    app.py for where this is actually invoked, and why."""
+    """Starts the background ping thread; safe to call more than once, only
+    the first call does anything. Not called from create_app() -- see app.py -- to avoid leaking threads in tests."""
     global _started
     with _lock:
         if _started:
@@ -138,14 +81,8 @@ def start_server_monitor():
 
 
 def get_server_statuses():
-    """The current status of every configured Caddy server, ready for
-    both the navbar's server-rendered tags (via the nav_caddy_servers
-    context processor in __init__.py) and the JSON refresh endpoint
-    (nav_server_status() in views.py) -- each entry: display_name, host,
-    status ("online", "warning", "danger", or "pending" -- see
-    STATUS_DISPLAY), and that status's display metadata (bg_class,
-    dot_class, label) so neither the template nor the JS poller needs
-    its own copy of the thresholds-to-status mapping."""
+    """Current status of every configured server, for the navbar tags and the
+    JSON refresh endpoint. Each entry includes its STATUS_DISPLAY metadata."""
     servers = get_caddy_servers()
     warning_after = get_caddy_server_warning_after_misses()
     danger_after = get_caddy_server_danger_after_misses()

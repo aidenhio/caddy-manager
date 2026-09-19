@@ -52,8 +52,7 @@ def dashboard():
         "failed_requests": caddy_stats["failed_requests"] if caddy_stats else None,
         "unique_requested_sites": caddy_stats["unique_requested_sites"] if caddy_stats else None,
     }
-    # Most recently created blocks first -- created_ts (not updated_ts) so
-    # an unrelated edit doesn't bump an old block back to the top.
+    # created_ts, not updated_ts, so an unrelated edit doesn't bump a block back to the top.
     recent_blocks = sorted(blocks, key=lambda b: b["created_ts"], reverse=True)[:5]
     return render_template(
         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
@@ -65,10 +64,8 @@ def dashboard():
 @bp.route("/dashboard/caddy-stats")
 @login_required
 def dashboard_caddy_stats():
-    """JSON refresh endpoint for the Dashboard's Current Requests and
-    Upstream Health cards -- both are sourced live from Caddy's own admin
-    API rather than this app's own files, so they're the ones that go
-    stale if the page is left open (see static/js/dashboard-stats.js)."""
+    """JSON refresh for the Dashboard's Current Requests/Upstream Health
+    cards, sourced live from Caddy's admin API (see dashboard-stats.js)."""
     caddy_stats = upstream_stats()
     return jsonify(
         current_requests=caddy_stats["current_requests"] if caddy_stats else None,
@@ -81,11 +78,8 @@ def dashboard_caddy_stats():
 @bp.route("/nav/server-status")
 @login_required
 def nav_server_status():
-    """JSON refresh endpoint for the navbar's Caddy Server status tags --
-    see static/js/nav-status.js. Reads the background ping monitor's
-    in-memory state (server_monitor.py) rather than pinging live per
-    request, since a real ping round-trip is far too slow for an
-    endpoint every open page polls on a timer."""
+    """JSON refresh for the navbar's status tags (see nav-status.js). Reads
+    the ping monitor's in-memory state rather than pinging live per request."""
     return jsonify(servers=get_server_statuses())
 
 
@@ -141,13 +135,8 @@ def new_block(block_type):
     meta = {}
 
     if request.method == "POST":
-        # The eventual filename (and hence the log file's path, embedded in
-        # the rendered content if logging is enabled) isn't known until the
-        # site addresses have been parsed/normalized -- which is exactly
-        # what build_block_from_form does internally. Rather than duplicate
-        # that validation here, redo the same cheap parse just to get a
-        # filename hint to pass in; build_block_from_form will parse the
-        # identical form data the same way, so the two never disagree.
+        # Redo the cheap site-address parse just for a filename hint;
+        # build_block_from_form parses the same data identically, so they can't disagree.
         create_disabled = request.form.get("disabled") == "1"
         site_addresses_hint = site_addresses_from_textarea(request.form.get("site_addresses", ""))
         filename_hint = None
@@ -178,7 +167,8 @@ def new_block(block_type):
     return render_template(
         f"blocks/{block_type}.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
-        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),
+        log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
         disabled_toggle_checked=disabled_toggle_checked,
     )
 
@@ -205,10 +195,7 @@ def edit_block(filename):
     if request.method == "POST":
         original_filename = filename
         disabled_requested = request.form.get("disabled") == "1"
-        # The log block's `output file` path (if enabled) is derived from
-        # the block's current on-disk filename -- if the primary site
-        # address changes below, both the content and the physical log
-        # file are brought in line with the new filename afterwards.
+        # The log path is derived from the current filename; brought in line with a rename below.
         content, meta, error = build_block_from_form(block_type, request.form, log_filename_hint=filename)
         if block_type == "custom":
             raw_body_text = request.form.get("raw_content", "").strip()
@@ -225,17 +212,13 @@ def edit_block(filename):
             if previous_log_enabled and not meta.get("log_enabled"):
                 delete_log_file(original_filename)
 
-            # Rename the .conf/.metadata pair if the primary (first-after-
-            # sorting) site address changed, so the filename keeps tracking it.
+            # Rename to track the primary (first-after-sorting) site address if it changed.
             filename, path = rename_block_if_first_site_address_changed(
                 filename, path, old_site_addresses, meta["site_addresses"]
             )
 
             if filename != original_filename and meta.get("log_enabled"):
-                # The log file (if any) and the log path baked into the
-                # content we just wrote both still reference the old
-                # filename -- move the file and re-render the content
-                # against the new one.
+                # The log file and its path baked into the content both still reference the old name.
                 rename_log_file(original_filename, filename)
                 fixed_content, _fixed_meta, fixed_error = build_block_from_form(
                     block_type, request.form, log_filename_hint=filename
@@ -244,10 +227,7 @@ def edit_block(filename):
                     with open(path, "w") as f:
                         f.write(fixed_content)
 
-            # Apply the form's own disable/enable toggle last -- it doesn't
-            # touch the log file (whose name never includes the .disabled
-            # suffix) or the rendered content, just the .conf/.metadata
-            # filenames, so it's independent of everything above.
+            # Applied last -- only renames .conf/.metadata, independent of everything above.
             filename, path = set_block_disabled(filename, path, disabled_requested)
 
             flash(f"Saved {filename}" + (" (disabled)" if disabled_requested else ""), "success")
@@ -263,7 +243,8 @@ def edit_block(filename):
         f"blocks/{block_type}.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
-        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(), log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),
+        log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
         disabled_toggle_checked=disabled_toggle_checked,
     )
 
@@ -275,9 +256,7 @@ def preview_block(filename):
     if not os.path.isfile(path):
         abort(404)
 
-    # read_metadata may self-heal (rewrite) a stale/missing sidecar, so call
-    # it before reading the raw metadata file below -- the preview should
-    # always show the same sidecar content the rest of the app is using.
+    # Call before reading the raw sidecar below, so it self-heals first and preview stays in sync.
     meta = read_metadata(filename, path)
     block_type = meta.get("type", "custom")
 
@@ -334,12 +313,8 @@ def delete_block(filename):
     return redirect(url_for("main.site_blocks"))
 
 
-# Which Settings tab-pane each form's "action" belongs to, and the full set
-# of valid tab ids -- both drive keeping the page on the tab a form was
-# submitted from, instead of always bouncing back to the first tab (User)
-# after any save. A GET's ?tab= query param is checked against TAB_IDS
-# before being trusted, so an unrecognized/missing value just falls back to
-# the default tab rather than rendering a Jinja block that doesn't exist.
+# Which tab-pane each form action belongs to, and the valid tab ids -- keeps a save on its own
+# tab instead of bouncing to User; an unrecognized ?tab= falls back to DEFAULT_TAB.
 TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "api", "servers", "logs")
 DEFAULT_TAB = "user"
 ACTION_TAB = {
@@ -369,14 +344,8 @@ def settings():
         action = request.form.get("action")
 
         if action == "update_dir":
-            # Directories are either fully derived from the Caddy root
-            # directory, or fully custom -- never a mix of the two. In the
-            # custom case root_dir is cleared to None so the UI (and this
-            # branch, next time) can tell the two modes apart without a
-            # separate flag. The four path fields themselves are only
-            # trusted from the submitted form in custom mode; in root mode
-            # they're recomputed here regardless of what the (disabled,
-            # JS-derived) fields happened to submit.
+            # Fully root-derived or fully custom, never a mix; root_dir stays None in custom
+            # mode. Root mode always recomputes the four paths, ignoring the disabled fields.
             custom_dirs = request.form.get("custom_dirs") == "1"
             root_dir = conf_dir = certificate_dir = log_dir = caddyfile_path = None
 
@@ -428,17 +397,12 @@ def settings():
                 error = "No Caddyfile path is configured. Set one in Directories first."
             else:
                 content = request.form.get("caddyfile_content", "")
-                # Editors conventionally leave the file ending in exactly one
-                # newline -- match that instead of writing back whatever
-                # trailing whitespace the textarea happened to submit.
+                # Normalize to exactly one trailing newline, like a normal editor would.
                 if content and not content.endswith("\n"):
                     content += "\n"
                 try:
                     os.makedirs(os.path.dirname(caddyfile_path), exist_ok=True)
-                    # Snapshot whatever's on disk right now before it's
-                    # overwritten, so a bad edit can be rolled back. Only one
-                    # backup is ever kept -- each save replaces it with the
-                    # version it's about to overwrite, not a history.
+                    # One backup slot, not a history -- each save replaces it with the prior version.
                     if os.path.isfile(caddyfile_path):
                         shutil.copyfile(caddyfile_path, get_caddyfile_backup_path())
                     with open(caddyfile_path, "w") as f:
@@ -459,13 +423,7 @@ def settings():
             else:
                 try:
                     shutil.copyfile(backup_path, caddyfile_path)
-                    # The backup's only purpose was undoing the save it was
-                    # taken before -- once that's done, remove it rather
-                    # than leaving it around to be rolled back to again
-                    # (which would silently re-apply an even older version
-                    # than the person likely intends), and so the button
-                    # itself disappears until the next save creates a fresh
-                    # one.
+                    # Consumed by the rollback it undoes, so a second rollback can't reapply a stale version.
                     os.remove(backup_path)
                 except OSError as e:
                     error = f"Could not roll back the Caddyfile: {e}"
@@ -486,13 +444,8 @@ def settings():
             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_caddy_servers":
-            # Two fixed named slots rather than a dynamic add/remove list --
-            # MAX_CADDY_SERVERS is 2, matching the navbar layout this was
-            # designed against, so there's no real list to manage. A slot
-            # is either fully filled in or left fully blank; one field
-            # filled and the other blank is rejected rather than silently
-            # dropped or defaulted, since either guess (drop the slot,
-            # invent a name) could surprise the person configuring it.
+            # Two fixed named slots, not a dynamic list. A slot is either fully filled
+            # or fully blank; one field set and the other blank is rejected, not guessed at.
             servers = []
             for i in range(1, MAX_CADDY_SERVERS + 1):
                 display_name = request.form.get(f"server{i}_display_name", "").strip()
@@ -526,10 +479,7 @@ def settings():
                 cfg["caddy_server_warning_after_misses"] = int(warning_raw)
                 cfg["caddy_server_danger_after_misses"] = int(danger_raw)
                 save_config(cfg)
-                # Wakes the ping monitor thread for an immediate check
-                # rather than leaving a newly added/edited server showing
-                # "Checking" (or a stale previous host's status) for up to
-                # a full ping interval.
+                # Wakes the monitor for an immediate check, instead of "Checking" for up to a full interval.
                 notify_config_changed()
                 flash("Caddy Servers settings updated.", "success")
                 return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
@@ -600,9 +550,7 @@ def settings():
                 flash("Password updated.", "success")
                 return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
-    # The Global Configuration tab always shows either what's currently on
-    # disk, or -- if the save attempt above just failed validation -- what
-    # was submitted, so a rejected save doesn't wipe out the edit.
+    # Shows what's on disk, or what was just submitted if validation failed, so a rejected save doesn't wipe the edit.
     if request.method == "POST" and request.form.get("action") == "update_global_config":
         caddyfile_content = request.form.get("caddyfile_content", "")
         caddyfile_read_error = None
@@ -624,13 +572,8 @@ def settings():
             os.path.getmtime(caddyfile_backup_path)
         ).strftime("%d/%m/%Y %I:%M%p")
 
-    # The Caddy Servers tab always shows either what's currently saved, or
-    # -- if the save attempt above just failed validation -- what was
-    # submitted, the same "don't wipe out a rejected edit" treatment the
-    # Global Configuration tab gets above. caddy_servers_padded always has
-    # exactly MAX_CADDY_SERVERS entries (blank ones for an unconfigured
-    # slot) so the template can index straight into it without checking
-    # length itself.
+    # Same "don't wipe a rejected edit" treatment as Global Configuration above.
+    # caddy_servers_padded always has exactly MAX_CADDY_SERVERS entries for the template to index into.
     if request.method == "POST" and request.form.get("action") == "update_caddy_servers":
         caddy_servers_padded = [
             {
@@ -659,13 +602,7 @@ def settings():
             "danger_after": get_caddy_server_danger_after_misses(),
         }
 
-    # Which tab-pane to render as active. A POST that fell through to here
-    # (i.e. failed validation, so none of the branches above returned)
-    # re-shows the tab the failed form lives on, from its action. A GET is
-    # the page reload after a successful save's redirect above, which
-    # passes the tab along as a query param -- falling back to the default
-    # tab for a plain, tab-less visit to /settings, or an unrecognized
-    # value.
+    # A POST that failed validation re-shows its own tab; a GET reads ?tab= from the save redirect.
     if request.method == "POST":
         active_tab = ACTION_TAB.get(action, DEFAULT_TAB)
     else:

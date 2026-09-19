@@ -1,9 +1,6 @@
 // BEGIN CERTIFICATE DETAIL MODAL
-// Fills the shared #certificate-detail-modal from the data-cert-* attributes
-// of whichever row's "..." button triggered it -- the standard Bootstrap
-// pattern for one modal reused across many trigger buttons (see
-// event.relatedTarget in Bootstrap's own modal docs), so the table doesn't
-// need to render a separate modal per certificate.
+// Fills the shared modal from the triggering row's data-cert-* attributes
+// (event.relatedTarget), so one modal serves every row instead of one per certificate.
 (function () {
   const modal = document.getElementById('certificate-detail-modal');
   if (!modal) return;

@@ -1,33 +1,16 @@
-"""Config file helpers.
-
-A JSON file stands in for a database -- there's very little to store: the
-admin credentials, the Caddy root directory and the paths derived from
-it, and a session secret key.
-"""
+"""Config file helpers. A JSON file stands in for a database -- admin
+credentials, the Caddy root directory and derived paths, and a session secret key."""
 import os
 import json
 
-# One level up from this package (caddy_manager/) is the project root, where
-# config.json has always lived -- keeping this path unchanged means existing
-# installs keep working without needing to move anything.
+# config.json lives at the project root, one level up from this package.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 
 
 def default_paths_for_root(root_dir):
-    """The conventional Caddy directory layout this app assumes under a
-    given root directory:
-
-        <root>/
-        |- caddy.d/    -- conf_dir: the .conf blocks this app manages
-        |- data/       -- certificate_dir: Caddy's data directory
-        |               (https://caddyserver.com/docs/conventions#data-directory),
-        |               where it keeps TLS certificates/keys
-        |- logs/       -- log_dir
-        |- Caddyfile   -- caddyfile_path: the main Caddyfile importing conf_dir
-
-    Any of these can be overridden away from the default individually, in
-    Setup's advanced options or later from Settings."""
+    """Conventional Caddy layout under root_dir: caddy.d/ (conf_dir),
+    data/ (certificate_dir), logs/ (log_dir), Caddyfile. Each is overridable from Settings."""
     root_dir = (root_dir or "").rstrip("/\\")
     return {
         "conf_dir": os.path.join(root_dir, "caddy.d"),
@@ -44,10 +27,7 @@ def load_config():
         cfg = json.load(f)
 
     if "conf_dir" not in cfg and "caddy_dir" in cfg:
-        # Migrate installs from before the Caddy root directory concept:
-        # the single caddy_dir they configured becomes conf_dir, and its
-        # parent becomes a best-guess root_dir so the other three paths
-        # have a sensible default -- correct any of them from Settings.
+        # Migrate pre-root-directory installs: caddy_dir -> conf_dir, its parent -> a guessed root_dir.
         conf_dir = cfg.pop("caddy_dir")
         root_dir = os.path.dirname(conf_dir.rstrip("/\\")) or conf_dir
         cfg["root_dir"] = root_dir
@@ -88,11 +68,8 @@ def get_caddyfile_path():
 
 
 def get_caddyfile_backup_path():
-    """Where the Global Configuration tab's "back up before saving" and
-    rollback features read/write the Caddyfile's backup -- always named
-    Caddyfile.bak, next to the real Caddyfile, regardless of what the
-    Caddyfile itself happens to be named. None if no Caddyfile path is
-    configured yet."""
+    """Backup path for the Global Configuration tab's save/rollback: always
+    Caddyfile.bak next to the real Caddyfile, or None if unconfigured."""
     caddyfile_path = get_caddyfile_path()
     if not caddyfile_path:
         return None
@@ -100,39 +77,22 @@ def get_caddyfile_backup_path():
 
 
 def get_caddy_log_output_dir():
-    """The directory path written into a block's `output file` line when
-    logging is enabled -- i.e. where Caddy itself will actually write that
-    block's access log, as far as Caddy's own filesystem sees it.
-
-    This is deliberately independent from get_log_dir(), which is where
-    Caddy Manager looks to read/tail/delete/rename log files on its own
-    side. The two normally point at the same directory (this defaults to
-    get_log_dir(), itself root_dir/logs by default), but they can be split
-    apart when Caddy and Caddy Manager don't share the same filesystem
-    view of the logs volume -- for example, each running in its own
-    container with that volume mounted at a different path. Overriding
-    this setting only changes what gets written into newly rendered .conf
-    files; it never affects where Caddy Manager itself looks for logs."""
+    """Directory written into a block's `output file` line -- independent of
+    get_log_dir() (this app's read side), for a split Caddy/app filesystem view."""
     cfg = load_config()
     value = (cfg.get("caddy_log_output_dir") or "").strip() if cfg else ""
     return value or get_log_dir()
 
 
 def get_caddy_admin_api_url():
-    """The address of Caddy's admin API (e.g. "caddy.example.com:2019" or
-    "https://caddy.example.com:2019"), used to read live stats such as
-    reverse-proxy upstream request counts for the Dashboard. Empty string
-    if unset -- this is entirely optional; nothing else in the app
-    depends on it."""
+    """Caddy admin API address, used for Dashboard stats. Empty string if
+    unset -- entirely optional, nothing else depends on it."""
     cfg = load_config()
     return (cfg.get("caddy_admin_api_url") or "").strip() if cfg else ""
 
 
-# Caddy's built-in default is to attempt renewal starting 30 days before
-# expiry -- 37 gives it a week of retries (rate limits, a flaky ACME
-# challenge, DNS propagation) before the Certificates page calls a cert
-# "expiring soon", so the badge means "renewal may need attention" rather
-# than just "due soon and presumably fine."
+# Caddy starts renewal 30 days out; 37 gives it a week of retries before
+# this app's "expiring soon" badge means renewal may need attention.
 DEFAULT_CERT_EXPIRING_SOON_DAYS = 37
 
 
@@ -163,13 +123,8 @@ def get_log_tail_lines():
     return DEFAULT_LOG_TAIL_LINES
 
 
-# The header "Quick Add" button skips the New Site Block type-picker modal,
-# linking straight to main.new_block for one pre-chosen type -- configured
-# separately per page (Home Dashboard vs Site Blocks) since a deployment
-# might create mostly reverse proxies on one and mostly static sites on the
-# other. A page's type defaults to (and can be reset to) "None", which is
-# itself what turns the button off for that page -- there's no separate
-# enable switch.
+# The "Quick Add" button skips the type-picker modal for one pre-chosen type,
+# set per page. "None" both is the default and turns the button off.
 QUICK_ADD_BLOCK_TYPES = ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom")
 
 
@@ -185,10 +140,7 @@ def get_quick_add_type_site_blocks():
     return value if value in QUICK_ADD_BLOCK_TYPES else None
 
 
-# Whether a block's Preview page shows the raw metadata sidecar alongside its
-# Caddy config -- on by default, since the metadata card is how someone
-# double-checks what the app has stored about a block (creation time, log
-# settings, etc.) without opening the sidecar file directly.
+# Whether the Preview page shows the raw metadata sidecar. On by default.
 DEFAULT_SHOW_METADATA_CARD = True
 
 
@@ -200,10 +152,7 @@ def get_show_metadata_card():
     return DEFAULT_SHOW_METADATA_CARD
 
 
-# The Dashboard's widgets, in the order they're listed in Settings >
-# Dashboard and rendered on the page -- each is a (key, label) pair, where
-# key is what's stored in config.json's dashboard_widgets dict and label is
-# what's shown next to its toggle switch. All five are shown by default.
+# Dashboard widgets in display order, as (config key, toggle label). All shown by default.
 DASHBOARD_WIDGETS = (
     ("quick_glance_row", "Quick Glance Row"),
     ("recently_added", "Recently Added"),
@@ -212,31 +161,20 @@ DASHBOARD_WIDGETS = (
     ("upstream_health", "Upstream Health"),
 )
 
-
-
-# "Caddy Servers" (Settings -> Caddy Servers): up to this many servers can
-# be ping-monitored, each showing a live status tag in the navbar (see
-# server_monitor.py). Two, to match the navbar layout the app's design
-# was already stubbed in with.
+# Up to this many servers can be ping-monitored (see server_monitor.py),
+# matching the navbar layout's design.
 MAX_CADDY_SERVERS = 2
 
 DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS = 60
-# A shorter interval than this risks queuing pings faster than they can
-# resolve -- server_monitor.PING_TIMEOUT_SECONDS is comfortably under it,
-# but a much shorter interval than that would leave no real gap between
-# checks. Enforced by the Caddy Servers settings form, not here, but the
-# constant lives here so the getter and the form validation can't drift
-# apart.
+# Floor for the settings form's validation, kept here so it can't drift from the getter.
 MIN_CADDY_SERVER_PING_INTERVAL_SECONDS = 10
 DEFAULT_CADDY_SERVER_WARNING_AFTER_MISSES = 3
 DEFAULT_CADDY_SERVER_DANGER_AFTER_MISSES = 5
 
 
 def get_caddy_servers():
-    """Up to MAX_CADDY_SERVERS configured Caddy servers to ping-monitor,
-    each as {"display_name": str, "host": str} -- both always non-empty,
-    since the settings form itself rejects (and never saves) a
-    partially-filled slot. Empty list if none are configured."""
+    """Up to MAX_CADDY_SERVERS servers to ping-monitor, each as
+    {"display_name": str, "host": str}, both always non-empty."""
     cfg = load_config()
     stored = cfg.get("caddy_servers") if cfg else None
     if not isinstance(stored, list):
@@ -289,12 +227,8 @@ def get_caddy_server_danger_after_misses():
 
 
 def get_dashboard_widget_visibility():
-    """Which Dashboard widgets are shown, as a {key: bool} dict covering
-    every key in DASHBOARD_WIDGETS. Defaults every widget to shown (True)
-    -- both when config.json has no dashboard_widgets entry at all (an
-    existing install, or a fresh one before Settings is ever touched) and
-    when a stored value for a given key is missing or malformed, e.g. a
-    widget added after the config was last saved."""
+    """{key: bool} for every key in DASHBOARD_WIDGETS, defaulting to
+    shown (True) when unset or malformed."""
     cfg = load_config()
     stored = cfg.get("dashboard_widgets") if cfg else None
     stored = stored if isinstance(stored, dict) else {}

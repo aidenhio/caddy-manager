@@ -9,25 +9,18 @@ from .server_monitor import get_server_statuses
 
 
 def create_app():
-    # templates/ and static/ live at the project root (one level up from
-    # this package), unchanged from before this app was split into modules.
+    # templates/ and static/ live at the project root, one level up from this package.
     app = Flask(
         __name__,
         template_folder=os.path.join(BASE_DIR, "templates"),
         static_folder=os.path.join(BASE_DIR, "static"),
     )
 
-    # nav_caddy_servers is read fresh on every request (Flask calls this
-    # lambda per-render) so the navbar's server-rendered status tags --
-    # see templates/partials/header_nav_bar.html -- always start from the
-    # ping monitor's current state, without every view function needing
-    # to pass it through individually.
+    # Re-evaluated per render, so every page's navbar status tags reflect
+    # the ping monitor's current state with no per-view wiring needed.
     app.context_processor(lambda: dict(type_color=type_color, nav_caddy_servers=get_server_statuses()))
 
-    # A random placeholder so the session/flash machinery always has a
-    # usable key -- even on the very first request Flask ever handles,
-    # before `load_secret_key` below gets a chance to run. Overwritten by
-    # the real, persisted secret_key as soon as setup has completed.
+    # Placeholder so sessions/flash work before setup saves a real secret_key.
     app.secret_key = secrets.token_hex(32)
 
     @app.before_request

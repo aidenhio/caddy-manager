@@ -1,17 +1,5 @@
-"""Block file & metadata management.
-
-Every block gets a small sidecar metadata file (same base name as the
-.conf, extension .json) living in a hidden .metadata subdirectory of the
-caddy.d directory -- kept out of the way of Caddy's own `import *.conf`
-and out of the way of the site blocks list. It holds the block's structured
-fields plus the .conf's mtime/size at the time it was written. Listing a
-directory is then just one JSON read per file -- the .conf itself is only
-re-parsed with regex when a sidecar is missing or its stamped mtime/size no
-longer matches the .conf on disk (i.e. it was created or hand-edited
-outside the app). Blocks created/edited through this app's forms never
-take that path at all: their metadata is written directly from the
-submitted fields (see build_block_from_form below).
-"""
+"""Block file & metadata management. Each block gets a hidden .metadata/*.json
+sidecar so listing is a cheap JSON read; re-parsed only when stale or missing."""
 import os
 import glob
 import json
@@ -56,9 +44,8 @@ def safe_meta_path(filename):
 
 
 def block_base_name(conf_filename):
-    """The .conf filename with its .disabled and .conf suffixes stripped
-    -- the stem shared by a block's .conf, its .metadata/*.json sidecar,
-    and (when logging is enabled) its logs_dir/*.log file."""
+    """The .conf filename with its .disabled/.conf suffixes stripped --
+    the stem shared by a block's .conf, sidecar, and log file."""
     base = conf_filename[: -len(".disabled")] if conf_filename.endswith(".disabled") else conf_filename
     if base.endswith(".conf"):
         base = base[: -len(".conf")]
@@ -87,26 +74,16 @@ def safe_log_path(filename):
 
 
 def log_path_for(conf_filename):
-    """Absolute path of the log file that would correspond to a given
-    .conf filename (same base name as its .conf/.metadata sidecar, with a
-    .log extension), or None if no logs directory is configured.
-
-    This is Caddy Manager's own view of where the log file lives, used
-    whenever the app itself reads/tails/deletes/renames a log file. It is
-    NOT necessarily the path Caddy itself writes to -- see
-    caddy_log_path_for() below for that."""
+    """Path of conf_filename's log file, or None if unconfigured -- this
+    app's own view; not necessarily where Caddy writes, see caddy_log_path_for()."""
     if not conf_filename:
         return None
     return safe_log_path(block_base_name(conf_filename) + ".log")
 
 
 def caddy_log_path_for(conf_filename):
-    """Absolute path Caddy itself will write conf_filename's access log to,
-    as baked into the block's `output file` directive -- resolved within
-    the configured Caddy log output directory (get_caddy_log_output_dir()),
-    which defaults to the same directory log_path_for() uses but can be
-    overridden separately in Settings > Caddy Settings > Logging. Returns
-    None if no output directory can be determined."""
+    """Path Caddy itself writes conf_filename's access log to, baked into
+    the `output file` directive -- overridable in Settings > Logging."""
     if not conf_filename:
         return None
     log_dir = get_caddy_log_output_dir()
@@ -125,9 +102,8 @@ def delete_log_file(conf_filename):
 
 
 def rename_log_file(old_conf_filename, new_conf_filename):
-    """If a log file exists for the old filename, move it to match the
-    new one -- called alongside the .conf/.metadata rename that happens
-    when a block's primary site address changes."""
+    """Move an existing log file to match a renamed block, alongside the
+    .conf/.metadata rename that happens when the primary site address changes."""
     old_path = log_path_for(old_conf_filename)
     new_path = log_path_for(new_conf_filename)
     if not old_path or not new_path or old_path == new_path or not os.path.isfile(old_path):
@@ -144,15 +120,8 @@ def rename_log_file(old_conf_filename, new_conf_filename):
 # ---------------------------------------------------------------------------
 
 def write_metadata(conf_filename, conf_path, meta):
-    """Persist metadata for a block, stamped with the .conf's current
-    mtime/size so future reads know whether the cache is still valid.
-    Also stamps/preserves a created_ts: the first time a sidecar is ever
-    written for a filename it's set from the .conf's own ctime (a close
-    enough proxy for creation time, and exactly right for a block just
-    created through the app, since this always runs immediately after
-    the .conf itself is written) -- every write after that just carries
-    the existing sidecar's created_ts forward untouched, so editing a
-    block never resets when it was "created"."""
+    """Persist metadata stamped with the .conf's mtime/size for cache
+    validity. created_ts is set once and carried forward untouched after that."""
     try:
         st = os.stat(conf_path)
     except OSError:
@@ -180,9 +149,8 @@ def write_metadata(conf_filename, conf_path, meta):
 
 
 def read_metadata(conf_filename, conf_path):
-    """Load metadata for a block: the cached sidecar if it's still fresh,
-    otherwise a fallback parse of the .conf content (which also refreshes
-    the cache so the next read is cheap again)."""
+    """The cached sidecar if fresh, otherwise a fallback .conf parse
+    (which also refreshes the cache)."""
     try:
         st = os.stat(conf_path)
     except OSError:
@@ -194,8 +162,7 @@ def read_metadata(conf_filename, conf_path):
             with open(meta_file) as f:
                 cached = json.load(f)
             if cached.get("source_mtime") == st.st_mtime and cached.get("source_size") == st.st_size:
-                # Migrate sidecars written before the hosts -> site_addresses
-                # rename, so pre-existing installs upgrade transparently.
+                # Migrate pre-rename sidecars (hosts -> site_addresses) transparently.
                 if "site_addresses" not in cached and "hosts" in cached:
                     cached["site_addresses"] = cached.pop("hosts")
                 return cached
@@ -222,13 +189,8 @@ def delete_metadata(conf_filename):
 
 
 def cleanup_orphaned_metadata():
-    """Remove metadata sidecars that no longer have a matching .conf file.
-    Renames/deletes made through the app already keep the sidecar in sync
-    (see rename_block_if_first_site_address_changed / delete_block), but a
-    .conf renamed or deleted directly on disk -- which this app is explicitly
-    designed to allow -- leaves its .json behind with nothing to key off
-    of. Runs as part of list_blocks() so it self-heals on every page load,
-    the same way read_metadata already self-heals stale caches."""
+    """Remove sidecars whose .conf was renamed/deleted directly on disk.
+    Runs as part of list_blocks(), self-healing on every page load."""
     mdir = metadata_dir()
     if not os.path.isdir(mdir):
         return
@@ -259,14 +221,8 @@ def _conf_paths():
 
 
 def refresh_all_metadata():
-    """Bring every block's metadata sidecar up to date: clean up any
-    orphaned sidecars, then read (and, via read_metadata's own self-heal,
-    re-parse/re-write if stale) every .conf/.conf.disabled file's
-    metadata. Called once at login so anything changed outside the app
-    since the last visit -- a hand-edited block, or a .conf dropped in,
-    renamed, or removed directly -- is already reflected before the user
-    reaches the site blocks list or a preview page, rather than only
-    self-healing lazily, file by file, as each happens to be viewed."""
+    """Clean up orphaned sidecars and refresh every block's metadata.
+    Called once at login so changes made outside the app are already reflected."""
     cleanup_orphaned_metadata()
     for path in _conf_paths():
         read_metadata(os.path.basename(path), path)
@@ -283,10 +239,7 @@ def list_blocks():
         fdate = datetime.fromtimestamp(os.path.getmtime(path))
         meta = read_metadata(fname, path)
         block_type = meta.get("type", "custom")
-        # created_ts is stamped once by write_metadata and carried forward
-        # untouched by later edits (see its docstring) -- falling back to
-        # the .conf's own ctime covers a hand-added file that's never been
-        # through write_metadata yet.
+        # Falls back to ctime for a hand-added file never through write_metadata yet.
         created_ts = meta.get("created_ts") or os.path.getctime(path)
         cdate = datetime.fromtimestamp(created_ts)
 
@@ -343,10 +296,8 @@ def unique_filename(base):
 
 
 def rename_block_if_first_site_address_changed(filename, path, old_site_addresses, new_site_addresses):
-    """If the sorted, first (i.e. filename-defining) site address changed,
-    rename the .conf (and its metadata sidecar) to match -- preserving the
-    .disabled suffix if the block is currently disabled. Returns the
-    filename/path to use from here on (unchanged if no rename happened)."""
+    """Rename the .conf and sidecar to match if the first (filename-defining)
+    site address changed. Returns the filename/path to use from here on."""
     old_first = old_site_addresses[0] if old_site_addresses else None
     new_first = new_site_addresses[0] if new_site_addresses else None
     if not new_first or (old_first and slugify(new_first) == slugify(old_first)):
@@ -365,20 +316,13 @@ def rename_block_if_first_site_address_changed(filename, path, old_site_addresse
             os.rename(old_meta_path, meta_path_for(new_conf_name))
         return new_conf_name, new_path
     except OSError:
-        # Content/metadata are already saved under the old name -- if the
-        # rename itself fails, just keep the old filename rather than
-        # losing the edit.
+        # Content/metadata are already saved under the old name; keep it rather than lose the edit.
         return filename, path
 
 
 def set_block_disabled(filename, path, disabled):
-    """Add or remove the .disabled suffix on a block's .conf (and its
-    metadata sidecar) to match the requested state -- a no-op if it
-    already matches. Used both by the block form's own disable/enable
-    toggle and the site-blocks list's Enable/Disable action, so the two
-    can never drift out of sync with each other. Returns the
-    filename/path to use from here on (unchanged if no rename happened
-    or the block was already in the requested state)."""
+    """Add/remove the .disabled suffix on a block's .conf and sidecar to
+    match, a no-op if already matching. Returns the filename/path to use from here on."""
     if filename.endswith(".disabled") == disabled:
         return filename, path
 
@@ -399,13 +343,8 @@ def set_block_disabled(filename, path, disabled):
 # ---------------------------------------------------------------------------
 
 def parse_logging_fields(form):
-    """Parse+validate the Logging accordion's fields, shared by every
-    block type. Falls back to INFO/json for anything missing or not one
-    of the choices the accordion itself offers. The rotation fields are
-    all optional and left as free text/number here -- validated (and
-    only if logging is actually enabled) by the caller, since a blank
-    value just means "use Caddy's own rotation defaults" rather than an
-    error."""
+    """Parse the Logging accordion's fields, shared by every block type.
+    Falls back to INFO/json for invalid choices; rotation fields are left as-is, validated by the caller."""
     log_enabled = form.get("log_enabled") == "1"
     log_level = form.get("log_level", "INFO").strip().upper()
     if log_level not in LOG_LEVELS:
@@ -420,26 +359,8 @@ def parse_logging_fields(form):
 
 
 def build_block_from_form(block_type, form, log_filename_hint=None):
-    """Parse and validate submitted block-form fields for `block_type`,
-    rendering the Caddyfile block content. Returns (content, meta, error):
-    `content` is the rendered block text (None if invalid), `meta` is the
-    metadata dict ready for write_metadata() -- populated with whatever the
-    user submitted even when `error` is set, so the form can re-render the
-    attempted values.
-
-    `log_filename_hint` is the .conf filename the log block's `output
-    file` path should be derived from (the same base name, in the
-    configured logs directory) -- the eventual filename for a new block,
-    or the block's current filename when editing. It's a hint rather than
-    something this function resolves itself because a new block's
-    filename isn't decided until after this call returns (it depends on
-    the normalized site_addresses this function produces); the caller is
-    expected to pass the filename it intends to use.
-
-    This is the one place the five block-type shapes are described; both
-    new_block() and edit_block() call it identically, since every field a
-    saved block needs is always resubmitted in full on every save (nothing
-    from a previous version needs to be separately preserved/merged in)."""
+    """Parse+validate submitted block-form fields, rendering Caddyfile content.
+    Returns (content, meta, error); meta is populated even on error so a rejected form can re-render it."""
     site_addresses = site_addresses_from_textarea(form.get("site_addresses", ""))
     meta = {"site_addresses": site_addresses}
     content = None
@@ -487,20 +408,14 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
         lb_try_duration = form.get("lb_try_duration", "").strip()
         lb_try_interval = form.get("lb_try_interval", "").strip()
         health_uri = form.get("health_uri", "").strip()
-        # health_method comes from a <select> (see HEALTH_METHODS in
-        # block_form.html) whose first option is blank, matching every
-        # other health_* field here: unset means "let Caddy use its own
-        # default (GET)" rather than writing a redundant explicit line.
+        # Blank means "use Caddy's own GET default" rather than a redundant explicit line.
         health_method = form.get("health_method", "").strip().upper()
         health_interval = form.get("health_interval", "").strip()
         health_timeout = form.get("health_timeout", "").strip()
         health_status = form.get("health_status", "").strip()
         health_passes = form.get("health_passes", "").strip()
         health_fails = form.get("health_fails", "").strip()
-        # The Scheme select is shared by every upstream row (see
-        # block-form.js), so -- like reverse_proxy's own checkbox -- the
-        # skip-verify checkbox is only honored server-side when the
-        # upstreams actually are https, regardless of what the client sent.
+        # Skip-verify is only honored server-side when upstreams are actually https.
         lb_scheme = split_target(upstreams[0])[0] if upstreams else ""
         insecure_skip_verify = lb_scheme == "https" and form.get("insecure_skip_verify") == "1"
         meta.update(upstreams=upstreams, lb_policy=lb_policy, extra=extra,

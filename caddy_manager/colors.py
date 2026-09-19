@@ -1,10 +1,5 @@
-"""Block type colors -- the single place block-type -> Tabler color is
-defined. Templates get this as the `type_color(block_type)` Jinja global
-(registered in caddy_manager/__init__.py), so every page/badge/button stays
-in sync if a color ever changes here. `primary` is reserved for generic UI
-elements (nav, page buttons, etc.) and is never used to represent a block
-type.
-"""
+"""Block type -> Tabler color, exposed to templates as the `type_color()`
+Jinja global. `primary` is reserved for generic UI, never a block type."""
 
 TYPE_COLORS = {
     "reverse_proxy": "azure",

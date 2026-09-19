@@ -34,11 +34,8 @@ def setup():
         password = request.form.get("password", "")
         password2 = request.form.get("password2", "")
 
-        # Directories are either fully derived from a Caddy root directory,
-        # or fully custom -- never a mix (matches the Settings Directories
-        # tab). In the custom case root_dir is left None so its nullness is
-        # itself the record of which mode was used, without needing a
-        # separate flag.
+        # Directories are either fully root-derived or fully custom, never a mix.
+        # root_dir stays None in custom mode -- its nullness records the active mode.
         custom_dirs = request.form.get("custom_dirs") == "1"
         root_dir = conf_dir = certificate_dir = log_dir = caddyfile_path = None
 
@@ -107,10 +104,7 @@ def login():
         if username == cfg["username"] and check_password_hash(cfg["password_hash"], password):
             session["logged_in"] = True
             session["username"] = username
-            # Catch up on anything changed outside the app since the last
-            # visit before the user reaches the site blocks list or a
-            # preview page, rather than relying on each file self-healing
-            # only when it happens to be read.
+            # Pick up anything changed on disk outside the app since the last visit.
             refresh_all_metadata()
             return redirect(url_for("main.dashboard"))
         error = "Invalid username or password."

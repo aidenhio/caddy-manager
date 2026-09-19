@@ -1,8 +1,6 @@
 // BEGIN GLOBAL CONFIGURATION CADDYFILE EDITOR
-// Wires up the Settings -> Caddy Settings -> Global Configuration tab: a
-// live check for whether the raw Caddyfile actually imports this app's conf
-// directory -- without that import line, blocks created in Caddy Manager
-// are never picked up by Caddy. Plain textarea, no code editor library.
+// Live check for whether the Caddyfile imports this app's conf directory --
+// without that import line, blocks created here are never loaded by Caddy.
 (function () {
   const textarea = document.getElementById("caddyfile-content");
   if (!textarea) return;
@@ -16,16 +14,8 @@
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  // Matches a line such as `import /etc/caddy/caddy.d/*.conf` -- optionally
-  // quoted, with or without a trailing slash before the glob, and with or
-  // without the .conf extension on it -- covering the reasonable ways
-  // someone would write the import line Caddy needs to actually load the
-  // blocks this app manages. Also accepts a relative import using just the
-  // conf directory's own name (e.g. `import caddy.d/*.conf`, optionally
-  // `./`-prefixed) -- Caddy resolves relative import paths against the
-  // Caddyfile's own directory, which for the default layout is exactly one
-  // level above the conf directory, so the directory's basename alone is a
-  // valid import too.
+  // Matches `import /path/to/caddy.d/*.conf` in its reasonable variants
+  // (quoted, with/without .conf), plus a relative import by directory basename alone.
   function buildImportPattern(dir) {
     const normalized = dir.replace(/[/\\]+$/, "");
     const segments = normalized.split(/[/\\]+/).filter(Boolean);

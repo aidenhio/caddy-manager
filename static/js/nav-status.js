@@ -1,19 +1,12 @@
 // BEGIN NAVBAR CADDY SERVER STATUS
-// Keeps the Caddy Server status tags in the navbar's right-hand side
-// (see templates/partials/header_nav_bar.html) live across every page,
-// not just while some particular page happens to stay open -- the
-// background ping monitor this polls (server_monitor.py) runs for as
-// long as the app itself is running, independent of any browser tab.
+// Keeps the navbar's Caddy Server status tags live on every page by
+// polling the background ping monitor's state (server_monitor.py).
 (function () {
   const tags = document.querySelectorAll('[data-server-host]');
   if (!tags.length) return;
 
-  // Independent of the actual ping interval (configurable in Settings,
-  // 60s by default) -- this just refreshes what the navbar shows of
-  // already-known state, so polling more often than pings actually
-  // happen is harmless (the endpoint reads cheap in-memory state, no
-  // live ping triggered per request) and keeps a status change visible
-  // sooner than waiting a full ping interval to notice it.
+  // Independent of the actual ping interval -- the endpoint reads cheap in-memory
+  // state, so polling more often just surfaces a change sooner.
   const REFRESH_INTERVAL_MS = 20000;
 
   const BG_CLASSES = ['bg-success-lt', 'bg-warning-lt', 'bg-danger-lt', 'bg-secondary-lt'];
@@ -27,11 +20,7 @@
       dot.classList.remove(...DOT_CLASSES);
       dot.classList.add(server.dot_class);
     }
-    // Bootstrap's tooltip re-reads this attribute fresh every time it's
-    // shown (see Tooltip._getTitle() in Tabler's bundled Bootstrap
-    // build) rather than caching the title at init time, so updating it
-    // here is enough -- no need to destroy/recreate the Tooltip
-    // instance Tabler's own bundle already created for this element.
+    // Bootstrap re-reads this attribute fresh on every show(), so no need to recreate the Tooltip instance.
     tag.setAttribute('data-bs-original-title', server.label + ' (' + server.host + ')');
   }
 
@@ -47,8 +36,7 @@
         });
       })
       .catch(() => {
-        // Leave the last known status showing rather than flashing
-        // anything for what's likely just a transient network hiccup.
+        // Leave the last known status showing rather than flash anything on a transient hiccup.
       });
   }
 

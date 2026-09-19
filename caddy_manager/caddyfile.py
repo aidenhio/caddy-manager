@@ -1,9 +1,5 @@
-"""Pure Caddyfile string building & parsing.
-
-Nothing in this module touches the filesystem or Flask -- it's just string
-in, string out, which makes it easy to reason about (and test) in
-isolation from the metadata/routing layers built on top of it in blocks.py.
-"""
+"""Pure Caddyfile string building & parsing -- string in, string out, no
+filesystem or Flask, so it's easy to reason about and test in isolation."""
 import re
 
 REVERSE_PROXY_RE = re.compile(r"^\s*reverse_proxy\s+([^\n{]+?)\s*\{?\s*$", re.MULTILINE)
@@ -22,29 +18,19 @@ ROLL_SIZE_RE = re.compile(r"^\s*roll_size\s+(\S+)", re.MULTILINE)
 ROLL_KEEP_RE = re.compile(r"^\s*roll_keep\s+(\d+)\b", re.MULTILINE)
 ROLL_KEEP_FOR_RE = re.compile(r"^\s*roll_keep_for\s+(\S+)", re.MULTILINE)
 
-# The encode formats offered in the Static Site form, in the order they're
-# presented -- also used to filter/validate whatever a submitted form or a
-# hand-edited .conf's `encode` line actually contains.
+# Encode formats offered in the Static Site form; also used to validate
+# a submitted form or a hand-edited .conf's `encode` line.
 ENCODE_FORMATS = ("gzip", "zstd", "br")
 
-# The log levels/formats offered in the Logging accordion of every block
-# type, in the order they're presented -- also used to filter/validate
-# whatever a submitted form or a hand-edited .conf's `log` block actually
-# contains. Caddy supports more of each (e.g. DEBUG/WARN/PANIC/FATAL
-# levels), but the form intentionally only exposes the two most commonly
-# useful choices for a reverse-proxy-style access log. JSON/INFO are also
-# Caddy's own defaults for a non-terminal (file) output.
+# Log levels/formats offered in the Logging accordion; also used to
+# validate a submitted form or hand-edited `log` block.
 LOG_LEVELS = ("INFO", "ERROR")
 LOG_FORMATS = ("json", "console")
 
 
 def find_braced_block(content, start_match):
-    """Given a regex match ending just after an opening '{', return the
-    text up to its matching '}' (brace-depth aware), or None if unbalanced.
-    Needed for the `log` block specifically because it can itself contain
-    a nested `output file <path> { roll_size ... }` block -- a non-greedy
-    `.*?\\}` regex would stop at that inner '}' instead of the log block's
-    own, so parsing it back out requires actually counting braces."""
+    """Text up to the matching '}' for a match ending after an opening '{',
+    brace-depth aware (None if unbalanced) -- needed since `log` blocks can nest."""
     depth = 1
     i = start_match.end()
     start = i
@@ -86,10 +72,8 @@ def join_target(scheme, host, port):
 # ---------------------------------------------------------------------------
 
 def normalize_site_addresses(raw_site_addresses):
-    """Clean, dedupe (first occurrence wins) and sort a list of site
-    addresses: addresses starting with a letter sort before addresses
-    starting with a digit, alphabetically within each group -- e.g.
-    api.example.com, app.example.com, 2.example.com."""
+    """Clean, dedupe (first occurrence wins) and sort site addresses --
+    letter-leading addresses sort before digit-leading ones."""
     seen = set()
     site_addresses = []
     for h in raw_site_addresses:
@@ -141,18 +125,8 @@ def render_domain_block(site_header, body_lines):
 
 
 def render_log_block(log_path, level="INFO", format="json", roll_size="", roll_keep="", roll_keep_for=""):
-    """Lines for a `log { ... }` directive that writes this block's access
-    log to `log_path` -- meant to be prepended to another render_*
-    function's body list (each line here gets the same single level of
-    indent render_domain_block already applies to every body line).
-    Level and format are always stated explicitly, even when they're the
-    Caddy default, since this is meant to be a readable, hand-editable
-    admin tool rather than the most terse possible config.
-
-    roll_size/roll_keep/roll_keep_for are all optional -- when none are
-    set, `output file` is a bare line and Caddy's own rotation defaults
-    (100MiB, 10 files, 2160h) apply; setting any of them nests `output
-    file` into its own block so they can be stated."""
+    """Lines for a `log { ... }` directive, prepended to another render_*
+    function's body. Setting any roll_* option nests `output file` into a block."""
     path = f'"{log_path}"' if log_path and (" " in log_path or "\t" in log_path) else log_path
     roll_size = (roll_size or "").strip()
     roll_keep = str(roll_keep or "").strip()
@@ -197,10 +171,8 @@ def render_redirect(site_header, target, redirect_code="", log_lines=None):
 
 
 def render_static_site(site_header, path, encodings=None, browse=False, index="", hide="", log_lines=None):
-    """file_server is always present for this block type (a static site
-    with no file_server wouldn't actually serve anything) -- rendered as a
-    bare `file_server` line when none of browse/index/hide are set, or as
-    a `file_server { ... }` block when any of them are."""
+    """file_server is always present -- a bare line if none of
+    browse/index/hide are set, otherwise a `file_server { ... }` block."""
     encodings = [e for e in (encodings or []) if e in ENCODE_FORMATS]
     index = (index or "").strip()
     hide = (hide or "").strip()
@@ -232,18 +204,8 @@ def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", lo
                           lb_retries="", lb_try_duration="", lb_try_interval="",
                           health_uri="", health_method="", health_interval="", health_timeout="",
                           health_status="", health_passes="", health_fails="", insecure_skip_verify=False):
-    """`lb_retries`/`lb_try_duration`/`lb_try_interval` (load-balancing) and
-    `health_uri`/`health_method`/`health_interval`/`health_timeout`/
-    `health_status`/`health_passes`/`health_fails` (active health checking)
-    are all optional Caddy `reverse_proxy` sub-directives -- see
-    https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#load-balancing
-    -- each only rendered when set, so a block with none of them looks
-    exactly like it did before they existed. `health_method` is blank by
-    default (the form's Method dropdown's first option) rather than an
-    explicit "GET", matching every other field here: Caddy's own default
-    for the directive already is GET, so leaving it unset behaves
-    identically and doesn't add a redundant line to blocks that don't use
-    health checks at all."""
+    """Retry/health-check params are optional `reverse_proxy` sub-directives,
+    rendered only when set. Blank `health_method` means Caddy's own GET default."""
     inner = [f"lb_policy {lb_policy}"] if lb_policy else []
 
     lb_retries = str(lb_retries or "").strip()
@@ -290,13 +252,8 @@ def render_load_balancer(site_header, upstreams, lb_policy="", extra_text="", lo
 
 
 def render_custom(site_header, body_text, log_lines=None):
-    """Wrap a user-authored body (whatever's between the braces) with the
-    site header, which is always derived from the Site Address field -- the
-    user only ever writes/edits the inside of the block, never the site
-    address line. Unlike the other render_* functions, the body here isn't
-    a list of directive lines this module controls -- it's opaque
-    user-authored text -- so a `log` block, if enabled, is stitched onto
-    the front of it directly rather than passed to render_domain_block."""
+    """Wrap opaque user-authored body text with the site header. Unlike the
+    other render_* functions, a `log` block is stitched on directly, not via render_domain_block."""
     body = (body_text or "").rstrip("\n")
     prefix_lines = [f"    {line}" for line in (log_lines or [])]
     prefix = ("\n".join(prefix_lines) + "\n") if prefix_lines else ""
@@ -305,10 +262,8 @@ def render_custom(site_header, body_text, log_lines=None):
 
 
 def extract_body(content):
-    """Return the text between the first '{' and the matching last '}' of
-    a block -- i.e. the inverse of render_custom -- for prefilling the
-    custom-block edit form. Assumes one block per file, which matches how
-    this app writes .conf files."""
+    """Text between the first '{' and matching last '}' (inverse of
+    render_custom), for prefilling the custom-block edit form."""
     start = content.find("{")
     end = content.rfind("}")
     if start == -1 or end == -1 or end <= start:
@@ -317,11 +272,8 @@ def extract_body(content):
 
 
 # ---------------------------------------------------------------------------
-# Block parsing (Caddyfile text -> structured fields)
-#
-# Only used as a fallback for files this app didn't write itself (or that
-# were hand-edited since) -- app-created blocks skip this entirely because
-# their metadata is written straight from the form. See blocks.read_metadata.
+# Block parsing (Caddyfile text -> structured fields). Fallback only, for
+# files this app didn't write -- see blocks.read_metadata.
 # ---------------------------------------------------------------------------
 
 def extract_site_addresses(content):
@@ -336,15 +288,8 @@ def extract_site_addresses(content):
 
 
 def extract_logging(content):
-    """Best-effort parse of a `log { ... }` block out of a raw Caddy block,
-    for the structured (non-custom) block types' fallback parser -- a
-    `log` block added by hand between app saves should still show up,
-    pre-filled, in the Logging accordion next time the block is opened.
-    Only recognizes the level/format combinations the Logging accordion
-    itself can produce (see LOG_LEVELS/LOG_FORMATS); anything else falls
-    back to the form's defaults rather than being left blank. Rotation
-    settings (roll_size/roll_keep/roll_keep_for), being free-form, are
-    carried through as-is if present."""
+    """Best-effort parse of a `log { ... }` block for the fallback parser.
+    Unrecognized level/format falls back to defaults; roll_* settings pass through as-is."""
     start_match = LOG_START_RE.search(content)
     body = find_braced_block(content, start_match) if start_match else None
     if body is None:

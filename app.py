@@ -7,16 +7,11 @@ app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    debug = True
-    # Flask's reloader (implied by debug=True) re-executes this whole
-    # module in a child worker process it spawns to actually serve
-    # requests, after first running it once in a parent process that
-    # only watches for file changes and never serves anything --
-    # WERKZEUG_RUN_MAIN is set only in that child. Gating the ping
-    # monitor's startup on it (or starting unconditionally whenever the
-    # reloader isn't in play at all, i.e. debug is off) avoids running a
-    # second, orphaned copy of the background thread in the parent
-    # watcher process.
+    # Off by default -- Werkzeug's debug mode exposes an interactive, unauthenticated
+    # code-execution console on any unhandled error. Set FLASK_DEBUG=1 for local dev.
+    debug = os.environ.get("FLASK_DEBUG") == "1"
+    # debug=True forks a reloader child that sets WERKZEUG_RUN_MAIN; only
+    # start the monitor there, so the parent watcher doesn't run a second copy.
     if not debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         start_server_monitor()
     app.run(host="0.0.0.0", port=port, debug=debug)

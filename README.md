@@ -91,6 +91,11 @@ python app.py
 By default it listens on `http://0.0.0.0:5000`. Set a different port with
 the `PORT` environment variable if needed, e.g. `PORT=8080 python app.py`.
 
+Debug mode (auto-reload, and Werkzeug's interactive debugger on errors) is
+off by default. For local development, set `FLASK_DEBUG=1 python app.py`.
+Leave it off for anything reachable beyond your own machine — the debugger
+allows arbitrary code execution and has no authentication of its own.
+
 On first visit you'll be sent to `/setup` to create the admin username,
 password, and point the app at your `caddy.d` directory (e.g.
 `/etc/caddy/caddy.d`). That configuration is stored in `config.json`,

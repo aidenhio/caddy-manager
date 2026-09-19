@@ -1,25 +1,5 @@
-"""Caddy admin API client -- currently just the one read used by the
-Dashboard's "Current Requests" widget: GET /reverse_proxy/upstreams,
-which Caddy's admin API exposes to introspect the live state of its
-configured reverse-proxy upstreams
-(https://caddyserver.com/docs/api#get-reverseproxyupstreams). Each item
-in the returned array carries the upstream's dial `address`, its
-currently in-flight `num_requests` (an active/live count, not a
-cumulative historical total), and its `fails` count from passive health
-checks.
-
-This talks directly to Caddy's admin endpoint -- a separate, optional
-integration from everything else this app manages -- so any failure
-(Caddy not running, no admin API URL configured, host unreachable, an
-unexpected response shape) is swallowed and surfaced as None rather
-than raised: a dashboard widget shouldn't break the page just because
-Caddy is briefly unreachable.
-
-The stats computed here (upstream count, summed requests/fails) mirror
-the approach community dashboard widgets for Caddy already take, e.g.
-homepage's (https://github.com/gethomepage/homepage/tree/main/src/widgets/caddy),
-which sums num_requests/fails across every upstream the same way.
-"""
+"""Caddy admin API client -- GET /reverse_proxy/upstreams for the Dashboard's
+widgets. Any failure returns None rather than raising, so a widget degrades quietly."""
 import json
 import urllib.request
 import urllib.error
@@ -30,11 +10,8 @@ REQUEST_TIMEOUT_SECONDS = 3
 
 
 def normalize_admin_api_url(raw_url):
-    """A user-entered admin API address (e.g. "caddy.example.com:2019" or
-    "https://caddy.example.com:2019") normalized to a base URL with a
-    scheme and no trailing slash, or "" if nothing was given. Caddy's
-    admin API listens on plain HTTP by default, so a bare host:port
-    defaults to http://."""
+    """Normalize a user-entered admin API address to a base URL with a scheme
+    and no trailing slash ("" if blank). Bare host:port defaults to http://."""
     url = (raw_url or "").strip().rstrip("/")
     if not url:
         return ""
@@ -44,10 +21,8 @@ def normalize_admin_api_url(raw_url):
 
 
 def fetch_reverse_proxy_upstreams():
-    """GET {admin_api_url}/reverse_proxy/upstreams, returning the parsed
-    JSON list of upstreams, or None if no admin API URL is configured, the
-    request fails, or the response isn't the JSON array this endpoint is
-    documented to return."""
+    """GET {admin_api_url}/reverse_proxy/upstreams; returns the parsed JSON
+    list, or None if unconfigured, unreachable, or not a JSON array."""
     base_url = normalize_admin_api_url(get_caddy_admin_api_url())
     if not base_url:
         return None
@@ -63,17 +38,8 @@ def fetch_reverse_proxy_upstreams():
 
 
 def upstream_stats():
-    """Summary counts derived from the live /reverse_proxy/upstreams
-    response, ready for the Dashboard's Current Requests and Upstream
-    Health widgets. Returns None -- rather than zeroed-out values -- when
-    the API couldn't be reached at all, so the caller can tell "0
-    requests" apart from "not configured/unreachable".
-
-    unique_requested_sites counts distinct upstream addresses that have
-    at least one in-flight request right now -- distinct because the same
-    backend address can appear more than once in the raw response when
-    more than one site/route proxies to it, so a plain count of entries
-    would double-count that backend."""
+    """Summary counts for the Dashboard widgets. Returns None (not zeros)
+    when unreachable, so "0 requests" is distinguishable from "unconfigured"."""
     upstreams = fetch_reverse_proxy_upstreams()
     if upstreams is None:
         return None

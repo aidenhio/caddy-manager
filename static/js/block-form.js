@@ -16,9 +16,7 @@
   }
 
   function sortedFirstSiteAddress() {
-    // Mirrors the backend's normalize_site_addresses(): addresses starting
-    // with a letter sort before addresses starting with a digit,
-    // alphabetically (case-insensitively) within each group.
+    // Mirrors the backend's normalize_site_addresses(): letter-leading sorts before digit-leading.
     const siteAddresses = currentSiteAddresses().slice();
     siteAddresses.sort((a, b) => {
       const aDigit = /^[0-9]/.test(a) ? 1 : 0;
@@ -144,13 +142,8 @@
 // END REVERSE PROXY SCHEME -> INSECURE SKIP VERIFY TOGGLE
 
 // BEGIN LOAD BALANCER SCHEME -> INSECURE SKIP VERIFY TOGGLE
-// Mirrors the reverse proxy toggle above: the row's initial shown/hidden
-// state comes from the server-rendered `hidden` attribute (based on
-// meta.upstreams[0]'s scheme), and this listener only needs to react to
-// the visitor changing the Scheme select afterwards -- it deliberately
-// does *not* sync on load, since at that point #lb-scheme still shows its
-// default 'http' option; the LOAD BALANCER UPSTREAM ROWS block below is
-// what corrects #lb-scheme's value to match the loaded upstreams.
+// Mirrors the reverse proxy toggle above, but doesn't sync on load -- the
+// UPSTREAM ROWS block below corrects #lb-scheme's value first.
 (function () {
   const schemeSelect = document.getElementById('lb-scheme');
   const row = document.getElementById('lb-insecure-skip-verify-row');

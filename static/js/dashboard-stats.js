@@ -1,18 +1,9 @@
 // BEGIN DASHBOARD STATS AUTO-REFRESH
-// Keeps the Current Requests stat card and the Upstream Health card
-// current without needing a full page reload. These are the Dashboard
-// stats sourced live from Caddy's own admin API (see caddy_api.py)
-// rather than this app's own files/config, so they're the ones that
-// visibly go stale if the page is left open -- Active/Disabled Site
-// Blocks and SSL Certificates only change in response to actions taken
-// through this app itself, so they don't need the same treatment.
+// Keeps the Current Requests / Upstream Health cards fresh without a reload --
+// these are sourced live from Caddy's admin API, unlike the rest of the dashboard.
 (function () {
-  // Each of these elements can be independently missing from the DOM: the
-  // Current Requests span is only rendered when the Quick Glance Row
-  // widget is turned on (Settings > Dashboard), and the Upstream Health
-  // card's spans only exist when both that widget is turned on and the
-  // Caddy admin API is configured. setValue()/the wrapper check below
-  // just skip updating whichever of these aren't present.
+  // Each element can be independently missing (its widget/the admin API may be off);
+  // setValue() and the check below just skip whichever aren't present.
   const currentRequestsEl = document.getElementById('current-requests-value');
   const upstreamCountEl = document.getElementById('upstream-count-value');
   const requestedSitesEl = document.getElementById('requested-sites-value');
@@ -42,8 +33,7 @@
         }
       })
       .catch(() => {
-        // Leave the last known values showing rather than flashing N/A for
-        // what's likely just a transient network hiccup.
+        // Leave the last known values showing rather than flash N/A on a transient hiccup.
       });
   }
 
