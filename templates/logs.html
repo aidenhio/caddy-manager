@@ -86,9 +86,9 @@
         <tr data-filename="{{ log.filename | lower }}" data-updated="{{ log.updated_ts }}">
           <!-- BEGIN FILENAME CELL -->
           <td>
-            <span class="tag bg-lt font-monospace">{{ log.filename }}</span>
+            <span class="font-monospace">{{ log.filename }}</span>
             {% if log.count > 1 %}
-              <span class="tag bg-primary-lt font-monospace" title="{{ log.count }} log files, including rotated backups">+{{ log.count - 1 }}</span>
+              <span class="badge bg-primary-lt font-monospace" title="{{ log.count }} log files, including rotated backups">+{{ log.count - 1 }}</span>
             {% endif %}
           </td>
           <!-- END FILENAME CELL -->

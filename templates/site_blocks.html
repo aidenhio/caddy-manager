@@ -231,7 +231,7 @@
             {% if b.site_addresses %}
               {{ b.site_addresses[0] }}
               {% if b.site_addresses | length > 1 %}
-                <span class="tag bg-{{ row_color }}-lt" title="{{ b.site_addresses[1:] | join(', ') }}">+{{ b.site_addresses | length - 1 }}</span>
+                <span class="badge bg-{{ row_color }}-lt" title="{{ b.site_addresses[1:] | join(', ') }}">+{{ b.site_addresses | length - 1 }}</span>
               {% endif %}
             {% else %}
               <span class="tag bg-danger-lt" title="No site address configured">
@@ -246,25 +246,25 @@
             {% endif %}
           </td>
           <!-- END SITE ADDRESS CELL -->
-          <!-- BEGIN UPSTREAM/TARGET CELL -->
+          <!-- BEGIN UPSTREAM CELL -->
           <td>
             {% if b.type == 'reverse_proxy' %}
-              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.host or '—' }}</span>
-               {% if b.port %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.port }}</span>{% endif %}
+              <span class="font-monospace">{{ b.host or '-' }}</span>
+               {% if b.port %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.port }}</span>{% endif %}
             {% elif b.type == 'redirect' %}
-              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.target or '—' }}</span>
-              {% if b.redirect_code %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.redirect_code }}</span>{% endif %}
+              <span class="font-monospace">{{ b.target or '-' }}</span>
+              {% if b.redirect_code %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.redirect_code }}</span>{% endif %}
             {% elif b.type == 'load_balancer' %}
-              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.upstreams | length }} upstreams</span>
-              {% if b.lb_policy %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
+              <span class="font-monospace">{{ b.upstreams | length }} upstreams</span>
+              {% if b.lb_policy %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.lb_policy }}</span>{% endif %}
             {% elif b.type == 'static_site' %}
-              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">{{ b.path or '—' }}</span>
-              {% if b.encode %}<span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.encode | join(', ') }}</span>{% endif %}
+              <span class="font-monospace">{{ b.path or '-' }}</span>
+              {% if b.encode %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.encode | join(', ') }}</span>{% endif %}
             {% else %}
-              <span class="tag {{ 'bg-muted-lt' if b.disabled else 'bg-lt' }} font-monospace">custom</span>
+              <span class="font-monospace">custom</span>
             {% endif %}
           </td>
-          <!-- END UPSTREAM/TARGET CELL -->
+          <!-- END UPSTREAM CELL -->
           <td>{{ b.updated }}</td>
           <td>
             <div class="btn-list flex-nowrap">
