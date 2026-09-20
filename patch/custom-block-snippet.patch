@@ -1,0 +1,85 @@
+diff --git a/caddy_manager/blocks.py b/caddy_manager/blocks.py
+index c76bb96..3231698 100644
+--- a/caddy_manager/blocks.py
++++ b/caddy_manager/blocks.py
+@@ -10,7 +10,7 @@ from flask import abort
+ from .configstore import get_conf_dir, get_log_dir, get_caddy_log_output_dir
+ from .caddyfile import (
+     site_addresses_from_textarea, site_address_header, slugify,
+-    join_target, split_target, parse_conf_content,
++    join_target, split_target, parse_conf_content, custom_block_preview, extract_body,
+     render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
+     render_log_block, ENCODE_FORMATS, LOG_LEVELS, LOG_FORMATS,
+ )
+@@ -165,6 +165,14 @@ def read_metadata(conf_filename, conf_path):
+                 # Migrate pre-rename sidecars (hosts -> site_addresses) transparently.
+                 if "site_addresses" not in cached and "hosts" in cached:
+                     cached["site_addresses"] = cached.pop("hosts")
++                # Backfill the Site Blocks table snippet for custom sidecars saved before it existed.
++                if cached.get("type") == "custom" and "snippet" not in cached:
++                    try:
++                        with open(conf_path) as f:
++                            cached["snippet"] = custom_block_preview(extract_body(f.read()))
++                        write_metadata(conf_filename, conf_path, cached)
++                    except OSError:
++                        cached["snippet"] = ""
+                 return cached
+         except (OSError, ValueError):
+             pass
+@@ -266,6 +274,7 @@ def list_blocks():
+             "lb_policy": meta.get("lb_policy", ""),
+             "path": meta.get("path", ""),
+             "encode": meta.get("encode", []),
++            "custom_snippet": meta.get("snippet", ""),
+             "browse": meta.get("browse", False),
+             "index": meta.get("index", ""),
+             "hide": meta.get("hide", ""),
+@@ -470,7 +479,7 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
+             error = "Block content is required."
+         else:
+             content = render_custom(site_address_header(site_addresses), raw, log_lines)
+-            meta.update(type="custom")
++            meta.update(type="custom", snippet=custom_block_preview(raw))
+ 
+     if not error:
+         error = log_error
+diff --git a/caddy_manager/caddyfile.py b/caddy_manager/caddyfile.py
+index 16b9cb9..21556d2 100644
+--- a/caddy_manager/caddyfile.py
++++ b/caddy_manager/caddyfile.py
+@@ -271,6 +271,15 @@ def extract_body(content):
+     return content[start + 1:end].strip("\n")
+ 
+ 
++def custom_block_preview(body_text, max_chars=240):
++    """Single-line, whitespace-collapsed preview of a custom block's body
++    text, for the Site Blocks table. Braces are kept as-is so it still reads as code."""
++    collapsed = re.sub(r"\s+", " ", (body_text or "")).strip()
++    if len(collapsed) > max_chars:
++        return collapsed[:max_chars].rstrip() + "…"
++    return collapsed
++
++
+ # ---------------------------------------------------------------------------
+ # Block parsing (Caddyfile text -> structured fields). Fallback only, for
+ # files this app didn't write -- see blocks.read_metadata.
+@@ -350,4 +359,5 @@ def parse_conf_content(content):
+                 "index": index_match.group(1).strip() if index_match else "",
+                 "hide": hide_match.group(1).strip() if hide_match else "", **logging_fields}
+ 
+-    return {"type": "custom", "site_addresses": site_addresses}
++    return {"type": "custom", "site_addresses": site_addresses,
++            "snippet": custom_block_preview(extract_body(content))}
+diff --git a/templates/site_blocks.html b/templates/site_blocks.html
+index 9778057..8f6b9ca 100644
+--- a/templates/site_blocks.html
++++ b/templates/site_blocks.html
+@@ -261,7 +261,7 @@
+               <span class="d-inline-block text-truncate align-bottom font-monospace" style="max-width: 200px;" title="{{ b.path or '-' }}">{{ b.path or '-' }}</span>
+               {% if b.encode %}<span class="badge {{ 'bg-muted-lt' if b.disabled else 'bg-' + row_color + '-lt' }} font-monospace">{{ b.encode | join(', ') }}</span>{% endif %}
+             {% else %}
+-              <span class="font-monospace">custom</span>
++              <span class="d-inline-block text-truncate align-bottom font-monospace" style="max-width: 200px;" title="{{ b.custom_snippet or 'custom' }}">{{ b.custom_snippet or 'custom' }}</span>
+             {% endif %}
+           </td>
+           <!-- END UPSTREAM CELL -->

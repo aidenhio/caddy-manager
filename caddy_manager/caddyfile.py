@@ -271,6 +271,15 @@ def extract_body(content):
     return content[start + 1:end].strip("\n")
 
 
+def custom_block_preview(body_text, max_chars=240):
+    """Single-line, whitespace-collapsed preview of a custom block's body
+    text, for the Site Blocks table. Braces are kept as-is so it still reads as code."""
+    collapsed = re.sub(r"\s+", " ", (body_text or "")).strip()
+    if len(collapsed) > max_chars:
+        return collapsed[:max_chars].rstrip() + "…"
+    return collapsed
+
+
 # ---------------------------------------------------------------------------
 # Block parsing (Caddyfile text -> structured fields). Fallback only, for
 # files this app didn't write -- see blocks.read_metadata.
@@ -350,4 +359,5 @@ def parse_conf_content(content):
                 "index": index_match.group(1).strip() if index_match else "",
                 "hide": hide_match.group(1).strip() if hide_match else "", **logging_fields}
 
-    return {"type": "custom", "site_addresses": site_addresses}
+    return {"type": "custom", "site_addresses": site_addresses,
+            "snippet": custom_block_preview(extract_body(content))}

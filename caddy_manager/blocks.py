@@ -10,7 +10,7 @@ from flask import abort
 from .configstore import get_conf_dir, get_log_dir, get_caddy_log_output_dir
 from .caddyfile import (
     site_addresses_from_textarea, site_address_header, slugify,
-    join_target, split_target, parse_conf_content,
+    join_target, split_target, parse_conf_content, custom_block_preview, extract_body,
     render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
     render_log_block, ENCODE_FORMATS, LOG_LEVELS, LOG_FORMATS,
 )
@@ -165,6 +165,14 @@ def read_metadata(conf_filename, conf_path):
                 # Migrate pre-rename sidecars (hosts -> site_addresses) transparently.
                 if "site_addresses" not in cached and "hosts" in cached:
                     cached["site_addresses"] = cached.pop("hosts")
+                # Backfill the Site Blocks table snippet for custom sidecars saved before it existed.
+                if cached.get("type") == "custom" and "snippet" not in cached:
+                    try:
+                        with open(conf_path) as f:
+                            cached["snippet"] = custom_block_preview(extract_body(f.read()))
+                        write_metadata(conf_filename, conf_path, cached)
+                    except OSError:
+                        cached["snippet"] = ""
                 return cached
         except (OSError, ValueError):
             pass
@@ -266,6 +274,7 @@ def list_blocks():
             "lb_policy": meta.get("lb_policy", ""),
             "path": meta.get("path", ""),
             "encode": meta.get("encode", []),
+            "custom_snippet": meta.get("snippet", ""),
             "browse": meta.get("browse", False),
             "index": meta.get("index", ""),
             "hide": meta.get("hide", ""),
@@ -470,7 +479,7 @@ def build_block_from_form(block_type, form, log_filename_hint=None):
             error = "Block content is required."
         else:
             content = render_custom(site_address_header(site_addresses), raw, log_lines)
-            meta.update(type="custom")
+            meta.update(type="custom", snippet=custom_block_preview(raw))
 
     if not error:
         error = log_error
