@@ -1,8 +1,11 @@
 .card-code pre {
-    border-radius: 0 0 var(--tblr-card-border-radius) var(--tblr-card-border-radius);
     font-size: var(--tblr-body-font-size);
     color: var(--tblr-code-color);
     tab-size: 2;
+}
+
+.rounded-tl-0 {
+  border-top-left-radius: 0 !important;
 }
 
 .code-primary-lt{

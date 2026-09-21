@@ -31,12 +31,12 @@
   {% if dashboard_widgets.quick_glance_row %}
   <!-- BEGIN QUICK GLANCE ROW -->
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm">
+    <div class="card card-sm card-gradient card-gradient-green card-gradient-start">
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-green-lt avatar">
+              class="bg-green avatar avatar-square text-white">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                 class="icon icon-tabler icons-tabler-outline icon-tabler-world-www">
@@ -62,13 +62,13 @@
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm">
+    <div class="card card-sm card-gradient card-gradient-red card-gradient-start">
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-red-lt avatar"><!-- Download SVG icon from http://tabler.io/icons/icon/shopping-cart -->
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-world-off">
+              class="bg-red avatar avatar-square text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-world-off">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5.657 5.615a9 9 0 1 0 12.717 12.739m1.672 -2.322a9 9 0 0 0 -12.066 -12.084" />
                 <path d="M3.6 9h5.4m4 0h7.4" />
@@ -88,14 +88,14 @@
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm">
+    <div class="card card-sm card-gradient card-gradient-yellow card-gradient-start">
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
-            <span class="bg-yellow-lt avatar">
+            <span class="bg-yellow avatar avatar-square text-white">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-              class="icon icon-tabler icons-tabler-outline icon-tabler-certificate">
+              class="icon icon-tabler-certificate">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M12 15a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
                 <path d="M13 17.5v4.5l2 -1.5l2 1.5v-4.5" />
@@ -115,13 +115,13 @@
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm">
+    <div class="card card-sm card-gradient card-gradient-azure card-gradient-start">
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-azure-lt avatar">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-affiliate">
+              class="bg-azure avatar avatar-square text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-affiliate">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5.931 6.936l1.275 4.249m5.607 5.609l4.251 1.275" />
                 <path d="M11.683 12.317l5.759 -5.759" />
@@ -150,7 +150,14 @@
       <div class="card-header">
         <h3 class="card-title">Recently Added</h3>
         <div class="card-actions">
-          <a href="{{ url_for('main.site_blocks') }}" class="btn">View all</a>
+          <a href="{{ url_for('main.site_blocks') }}" type="button" class="btn btn-icon" title="View all">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-dots">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+              <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+              <path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+            </svg>
+          </a>
         </div>
       </div>
       {% if recent_blocks %}
@@ -160,7 +167,7 @@
           {% set row_color = type_color(b.type) %}
           {% set row_label = 'Reverse Proxy' if b.type == 'reverse_proxy' else ('Redirect' if b.type == 'redirect' else ('Load Balancer' if b.type == 'load_balancer' else ('Static Site' if b.type == 'static_site' else 'Custom'))) %}
           <li class="timeline-event">
-            <div class="timeline-event-icon bg-{{ row_color }}-lt">
+            <div class="timeline-event-icon bg-{{ row_color }} text-white">
               {% if b.type == 'reverse_proxy' %}
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -285,7 +292,14 @@
           <div class="card-header">
             <h3 class="card-title">Certificate Status</h3>
             <div class="card-actions">
-              <a href="{{ url_for('main.certificates') }}" class="btn">View all</a>
+              <a href="{{ url_for('main.certificates') }}" type="button" class="btn btn-icon" title="View all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-dots">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                  <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                  <path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                </svg>
+              </a>
             </div>
           </div>
           <div class="card-body">

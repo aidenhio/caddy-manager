@@ -9,7 +9,7 @@
 
 {% block header_actions %}
 <div class="btn-list">
-  <a href="{{ url_for('main.site_blocks') }}" class="btn btn-1">
+  <a href="{{ url_for('main.site_blocks') }}" class="btn">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-arrow-left">
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M5 12l14 0" />
@@ -18,7 +18,7 @@
     </svg>
     Back
   </a>
-  <a href="{{ url_for('main.edit_block', filename=filename) }}" class="btn btn-{{ type_color }} btn-5 d-none d-sm-inline-block">
+  <a href="{{ url_for('main.edit_block', filename=filename) }}" class="btn btn-{{ type_color }}">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler-pencil">
       <path stroke="none" d="M0 0h24v24H0z" fill="none" />
       <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
@@ -37,8 +37,7 @@
 
   <!-- BEGIN METADATA SIDEBAR -->
   <div class="col-12 col-lg-4">
-    <div class="card rounded-top-0">
-      <div class="card-status-top bg-{{ type_color }}"></div>
+    <div class="card">
       <div class="card-header">
         <h3 class="card-title">Details</h3>
       </div>
@@ -129,7 +128,7 @@
         <div class="list-group-item">
           <div class="text-secondary small mb-1">{{ 'Site Addresses' if site_addresses | length > 1 else 'Site Address' }}</div>
           {% if site_addresses %}
-            {% for h in site_addresses %}<div class="font-monospace">{{ h }}</div>{% endfor %}
+            {% for h in site_addresses %}<div>{{ h }}</div>{% endfor %}
           {% else %}
             <span class="text-danger">No site address configured</span>
           {% endif %}
@@ -201,34 +200,43 @@
 
   <!-- BEGIN FILE CARDS -->
   <div class="col-12 col-lg-8">
-    
 
-    <!-- BEGIN CONF CARD -->
-    <div class="card rounded-top-0">
-      <div class="card-status-top bg-{{ type_color }}"></div>
-      <div class="card-header">
-        <h3 class="card-title">Caddy Config</h3>
-      </div>
-      <div class="card-body card-code p-0">
-        <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ conf_content }}</code></pre>
+    <!-- BEGIN TABBED CARDS -->
+    <div class="card-tabs">
+      
+      <!-- BEGIN TAB NAV -->
+      <ul class="nav nav-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <a href="#conf" id="tab-conf" class="nav-link active" data-bs-toggle="tab" data-bs-target="#conf" role="tab">
+            Configuration
+          </a>
+        </li>
+        <li class="nav-item" role="presentation">
+          <a href="#meta" id="tab-meta" class="nav-link" data-bs-toggle="tab" data-bs-target="#meta" role="tab" tabindex="-1">
+            Metadata
+          </a>
+        </li>
+      </ul>
+      <!-- BEGIN TAB NAV -->
+
+      <div class="tab-content">
+        <!-- BEGIN CONF CARD -->
+        <div id="conf" class="card tab-pane active show" role="tabpanel">
+          <div class="card-body card-code p-0 rounded-tl-0">
+              <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ conf_content }}</code></pre>
+          </div>
+        </div>
+        <!-- END CONF CARD -->
+        <!-- BEGIN METADATA CARD -->
+        <div id="meta" class="card tab-pane" role="tabpanel">
+          <div class="card-body card-code p-0 rounded-tl-0">
+            <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ metadata_content }}</code></pre>
+          </div>
+        </div>
+        <!-- END METADATA CARD -->
       </div>
     </div>
-    <!-- END CONF CARD -->
-
-    <!-- BEGIN METADATA CARD -->
-    {% if show_metadata_card %}
-    <div class="card rounded-top-0 mt-2">
-      <div class="card-status-top bg-{{ type_color }}"></div>
-      <div class="card-header">
-        <h3 class="card-title">Metadata</h3>
-      </div>
-      <div class="card-body card-code p-0">
-        <pre class="code-{{ type_color }}-lt p-3 mb-0"><code>{{ metadata_content }}</code></pre>
-      </div>
-    </div>
-    {% endif %}
-    <!-- END METADATA CARD -->
-
+    <!-- END TABBED CARDS -->
   </div>
   <!-- END FILE CARDS -->
 
