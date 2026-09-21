@@ -124,28 +124,8 @@
 
         <!-- TAB GENERAL -->
         <div id="general" class="tab-pane{% if active_tab == 'general' %} active{% endif %}">
-          {% set show_metadata_card = cfg.show_metadata_card if cfg.show_metadata_card is defined else true %}
           <div class="card-body">
             <h2 class="mb-4">General Settings</h2>
-
-            <h3 class="card-title">Preview Page Options</h3>
-            <p class="text-secondary">
-              Controls what's shown on a site block's Preview page.
-            </p>
-            <form method="post" id="preview-form">
-              <input type="hidden" name="action" value="update_preview">
-              <div class="mb-0">
-                <label class="form-check form-switch">
-                  <input type="checkbox" class="form-check-input" id="show-metadata-card-input" name="show_metadata_card" value="on" {{ 'checked' if show_metadata_card }}>
-                  <span class="form-check-label">Show Metadata card</span>
-                </label>
-              </div>
-              <div class="form-footer">
-                <button type="submit" class="btn btn-primary">Update</button>
-              </div>
-            </form>
-
-            <hr class="my-4">
 
             <h3 class="card-title">Log Viewer</h3>
             <p class="text-secondary">
@@ -186,7 +166,6 @@
             </form>
           </div>
           <script>
-            initFormValidation(document.getElementById('preview-form'));
             initFormValidation(document.getElementById('logging-form'));
             initFormValidation(document.getElementById('certificates-form'));
           </script>

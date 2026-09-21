@@ -140,18 +140,6 @@ def get_quick_add_type_site_blocks():
     return value if value in QUICK_ADD_BLOCK_TYPES else None
 
 
-# Whether the Preview page shows the raw metadata sidecar. On by default.
-DEFAULT_SHOW_METADATA_CARD = True
-
-
-def get_show_metadata_card():
-    cfg = load_config()
-    value = cfg.get("show_metadata_card") if cfg else None
-    if isinstance(value, bool):
-        return value
-    return DEFAULT_SHOW_METADATA_CARD
-
-
 # Dashboard widgets in display order, as (config key, toggle label). All shown by default.
 DASHBOARD_WIDGETS = (
     ("quick_glance_row", "Quick Glance Row"),
