@@ -190,14 +190,14 @@
     if (fieldEls.summary) fieldEls.summary.textContent = '';
     if (fieldEls.lines) fieldEls.lines.textContent = '';
     if (fieldEls.entries) fieldEls.entries.innerHTML = '';
-    if (fieldEls.error) fieldEls.error.textContent = '';
+    if (fieldEls['error-text']) fieldEls['error-text'].textContent = '';
     showState('loading');
 
     fetch(`/logs/${encodeURIComponent(filename)}/tail`, { headers: { Accept: 'application/json' } })
       .then((res) => res.json())
       .then((data) => {
         if (data.error) {
-          if (fieldEls.error) fieldEls.error.textContent = data.error;
+          if (fieldEls['error-text']) fieldEls['error-text'].textContent = data.error;
           showState('error');
           return;
         }
@@ -218,7 +218,7 @@
         }
       })
       .catch(() => {
-        if (fieldEls.error) fieldEls.error.textContent = 'Could not load the log file.';
+        if (fieldEls['error-text']) fieldEls['error-text'].textContent = 'Could not load the log file.';
         showState('error');
       });
   });

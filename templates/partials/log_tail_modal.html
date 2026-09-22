@@ -1,3 +1,4 @@
+{% from "macros/alerts.html" import alert_icon %}
 <!-- BEGIN LOG TAIL MODAL -->
 <div class="modal modal-blur fade" id="log-tail-modal" tabindex="-1">
   <div class="modal-dialog modal-xl modal-dialog-centered">
@@ -11,7 +12,12 @@
       <!-- BEGIN MODAL BODY -->
       <div class="modal-body">
         <div data-field="loading" class="text-secondary">Loading…</div>
-        <div data-field="error" class="alert alert-danger" hidden></div>
+        <div data-field="error" class="alert alert-danger" role="alert" hidden>
+          <div class="alert-icon">
+            {{ alert_icon('danger') }}
+          </div>
+          <div data-field="error-text"></div>
+        </div>
 
         <!-- BEGIN JSON ENTRIES VIEW -->
         <div data-field="entries" class="border rounded" style="max-height: 60vh; overflow-y: auto;" hidden></div>

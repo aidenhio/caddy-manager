@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/alerts.html" import alert %}
 
 {% block title %}Site Blocks - Caddy Manager{% endblock %}
 {% block page_pretitle %}Caddy{% endblock %}
@@ -31,7 +32,7 @@
 {% block content %}
 
 {% if not dir_exists %}
-  <div class="alert alert-danger">The Caddyfile conf directory doesn't exist yet. It will be created automatically when you add your first block.</div>
+  {% call alert('danger') %}The Caddyfile conf directory doesn't exist yet. It will be created automatically when you add your first block.{% endcall %}
 {% endif %}
 
 <div class="card">

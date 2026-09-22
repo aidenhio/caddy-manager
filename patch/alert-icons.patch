@@ -1,0 +1,314 @@
+diff --git a/static/js/log-tail-modal.js b/static/js/log-tail-modal.js
+index f35b196..6c1bf76 100644
+--- a/static/js/log-tail-modal.js
++++ b/static/js/log-tail-modal.js
+@@ -190,14 +190,14 @@
+     if (fieldEls.summary) fieldEls.summary.textContent = '';
+     if (fieldEls.lines) fieldEls.lines.textContent = '';
+     if (fieldEls.entries) fieldEls.entries.innerHTML = '';
+-    if (fieldEls.error) fieldEls.error.textContent = '';
++    if (fieldEls['error-text']) fieldEls['error-text'].textContent = '';
+     showState('loading');
+ 
+     fetch(`/logs/${encodeURIComponent(filename)}/tail`, { headers: { Accept: 'application/json' } })
+       .then((res) => res.json())
+       .then((data) => {
+         if (data.error) {
+-          if (fieldEls.error) fieldEls.error.textContent = data.error;
++          if (fieldEls['error-text']) fieldEls['error-text'].textContent = data.error;
+           showState('error');
+           return;
+         }
+@@ -218,7 +218,7 @@
+         }
+       })
+       .catch(() => {
+-        if (fieldEls.error) fieldEls.error.textContent = 'Could not load the log file.';
++        if (fieldEls['error-text']) fieldEls['error-text'].textContent = 'Could not load the log file.';
+         showState('error');
+       });
+   });
+diff --git a/templates/base.html b/templates/base.html
+index 30ed533..1321d1a 100644
+--- a/templates/base.html
++++ b/templates/base.html
+@@ -1,3 +1,4 @@
++{% from "macros/alerts.html" import alert %}
+ <!doctype html>
+ <html lang="en">
+ 
+@@ -67,11 +68,8 @@
+             <!-- BEGIN ALERTS --> 
+             {% with messages = get_flashed_messages(with_categories=true) %}
+               {% if messages %}
+-                {% for category, message in messages %} 
+-                  <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show mb-3" role="alert">
+-                    {{ message }}
+-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+-                  </div>
++                {% for category, message in messages %}
++                  {% call alert('success' if category == 'success' else 'danger', dismissible=True, classes='fade show mb-3') %}{{ message }}{% endcall %}
+                 {% endfor %}
+               {% endif %}
+             {% endwith %}  
+diff --git a/templates/block_form.html b/templates/block_form.html
+index 1a80300..a92b3b8 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -1,4 +1,5 @@
+ {% extends "base.html" %}
++{% from "macros/alerts.html" import alert %}
+ 
+ {% set type_color = type_color(block_type) %}
+ 
+@@ -83,7 +84,7 @@
+ 
+       <!-- BEGIN CARD BODY -->
+       <div class="card-body">
+-        {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
++        {% if error %}{% call alert('danger') %}{{ error }}{% endcall %}{% endif %}
+ 
+         <form method="post" id="block-form" data-type-color="{{ type_color }}" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
+ 
+diff --git a/templates/certificates.html b/templates/certificates.html
+index 09dcc03..0ae27cc 100644
+--- a/templates/certificates.html
++++ b/templates/certificates.html
+@@ -1,4 +1,5 @@
+ {% extends "base.html" %}
++{% from "macros/alerts.html" import alert %}
+ 
+ {% block title %}Certificates - Caddy Manager{% endblock %}
+ {% block page_pretitle %}Caddy{% endblock %}
+@@ -21,7 +22,7 @@
+ {% block content %}
+ 
+ {% if not dir_exists %}
+-  <div class="alert alert-danger">The certificates directory doesn't exist yet. Caddy creates it the first time it obtains a certificate.</div>
++  {% call alert('danger') %}The certificates directory doesn't exist yet. Caddy creates it the first time it obtains a certificate.{% endcall %}
+ {% endif %}
+ 
+ <div class="card">
+diff --git a/templates/login.html b/templates/login.html
+index 26736dc..68ff20f 100644
+--- a/templates/login.html
++++ b/templates/login.html
+@@ -1,3 +1,4 @@
++{% from "macros/alerts.html" import alert %}
+ <!doctype html>
+ <html lang="en">
+ 
+@@ -45,10 +46,7 @@
+         {% with messages = get_flashed_messages(with_categories=true) %}
+           {% if messages %}
+             {% for category, message in messages %}
+-              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible" role="alert">
+-                {{ message }}
+-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+-              </div>
++              {% call alert('success' if category == 'success' else 'danger', dismissible=True) %}{{ message }}{% endcall %}
+             {% endfor %}
+           {% endif %}
+         {% endwith %}
+@@ -58,7 +56,7 @@
+         <div class="card card-md">
+           <div class="card-body">
+             <h2 class="h2 text-center mb-4">Log in</h2>
+-            {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
++            {% if error %}{% call alert('danger') %}{{ error }}{% endcall %}{% endif %}
+             <form method="post" autocomplete="off" id="login-form">
+               <div class="mb-3">
+                 <label class="form-label">Username</label>
+diff --git a/templates/logs.html b/templates/logs.html
+index a5a84d8..10bd2f6 100644
+--- a/templates/logs.html
++++ b/templates/logs.html
+@@ -1,4 +1,5 @@
+ {% extends "base.html" %}
++{% from "macros/alerts.html" import alert %}
+ 
+ {% block title %}Logs - Caddy Manager{% endblock %}
+ {% block page_pretitle %}Caddy{% endblock %}
+@@ -22,7 +23,7 @@
+ {% block content %}
+ 
+ {% if not dir_exists %}
+-  <div class="alert alert-danger">The logs directory doesn't exist yet. It's created automatically the first time a site block has logging enabled.</div>
++  {% call alert('danger') %}The logs directory doesn't exist yet. It's created automatically the first time a site block has logging enabled.{% endcall %}
+ {% endif %}
+ 
+ <div class="card">
+diff --git a/templates/macros/alerts.html b/templates/macros/alerts.html
+new file mode 100644
+index 0000000..5b8455b
+--- /dev/null
++++ b/templates/macros/alerts.html
+@@ -0,0 +1,42 @@
++{# Icons match https://preview.tabler.io/alerts.html exactly (alert-circle/alert-triangle/check/info-circle). #}
++{% macro alert_icon(kind) %}
++  {%- if kind == 'danger' -%}
++<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" class="icon alert-icon">
++  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
++  <path d="M12 8v4" />
++  <path d="M12 16h.01" />
++</svg>
++  {%- elif kind == 'warning' -%}
++<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" class="icon alert-icon">
++  <path d="M12 9v4" />
++  <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />
++  <path d="M12 16h.01" />
++</svg>
++  {%- elif kind == 'success' -%}
++<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" class="icon alert-icon">
++  <path d="M5 12l5 5l10 -10" />
++</svg>
++  {%- elif kind == 'info' -%}
++<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" class="icon alert-icon">
++  <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
++  <path d="M12 9h.01" />
++  <path d="M11 12h1v4h1" />
++</svg>
++  {%- endif -%}
++{% endmacro %}
++
++{# Full alert with its icon. `kind` is danger/warning/success/info. `dismissible` adds the
++   standard close button; `classes` appends any extra utility classes (e.g. "fade show mb-3").
++   The body is wrapped in one <div> -- .alert is display:flex, so mixed content (text next to
++   a <code>/<a>/etc.) would otherwise split into separate flex columns instead of flowing. #}
++{% macro alert(kind, dismissible=False, classes='') %}
++<div class="alert alert-{{ kind }}{% if dismissible %} alert-dismissible{% endif %}{% if classes %} {{ classes }}{% endif %}" role="alert">
++  <div class="alert-icon">
++    {{ alert_icon(kind) }}
++  </div>
++  <div>{{ caller() }}</div>
++  {% if dismissible %}
++  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
++  {% endif %}
++</div>
++{% endmacro %}
+diff --git a/templates/partials/log_tail_modal.html b/templates/partials/log_tail_modal.html
+index 17e2d54..b5b9e43 100644
+--- a/templates/partials/log_tail_modal.html
++++ b/templates/partials/log_tail_modal.html
+@@ -1,3 +1,4 @@
++{% from "macros/alerts.html" import alert_icon %}
+ <!-- BEGIN LOG TAIL MODAL -->
+ <div class="modal modal-blur fade" id="log-tail-modal" tabindex="-1">
+   <div class="modal-dialog modal-xl modal-dialog-centered">
+@@ -11,7 +12,12 @@
+       <!-- BEGIN MODAL BODY -->
+       <div class="modal-body">
+         <div data-field="loading" class="text-secondary">Loading…</div>
+-        <div data-field="error" class="alert alert-danger" hidden></div>
++        <div data-field="error" class="alert alert-danger" role="alert" hidden>
++          <div class="alert-icon">
++            {{ alert_icon('danger') }}
++          </div>
++          <div data-field="error-text"></div>
++        </div>
+ 
+         <!-- BEGIN JSON ENTRIES VIEW -->
+         <div data-field="entries" class="border rounded" style="max-height: 60vh; overflow-y: auto;" hidden></div>
+diff --git a/templates/settings.html b/templates/settings.html
+index 7825e6a..9443190 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -1,4 +1,5 @@
+ {% extends "base.html" %}
++{% from "macros/alerts.html" import alert %}
+ 
+ {% block title %}Settings - Caddy Manager{% endblock %}
+ {% block page_pretitle %}Home{% endblock %}
+@@ -10,7 +11,7 @@
+ {% block content %}
+ 
+ {% if error %}
+-<div class="alert alert-danger">{{ error }}</div>
++{% call alert('danger') %}{{ error }}{% endcall %}
+ {% endif %}
+ 
+ <!-- BEGIN SETTINGS CARD -->
+@@ -315,28 +316,14 @@
+               Edit the main Caddyfile{% if cfg.caddyfile_path %} (<code>{{ cfg.caddyfile_path }}</code>){% endif %} directly.
+             </p>
+         
+-            <div class="alert alert-warning" role="alert">
+-              <div class="alert-icon">
+-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+-                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+-                  focusable="false" class="icon alert-icon">
+-                  <path d="M12 9v4"></path>
+-                  <path
+-                    d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0">
+-                  </path>
+-                  <path d="M12 16h.01"></path>
+-                </svg>
+-              </div>
+-              <span>
+-                Saving here writes straight to the Caddyfile on disk, outside of Caddy Manager's usual validation. Invalid syntax can stop Caddy from starting or reloading. Every save backs up the file that was on disk beforehand to <code>Caddyfile.bak</code> so you can roll back if something goes wrong.
+-              </span>
+-            </div>
+-        
++            {% call alert('warning') %}
++              Saving here writes straight to the Caddyfile on disk, outside of Caddy Manager's usual validation. Invalid syntax can stop Caddy from starting or reloading. Every save backs up the file that was on disk beforehand to <code>Caddyfile.bak</code> so you can roll back if something goes wrong.
++            {% endcall %}
++
+             {% if not cfg.caddyfile_path %}
+-            <div class="alert alert-danger">No Caddyfile path is configured, please set one in <a href="#directory"
+-                data-bs-toggle="tab">Directories</a> first.</div>
++            {% call alert('danger') %}No Caddyfile path is configured, please set one in <a href="#directory" data-bs-toggle="tab">Directories</a> first.{% endcall %}
+             {% elif caddyfile_read_error %}
+-            <div class="alert alert-danger">{{ caddyfile_read_error }}</div>
++            {% call alert('danger') %}{{ caddyfile_read_error }}{% endcall %}
+             {% else %}
+         
+             <!-- BEGIN CONF IMPORT CHECK -->
+diff --git a/templates/setup.html b/templates/setup.html
+index 6b64d9a..d203eb5 100644
+--- a/templates/setup.html
++++ b/templates/setup.html
+@@ -1,3 +1,4 @@
++{% from "macros/alerts.html" import alert %}
+ <!doctype html>
+ <html lang="en">
+ 
+@@ -45,10 +46,7 @@
+         {% with messages = get_flashed_messages(with_categories=true) %}
+           {% if messages %}
+             {% for category, message in messages %}
+-              <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible" role="alert">
+-                {{ message }}
+-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+-              </div>
++              {% call alert('success' if category == 'success' else 'danger', dismissible=True) %}{{ message }}{% endcall %}
+             {% endfor %}
+           {% endif %}
+         {% endwith %}
+@@ -59,7 +57,7 @@
+           <div class="card-body">
+             <h2 class="h2 text-center mb-4">Initial Setup</h2>
+             <p class="text-secondary text-center mb-4">Create your admin account and point this app at your Caddy root directory.</p>
+-            {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
++            {% if error %}{% call alert('danger') %}{{ error }}{% endcall %}{% endif %}
+             <form method="post" autocomplete="off" id="setup-form">
+               <div class="mb-3">
+                 <label class="form-label">Admin username</label>
+diff --git a/templates/site_blocks.html b/templates/site_blocks.html
+index 8f6b9ca..90f088f 100644
+--- a/templates/site_blocks.html
++++ b/templates/site_blocks.html
+@@ -1,4 +1,5 @@
+ {% extends "base.html" %}
++{% from "macros/alerts.html" import alert %}
+ 
+ {% block title %}Site Blocks - Caddy Manager{% endblock %}
+ {% block page_pretitle %}Caddy{% endblock %}
+@@ -31,7 +32,7 @@
+ {% block content %}
+ 
+ {% if not dir_exists %}
+-  <div class="alert alert-danger">The Caddyfile conf directory doesn't exist yet. It will be created automatically when you add your first block.</div>
++  {% call alert('danger') %}The Caddyfile conf directory doesn't exist yet. It will be created automatically when you add your first block.{% endcall %}
+ {% endif %}
+ 
+ <div class="card">

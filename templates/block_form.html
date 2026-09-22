@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/alerts.html" import alert %}
 
 {% set type_color = type_color(block_type) %}
 
@@ -83,7 +84,7 @@
 
       <!-- BEGIN CARD BODY -->
       <div class="card-body">
-        {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+        {% if error %}{% call alert('danger') %}{{ error }}{% endcall %}{% endif %}
 
         <form method="post" id="block-form" data-type-color="{{ type_color }}" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
 

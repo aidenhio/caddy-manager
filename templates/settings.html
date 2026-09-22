@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/alerts.html" import alert %}
 
 {% block title %}Settings - Caddy Manager{% endblock %}
 {% block page_pretitle %}Home{% endblock %}
@@ -10,7 +11,7 @@
 {% block content %}
 
 {% if error %}
-<div class="alert alert-danger">{{ error }}</div>
+{% call alert('danger') %}{{ error }}{% endcall %}
 {% endif %}
 
 <!-- BEGIN SETTINGS CARD -->
@@ -315,28 +316,14 @@
               Edit the main Caddyfile{% if cfg.caddyfile_path %} (<code>{{ cfg.caddyfile_path }}</code>){% endif %} directly.
             </p>
         
-            <div class="alert alert-warning" role="alert">
-              <div class="alert-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
-                  focusable="false" class="icon alert-icon">
-                  <path d="M12 9v4"></path>
-                  <path
-                    d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0">
-                  </path>
-                  <path d="M12 16h.01"></path>
-                </svg>
-              </div>
-              <span>
-                Saving here writes straight to the Caddyfile on disk, outside of Caddy Manager's usual validation. Invalid syntax can stop Caddy from starting or reloading. Every save backs up the file that was on disk beforehand to <code>Caddyfile.bak</code> so you can roll back if something goes wrong.
-              </span>
-            </div>
-        
+            {% call alert('warning') %}
+              Saving here writes straight to the Caddyfile on disk, outside of Caddy Manager's usual validation. Invalid syntax can stop Caddy from starting or reloading. Every save backs up the file that was on disk beforehand to <code>Caddyfile.bak</code> so you can roll back if something goes wrong.
+            {% endcall %}
+
             {% if not cfg.caddyfile_path %}
-            <div class="alert alert-danger">No Caddyfile path is configured, please set one in <a href="#directory"
-                data-bs-toggle="tab">Directories</a> first.</div>
+            {% call alert('danger') %}No Caddyfile path is configured, please set one in <a href="#directory" data-bs-toggle="tab">Directories</a> first.{% endcall %}
             {% elif caddyfile_read_error %}
-            <div class="alert alert-danger">{{ caddyfile_read_error }}</div>
+            {% call alert('danger') %}{{ caddyfile_read_error }}{% endcall %}
             {% else %}
         
             <!-- BEGIN CONF IMPORT CHECK -->

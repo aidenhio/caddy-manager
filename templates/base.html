@@ -1,3 +1,4 @@
+{% from "macros/alerts.html" import alert %}
 <!doctype html>
 <html lang="en">
 
@@ -67,11 +68,8 @@
             <!-- BEGIN ALERTS --> 
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
-                {% for category, message in messages %} 
-                  <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show mb-3" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                  </div>
+                {% for category, message in messages %}
+                  {% call alert('success' if category == 'success' else 'danger', dismissible=True, classes='fade show mb-3') %}{{ message }}{% endcall %}
                 {% endfor %}
               {% endif %}
             {% endwith %}  

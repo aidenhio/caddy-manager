@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/alerts.html" import alert %}
 
 {% block title %}Certificates - Caddy Manager{% endblock %}
 {% block page_pretitle %}Caddy{% endblock %}
@@ -21,7 +22,7 @@
 {% block content %}
 
 {% if not dir_exists %}
-  <div class="alert alert-danger">The certificates directory doesn't exist yet. Caddy creates it the first time it obtains a certificate.</div>
+  {% call alert('danger') %}The certificates directory doesn't exist yet. Caddy creates it the first time it obtains a certificate.{% endcall %}
 {% endif %}
 
 <div class="card">
