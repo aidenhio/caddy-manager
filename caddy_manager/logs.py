@@ -1,5 +1,6 @@
 """Logs page: scans the logs directory and groups Caddy's rotated backups
 (`<prefix>-<timestamp>-<reason><ext>`) back under their live log file."""
+import json
 import os
 import re
 from datetime import datetime
@@ -15,6 +16,10 @@ ROTATED_SUFFIX_RE = re.compile(
 MAX_TAIL_LINES = 2000
 TAIL_CHUNK_SIZE = 8192
 
+# Format sniffing only looks at the end of the file, so a big log costs one small read.
+FORMAT_SAMPLE_BYTES = 32768
+FORMAT_SAMPLE_LINES = 10
+
 
 def logical_log_name(filename):
     """The live log filename a file belongs to -- itself, unless it
@@ -25,9 +30,37 @@ def logical_log_name(filename):
     return match.group("prefix") + match.group("ext")
 
 
+def detect_log_format(path):
+    """"json" if each of the last few non-blank lines is a JSON object, else "console".
+    None if the file is missing, unreadable or has no complete lines yet."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            start = max(0, f.tell() - FORMAT_SAMPLE_BYTES)
+            f.seek(start)
+            data = f.read()
+    except OSError:
+        return None
+    lines = data.splitlines()
+    if start > 0 and lines:
+        # The window began mid-file, so the first entry is likely a partial line -- drop it.
+        lines = lines[1:]
+    lines = [line.strip() for line in lines if line.strip()][-FORMAT_SAMPLE_LINES:]
+    if not lines:
+        return None
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            return "console"
+        if not isinstance(entry, dict):
+            return "console"
+    return "json"
+
+
 def list_log_files():
-    """Every file in the logs directory, grouped by logical_log_name()
-    into one row per stream (file count + latest mtime). [] if unconfigured."""
+    """Every file in the logs directory, grouped by logical_log_name() into one row per
+    stream (file count, latest mtime, format of the live file). [] if unconfigured."""
     log_dir = get_log_dir()
     if not log_dir or not os.path.isdir(log_dir):
         return []
@@ -49,6 +82,8 @@ def list_log_files():
     logs = list(groups.values())
     for log in logs:
         log["updated"] = datetime.fromtimestamp(log["updated_ts"]).strftime("%d/%m/%Y %I:%M%p")
+        # Rotated backups may be compressed, so only the live file is sniffed.
+        log["format"] = detect_log_format(os.path.join(log_dir, log["filename"]))
     logs.sort(key=lambda entry: entry["filename"].lower())
     return logs
 

@@ -74,6 +74,11 @@
             </button>
           </th>
           <th>
+            <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="format" data-sort-type="text">
+              Format
+            </button>
+          </th>
+          <th>
             <button type="button" class="table-sort d-flex justify-content-between" data-sort-key="updated" data-sort-type="number">
               Updated
             </button>
@@ -83,7 +88,7 @@
       </thead>
       <tbody>
       {% for log in logs %}
-        <tr data-filename="{{ log.filename | lower }}" data-updated="{{ log.updated_ts }}">
+        <tr data-filename="{{ log.filename | lower }}" data-format="{{ log.format or '' }}" data-updated="{{ log.updated_ts }}">
           <!-- BEGIN FILENAME CELL -->
           <td>
             <span class="font-monospace">{{ log.filename }}</span>
@@ -92,6 +97,17 @@
             {% endif %}
           </td>
           <!-- END FILENAME CELL -->
+          <!-- BEGIN FORMAT CELL -->
+          <td>
+            {% if log.format == 'json' %}
+              <span class="tag bg-azure-lt">JSON</span>
+            {% elif log.format == 'console' %}
+              <span class="tag bg-secondary-lt">Console</span>
+            {% else %}
+              <span class="text-secondary" title="No log lines to detect a format from yet">&mdash;</span>
+            {% endif %}
+          </td>
+          <!-- END FORMAT CELL -->
           <td>{{ log.updated }}</td>
           <td>
             <div class="btn-list flex-nowrap">

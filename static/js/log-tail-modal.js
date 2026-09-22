@@ -1,6 +1,6 @@
 // BEGIN LOG TAIL MODAL
-// Fills the shared modal on open, fetching the tail fresh each time. JSON logs
-// also get a readable, expandable list view with a Formatted/Raw toggle.
+// Fills the shared modal on open, fetching the tail fresh each time. JSON logs show as a
+// readable, expandable list; anything else falls back to the raw lines.
 (function () {
   const modal = document.getElementById('log-tail-modal');
   if (!modal) return;
@@ -181,11 +181,6 @@
     });
   }
 
-  const formattedRadio = modal.querySelector('#log-view-formatted');
-  const rawRadio = modal.querySelector('#log-view-raw');
-  if (formattedRadio) formattedRadio.addEventListener('change', () => { if (formattedRadio.checked) showState('entries'); });
-  if (rawRadio) rawRadio.addEventListener('change', () => { if (rawRadio.checked) showState('lines'); });
-
   modal.addEventListener('show.bs.modal', (event) => {
     const button = event.relatedTarget;
     if (!button) return;
@@ -196,8 +191,6 @@
     if (fieldEls.lines) fieldEls.lines.textContent = '';
     if (fieldEls.entries) fieldEls.entries.innerHTML = '';
     if (fieldEls.error) fieldEls.error.textContent = '';
-    if (fieldEls['view-toggle']) fieldEls['view-toggle'].hidden = true;
-    if (formattedRadio) formattedRadio.checked = true;
     showState('loading');
 
     fetch(`/logs/${encodeURIComponent(filename)}/tail`, { headers: { Accept: 'application/json' } })
@@ -208,10 +201,6 @@
           showState('error');
           return;
         }
-        if (fieldEls.lines) {
-          // Blank line between entries so multi-line entries (stack traces) don't run together.
-          fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n\n') : '(empty file)';
-        }
         if (fieldEls.summary) {
           fieldEls.summary.textContent = `Showing the last ${data.lines.length} log line${data.lines.length === 1 ? '' : 's'}`;
         }
@@ -219,9 +208,12 @@
         const jsonEntries = parseJsonEntries(data.lines);
         if (jsonEntries && fieldEls.entries) {
           fieldEls.entries.innerHTML = buildEntriesHtml(jsonEntries);
-          if (fieldEls['view-toggle']) fieldEls['view-toggle'].hidden = false;
           showState('entries');
         } else {
+          if (fieldEls.lines) {
+            // Blank line between entries so multi-line entries (stack traces) don't run together.
+            fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n\n') : '(empty file)';
+          }
           showState('lines');
         }
       })

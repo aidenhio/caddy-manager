@@ -7,7 +7,7 @@
     <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }}>
     <span class="form-check-label">Enable logging</span>
   </label>
-  <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}</code>.</span>
+  <span class="form-hint">Writes this block's access log to <code>{{ log_dir_display }}</code>. Changing logging options may require a restart of the Caddy service.</span>
 </div>
 <div id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
   <hr class="my-3">
