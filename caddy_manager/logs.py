@@ -20,6 +20,12 @@ TAIL_CHUNK_SIZE = 8192
 FORMAT_SAMPLE_BYTES = 32768
 FORMAT_SAMPLE_LINES = 10
 
+# Caddy's console (zap) encoder writes tab-separated fields -- timestamp, level (optionally
+# ANSI-colored), logger name, message, then an optional trailing JSON object of extra fields,
+# e.g. `2026/09/22 08:38:40.718\t<esc>[34mINFO<esc>[0m\thttp.log.access.log1\thandled request\t{...}`.
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+CONSOLE_LOG_LEVELS = {"DEBUG", "INFO", "WARN", "WARNING", "ERROR", "DPANIC", "PANIC", "FATAL"}
+
 
 def logical_log_name(filename):
     """The live log filename a file belongs to -- itself, unless it
@@ -30,9 +36,30 @@ def logical_log_name(filename):
     return match.group("prefix") + match.group("ext")
 
 
+def _is_json_object_line(line):
+    try:
+        entry = json.loads(line)
+    except ValueError:
+        return False
+    return isinstance(entry, dict)
+
+
+def _is_console_log_line(line):
+    """True for a line shaped like Caddy's console encoder -- at least
+    ts/level/logger/message, tab-separated, with a real zap level name."""
+    parts = line.split("\t")
+    if len(parts) < 4:
+        return False
+    ts, level, logger = parts[0], parts[1], parts[2]
+    if not ts.strip() or not logger.strip():
+        return False
+    return ANSI_ESCAPE_RE.sub("", level).strip().upper() in CONSOLE_LOG_LEVELS
+
+
 def detect_log_format(path):
-    """"json" if each of the last few non-blank lines is a JSON object, else "console".
-    None if the file is missing, unreadable or has no complete lines yet."""
+    """"json" if every sampled line is a JSON object, "console" if every sampled line is
+    shaped like Caddy's console encoder output, else "text". None if the file is missing,
+    unreadable or has no complete lines yet."""
     try:
         with open(path, "rb") as f:
             f.seek(0, os.SEEK_END)
@@ -41,21 +68,19 @@ def detect_log_format(path):
             data = f.read()
     except OSError:
         return None
-    lines = data.splitlines()
-    if start > 0 and lines:
+    raw_lines = data.splitlines()
+    if start > 0 and raw_lines:
         # The window began mid-file, so the first entry is likely a partial line -- drop it.
-        lines = lines[1:]
-    lines = [line.strip() for line in lines if line.strip()][-FORMAT_SAMPLE_LINES:]
+        raw_lines = raw_lines[1:]
+    lines = [line.decode("utf-8", errors="replace").strip() for line in raw_lines]
+    lines = [line for line in lines if line][-FORMAT_SAMPLE_LINES:]
     if not lines:
         return None
-    for line in lines:
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            return "console"
-        if not isinstance(entry, dict):
-            return "console"
-    return "json"
+    if all(_is_json_object_line(line) for line in lines):
+        return "json"
+    if all(_is_console_log_line(line) for line in lines):
+        return "console"
+    return "text"
 
 
 def list_log_files():

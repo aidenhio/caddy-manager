@@ -211,8 +211,8 @@
           showState('entries');
         } else {
           if (fieldEls.lines) {
-            // Blank line between entries so multi-line entries (stack traces) don't run together.
-            fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n\n') : '(empty file)';
+            // One line per entry, matching the log file's own line breaks exactly.
+            fieldEls.lines.textContent = data.lines.length ? data.lines.join('\n') : '(empty file)';
           }
           showState('lines');
         }
