@@ -3,6 +3,8 @@ credentials, the Caddy root directory and derived paths, and a session secret ke
 import os
 import json
 
+from .block_types import BLOCK_TYPE_ORDER
+
 # config.json lives at the project root, one level up from this package.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
@@ -125,7 +127,7 @@ def get_log_tail_lines():
 
 # The "Quick Add" button skips the type-picker modal for one pre-chosen type,
 # set per page. "None" both is the default and turns the button off.
-QUICK_ADD_BLOCK_TYPES = ("reverse_proxy", "redirect", "load_balancer", "static_site", "custom")
+QUICK_ADD_BLOCK_TYPES = BLOCK_TYPE_ORDER
 
 
 def get_quick_add_type_dashboard():
