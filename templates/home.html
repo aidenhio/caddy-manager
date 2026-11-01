@@ -31,7 +31,8 @@
   {% if dashboard_widgets.quick_glance_row %}
   <!-- BEGIN QUICK GLANCE ROW -->
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm card-gradient card-gradient-green card-gradient-start">
+    <div class="card card-sm">
+      <div class="card-status-top bg-green"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
@@ -62,7 +63,8 @@
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm card-gradient card-gradient-red card-gradient-start">
+    <div class="card card-sm">
+      <div class="card-status-top bg-red"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
@@ -88,7 +90,8 @@
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm card-gradient card-gradient-yellow card-gradient-start">
+    <div class="card card-sm">
+      <div class="card-status-top bg-yellow"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
@@ -115,7 +118,8 @@
     </div>
   </div>
   <div class="col-sm-6 col-lg-3">
-    <div class="card card-sm card-gradient card-gradient-azure card-gradient-start">
+    <div class="card card-sm">
+      <div class="card-status-top bg-azure"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
@@ -168,7 +172,7 @@
           {% set row_label = type_label(b.type) %}
           <!-- BEGIN RECENT BLOCK CARD -->
           <div class="col-12">
-            <a href="{{ url_for('main.preview_block', filename=b.filename) }}" class="card card-gradient card-gradient-{{ row_color }} card-gradient-start card-link card-link-pop">
+            <a href="{{ url_for('main.preview_block', filename=b.filename) }}" class="card card-link card-link-pop">
               <div class="card-body">
                 <div class="row align-items-center">
                   <div class="col-auto">

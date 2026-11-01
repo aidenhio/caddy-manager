@@ -10,11 +10,12 @@
       <!-- END MODAL HEADER -->
       <!-- BEGIN MODAL BODY -->
       <div class="modal-body">
-        <div class="row row-cards justify-content-center">
+        <div class="row row-cards">
           <!-- BEGIN BLOCK TYPE CARDS -->
           {% for t in block_type_order %}
           <div class="col-12 col-sm-4">
-            <a href="{{ url_for('main.new_block', block_type=t) }}" class="card card-gradient card-gradient-{{ type_color(t) }} card-link card-link-pop">
+            <a href="{{ url_for('main.new_block', block_type=t) }}" class="card card-link card-link-pop">
+              <div class="card-status-top bg-{{ type_color(t) }}"></div>
               <div class="card-body text-center py-4">
                 <span class="avatar avatar-square avatar-xl bg-{{ type_color(t) }} text-white mb-3">
                   {{ type_icon(t) }}

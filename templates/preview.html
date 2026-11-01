@@ -35,121 +35,10 @@
 
 <div class="row row-cards">
 
-  <!-- BEGIN METADATA SIDEBAR -->
-  <div class="col-12 col-lg-4">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">Details</h3>
-      </div>
-      <div class="list-group list-group-flush">
-
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Status</div>
-          {% if disabled %}
-            <span class="text-secondary d-inline-flex align-items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-minus">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
-                <path d="M9 12l6 0" />
-              </svg>
-              Disabled
-            </span>
-          {% else %}
-            <span class="text-success d-inline-flex align-items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-check">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
-                <path d="M9 12l2 2l4 -4" />
-              </svg>
-              Enabled
-            </span>
-          {% endif %}
-        </div>
-
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Type</div>
-
-          <span class="tag bg-{{ type_color }}-lt">
-            {{ type_icon(block_type, 'icon tag-icon text-reset') }}
-            {{ type_label }}
-          </span>
-        </div>
-
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">{{ 'Site Addresses' if site_addresses | length > 1 else 'Site Address' }}</div>
-          {% if site_addresses %}
-            {% for h in site_addresses %}<div>{{ h }}</div>{% endfor %}
-          {% else %}
-            <span class="text-danger">No site address configured</span>
-          {% endif %}
-        </div>
-
-        {% if block_type == 'reverse_proxy' %}
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Upstream</div>
-          <div class="font-monospace">{{ meta.target or '—' }}</div>
-          {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
-        </div>
-        {% elif block_type == 'redirect' %}
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Redirect target</div>
-          <div class="font-monospace">{{ meta.target or '—' }}</div>
-          {% if meta.redirect_code %}<div class="text-secondary small mt-1">HTTP {{ meta.redirect_code }}</div>{% endif %}
-        </div>
-        {% elif block_type == 'load_balancer' %}
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Upstreams</div>
-          {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
-          {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
-          {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
-        </div>
-        {% elif block_type == 'static_site' %}
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">File path</div>
-          <div class="font-monospace">{{ meta.path or '—' }}</div>
-          {% if meta.encode %}<div class="text-secondary small mt-1">Encode: {{ meta.encode | join(', ') }}</div>{% endif %}
-          {% if meta.hide %}<div class="text-secondary small mt-1">Hide: {{ meta.hide }}</div>{% endif %}
-          {% if meta.index %}<div class="text-secondary small mt-1">Index: {{ meta.index }}</div>{% endif %}
-          {% if meta.browse %}<div class="text-secondary small mt-1">Directory browsing enabled</div>{% endif %}
-        </div>
-        {% endif %}
-
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Conf file path</div>
-          <div class="font-monospace text-break">{{ conf_path }}</div>
-        </div>
-
-        <!-- BEGIN LOGGING STATUS -->
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Logging</div>
-          {% if meta.log_enabled %}
-            <div>{{ meta.log_level or 'INFO' }} &middot; {{ 'JSON' if meta.log_format == 'json' else 'Console' }}</div>
-            {% if log_path %}<div class="font-monospace text-break text-secondary small mt-1">{{ log_path }}</div>{% endif %}
-          {% else %}
-            <span class="text-secondary">Disabled</span>
-          {% endif %}
-        </div>
-        <!-- END LOGGING STATUS -->
-
-        {% if created != 'Unknown' %}
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Created</div>
-          <div>{{ created }}</div>
-        </div>
-        {% endif %}
-
-        <div class="list-group-item">
-          <div class="text-secondary small mb-1">Last updated</div>
-          <div>{{ updated }}</div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-  <!-- END METADATA SIDEBAR -->
+  
 
   <!-- BEGIN FILE CARDS -->
-  <div class="col-12 col-lg-8">
+  <div class="col-12">
 
     <!-- BEGIN TABBED CARDS -->
     <div class="card-tabs">
@@ -189,6 +78,128 @@
     <!-- END TABBED CARDS -->
   </div>
   <!-- END FILE CARDS -->
+
+  <!-- BEGIN DETAILS DATAGRID -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Site Details</h2>
+      </div>
+      <div class="card-body">
+        <div class="datagrid datagrid-cols-2">
+
+          <div class="datagrid-item">
+            <div class="datagrid-title">Status</div>
+            <div class="datagrid-content">
+              {% if disabled %}
+                <span class="text-secondary d-inline-flex align-items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-minus">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                    <path d="M9 12l6 0" />
+                  </svg>
+                  Disabled
+                </span>
+              {% else %}
+                <span class="text-success d-inline-flex align-items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-circle-check">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                    <path d="M9 12l2 2l4 -4" />
+                  </svg>
+                  Enabled
+                </span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="datagrid-item">
+            <div class="datagrid-title">Type</div>
+            <div class="datagrid-content">
+              <span class="tag bg-{{ type_color }}-lt">
+                {{ type_icon(block_type, 'icon tag-icon text-reset') }}
+                {{ type_label }}
+              </span>
+            </div>
+          </div>
+
+          <div class="datagrid-item">
+            <div class="datagrid-title">{{ 'Site Addresses' if site_addresses | length > 1 else 'Site Address' }}</div>
+            <div class="datagrid-content">
+              {% if site_addresses %}
+                {% for h in site_addresses %}<div>{{ h }}</div>{% endfor %}
+              {% else %}
+                <span class="text-danger">No site address configured</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="datagrid-item">
+            {% if block_type == 'reverse_proxy' %}
+              <div class="datagrid-title">Upstream</div>
+              <div class="datagrid-content">
+                <div class="font-monospace">{{ meta.target or '-' }}</div>
+                {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
+              </div>
+            {% elif block_type == 'redirect' %}
+              <div class="datagrid-title">Redirect target</div>
+              <div class="datagrid-content">
+                <div class="font-monospace">{{ meta.target or '-' }}</div>
+                {% if meta.redirect_code %}<div class="text-secondary small mt-1">HTTP {{ meta.redirect_code }}</div>{% endif %}
+              </div>
+            {% elif block_type == 'load_balancer' %}
+              <div class="datagrid-title">Upstreams</div>
+              <div class="datagrid-content">
+                {% for u in meta.upstreams or [] %}<div class="font-monospace">{{ u }}</div>{% endfor %}
+                {% if meta.lb_policy %}<div class="text-secondary small mt-1">Policy: {{ meta.lb_policy }}</div>{% endif %}
+                {% if meta.insecure_skip_verify %}<div class="text-secondary small mt-1">TLS verification skipped</div>{% endif %}
+              </div>
+            {% elif block_type == 'static_site' %}
+              <div class="datagrid-title">File path</div>
+              <div class="datagrid-content">
+                <div class="font-monospace">{{ meta.path or '-' }}</div>
+                {% if meta.encode %}<div class="text-secondary small mt-1">Encode: {{ meta.encode | join(', ') }}</div>{% endif %}
+                {% if meta.hide %}<div class="text-secondary small mt-1">Hide: {{ meta.hide }}</div>{% endif %}
+                {% if meta.index %}<div class="text-secondary small mt-1">Index: {{ meta.index }}</div>{% endif %}
+                {% if meta.browse %}<div class="text-secondary small mt-1">Directory browsing enabled</div>{% endif %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="datagrid-item">
+            <div class="datagrid-title">Conf file path</div>
+            <div class="datagrid-content">{{ conf_path }}</div>
+          </div>
+
+          <div class="datagrid-item">
+            <div class="datagrid-title">Logging</div>
+            <div class="datagrid-content">
+              {% if meta.log_enabled %}
+                <div>{{ meta.log_level or 'INFO' }} &middot; {{ 'JSON' if meta.log_format == 'json' else 'Console' }}</div>
+                {% if log_path %}<div class="font-monospace text-break text-secondary small mt-1">{{ log_path }}</div>{% endif %}
+              {% else %}
+                <span class="text-secondary">Disabled</span>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if created != 'Unknown' %}
+          <div class="datagrid-item">
+            <div class="datagrid-title">Created</div>
+            <div class="datagrid-content">{{ created }}</div>
+          </div>
+          {% endif %}
+
+          <div class="datagrid-item">
+            <div class="datagrid-title">Last updated</div>
+            <div class="datagrid-content">{{ updated }}</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- END DETAILS DATAGRID -->
 
 </div>
 {% endblock %}

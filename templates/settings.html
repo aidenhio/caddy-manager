@@ -418,35 +418,45 @@
             </p>
             <form method="post" id="caddy-servers-form">
               <input type="hidden" name="action" value="update_caddy_servers">
-
+              
               <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Server 1 display name</label>
+                <h4 class="subheader">Server 1</h4>
+                <div class="col-md-5 mb-3">
+                  <label class="form-label">Display name</label>
                   <input type="text" name="server1_display_name" class="form-control" placeholder="net01"
                          value="{{ caddy_servers_padded[0].display_name }}">
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Server 1 IP or hostname</label>
+                <div class="col-md-5 mb-3">
+                  <label class="form-label">IP/hostname</label>
                   <input type="text" name="server1_host" class="form-control" placeholder="10.0.0.10"
                          value="{{ caddy_servers_padded[0].host }}">
                 </div>
+                <div class="col-md-2 mb-3">
+                  <label class="form-label">API port</label>
+                  <input type="text" name="server1_port" class="form-control" placeholder="2019">
+                </div>
               </div>
               <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Server 2 display name</label>
+                <h4 class="subheader">Server 2</h4>
+                <div class="col-md-5 mb-3">
+                  <label class="form-label">Display name</label>
                   <input type="text" name="server2_display_name" class="form-control" placeholder="net02"
                          value="{{ caddy_servers_padded[1].display_name }}">
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Server 2 IP or hostname</label>
+                <div class="col-md-5 mb-3">
+                  <label class="form-label">IP/hostname</label>
                   <input type="text" name="server2_host" class="form-control" placeholder="192.168.0.10"
                          value="{{ caddy_servers_padded[1].host }}">
+                </div>
+                <div class="col-md-2 mb-3">
+                  <label class="form-label">API port</label>
+                  <input type="text" name="server2_port" class="form-control" placeholder="2019">
                 </div>
               </div>
 
               <hr class="my-3">
 
-              <div class="subheader mb-3">Ping Monitor</div>
+              <div class="card-title mb-3">Ping Monitor</div>
               <div class="row">
                 <div class="col-md-4 mb-3">
                   <label class="form-label">Ping interval <span class="form-hint d-inline">(seconds)</span></label>
@@ -457,13 +467,29 @@
                   <label class="form-label">Warning after <span class="form-hint d-inline">(missed pings)</span></label>
                   <input type="number" min="1" step="1" name="warning_after_misses" class="form-control"
                          value="{{ caddy_server_form.warning_after }}">
-                  <small class="form-hint">Status tag turns yellow once this many pings in a row go unanswered.</small>
                 </div>
                 <div class="col-md-4 mb-3">
                   <label class="form-label">Offline after <span class="form-hint d-inline">(missed pings)</span></label>
                   <input type="number" min="1" step="1" name="danger_after_misses" class="form-control"
                          value="{{ caddy_server_form.danger_after }}">
-                  <small class="form-hint">Status tag turns red once this many pings in a row go unanswered.</small>
+                </div>
+              </div>
+
+              <hr class="my-3">
+
+              <div class="card-title mb-3">Status Monitor</div>
+              <div class="row">
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Status interval <span class="form-hint d-inline">(seconds)</span></label>
+                  <input type="number" min="10" step="1" name="status_interval_seconds" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Warning after <span class="form-hint d-inline">(missed status checks)</span></label>
+                  <input type="number" min="1" step="1" name="warning_after_misses" class="form-control">
+                </div>
+                <div class="col-md-4 mb-3">
+                  <label class="form-label">Offline after <span class="form-hint d-inline">(missed status checks)</span></label>
+                  <input type="number" min="1" step="1" name="danger_after_misses" class="form-control">
                 </div>
               </div>
 
