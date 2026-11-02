@@ -11,9 +11,9 @@ from .configstore import (
     QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
     get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
     DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
-    MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS,
-    get_caddy_server_ping_interval_seconds, get_caddy_server_warning_after_misses,
-    get_caddy_server_danger_after_misses,
+    MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS, MIN_CADDY_STATUS_INTERVAL_SECONDS,
+    get_caddy_server_ping_interval_seconds, get_caddy_server_offline_after_misses,
+    get_caddy_status_interval_seconds, get_caddy_status_failed_after,
 )
 from .caddy_api import upstream_stats
 from .server_monitor import get_server_statuses, notify_config_changed
@@ -78,8 +78,8 @@ def dashboard_caddy_stats():
 @bp.route("/nav/server-status")
 @login_required
 def nav_server_status():
-    """JSON refresh for the navbar's status tags (see nav-status.js). Reads
-    the ping monitor's in-memory state rather than pinging live per request."""
+    """JSON refresh for the navbar's status tags (see nav-status.js). Reads the
+    monitor's in-memory state rather than pinging or calling Caddy per request."""
     return jsonify(servers=get_server_statuses())
 
 
@@ -314,7 +314,7 @@ def delete_block(filename):
 
 # Which tab-pane each form action belongs to, and the valid tab ids -- keeps a save on its own
 # tab instead of bouncing to User; an unrecognized ?tab= falls back to DEFAULT_TAB.
-TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "api", "servers", "logs")
+TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "servers", "logs")
 DEFAULT_TAB = "user"
 ACTION_TAB = {
     "update_user": "user",
@@ -326,7 +326,6 @@ ACTION_TAB = {
     "update_quick_add": "quick-add",
     "update_global_config": "global",
     "rollback_global_config": "global",
-    "update_caddy_api": "api",
     "update_caddy_servers": "servers",
     "update_caddy_logging": "logs",
 }
@@ -435,12 +434,6 @@ def settings():
             flash("Caddy logging settings updated.", "success")
             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
-        elif action == "update_caddy_api":
-            cfg["caddy_admin_api_url"] = request.form.get("caddy_admin_api_url", "").strip()
-            save_config(cfg)
-            flash("Caddy API settings updated.", "success")
-            return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
-
         elif action == "update_caddy_servers":
             # Two fixed named slots, not a dynamic list. A slot is either fully filled
             # or fully blank; one field set and the other blank is rejected, not guessed at.
@@ -448,8 +441,13 @@ def settings():
             for i in range(1, MAX_CADDY_SERVERS + 1):
                 display_name = request.form.get(f"server{i}_display_name", "").strip()
                 host = request.form.get(f"server{i}_host", "").strip()
+                api_port = request.form.get(f"server{i}_api_port", "").strip()
+                if api_port and not (api_port.isdigit() and 1 <= int(api_port) <= 65535):
+                    error = f"Server {i} API port must be a number between 1 and 65535."
+                    break
                 if display_name and host:
-                    servers.append({"display_name": display_name, "host": host})
+                    servers.append({"display_name": display_name, "host": host,
+                                    "api_port": int(api_port) if api_port else None})
                 elif display_name or host:
                     error = f"Server {i} needs both a display name and a host, or leave both blank."
                     break
@@ -457,25 +455,31 @@ def settings():
             if not error and len(servers) == MAX_CADDY_SERVERS and servers[0]["host"] == servers[1]["host"]:
                 error = "Server 1 and Server 2 must have different hosts."
 
+            # The VIP field is disabled (so not submitted) with fewer than two servers; keep the saved value then.
+            vip_api_url = request.form.get("vip_api_url")
+            vip_api_url = vip_api_url.strip() if vip_api_url is not None else (cfg.get("caddy_vip_api_url") or "")
             ping_interval_raw = request.form.get("ping_interval_seconds", "").strip()
-            warning_raw = request.form.get("warning_after_misses", "").strip()
-            danger_raw = request.form.get("danger_after_misses", "").strip()
+            offline_raw = request.form.get("offline_after_misses", "").strip()
+            status_interval_raw = request.form.get("status_interval_seconds", "").strip()
+            failed_raw = request.form.get("status_failed_after", "").strip()
 
             if not error:
                 if not (ping_interval_raw.isdigit() and int(ping_interval_raw) >= MIN_CADDY_SERVER_PING_INTERVAL_SECONDS):
                     error = f"Ping interval must be a whole number of seconds, at least {MIN_CADDY_SERVER_PING_INTERVAL_SECONDS}."
-                elif not (warning_raw.isdigit() and int(warning_raw) > 0):
-                    error = "Warning threshold must be a positive whole number of missed pings."
-                elif not (danger_raw.isdigit() and int(danger_raw) > 0):
+                elif not (offline_raw.isdigit() and int(offline_raw) > 0):
                     error = "Offline threshold must be a positive whole number of missed pings."
-                elif int(danger_raw) <= int(warning_raw):
-                    error = "Offline threshold must be greater than the warning threshold."
+                elif not (status_interval_raw.isdigit() and int(status_interval_raw) >= MIN_CADDY_STATUS_INTERVAL_SECONDS):
+                    error = f"Status interval must be a whole number of seconds, at least {MIN_CADDY_STATUS_INTERVAL_SECONDS}."
+                elif not (failed_raw.isdigit() and int(failed_raw) > 0):
+                    error = "Failed threshold must be a positive whole number of status checks."
 
             if not error:
                 cfg["caddy_servers"] = servers
+                cfg["caddy_vip_api_url"] = vip_api_url
                 cfg["caddy_server_ping_interval_seconds"] = int(ping_interval_raw)
-                cfg["caddy_server_warning_after_misses"] = int(warning_raw)
-                cfg["caddy_server_danger_after_misses"] = int(danger_raw)
+                cfg["caddy_server_danger_after_misses"] = int(offline_raw)
+                cfg["caddy_status_interval_seconds"] = int(status_interval_raw)
+                cfg["caddy_status_failed_after"] = int(failed_raw)
                 save_config(cfg)
                 # Wakes the monitor for an immediate check, instead of "Checking" for up to a full interval.
                 notify_config_changed()
@@ -571,27 +575,34 @@ def settings():
             {
                 "display_name": request.form.get(f"server{i}_display_name", "").strip(),
                 "host": request.form.get(f"server{i}_host", "").strip(),
+                "api_port": request.form.get(f"server{i}_api_port", "").strip(),
             }
             for i in range(1, MAX_CADDY_SERVERS + 1)
         ]
         caddy_server_form = {
+            "vip_api_url": request.form.get("vip_api_url", cfg.get("caddy_vip_api_url") or "").strip(),
             "ping_interval": request.form.get("ping_interval_seconds", "").strip(),
-            "warning_after": request.form.get("warning_after_misses", "").strip(),
-            "danger_after": request.form.get("danger_after_misses", "").strip(),
+            "offline_after": request.form.get("offline_after_misses", "").strip(),
+            "status_interval": request.form.get("status_interval_seconds", "").strip(),
+            "failed_after": request.form.get("status_failed_after", "").strip(),
         }
     else:
-        raw_servers = (cfg.get("caddy_servers") or [])[:MAX_CADDY_SERVERS]
+        raw_servers = [s for s in (cfg.get("caddy_servers") or [])[:MAX_CADDY_SERVERS] if isinstance(s, dict)]
         caddy_servers_padded = [
             {
-                "display_name": raw_servers[i].get("display_name", "") if i < len(raw_servers) and isinstance(raw_servers[i], dict) else "",
-                "host": raw_servers[i].get("host", "") if i < len(raw_servers) and isinstance(raw_servers[i], dict) else "",
+                "display_name": raw_servers[i].get("display_name", "") if i < len(raw_servers) else "",
+                "host": raw_servers[i].get("host", "") if i < len(raw_servers) else "",
+                # Blank (not 2019) when unset, so the placeholder shows the default instead.
+                "api_port": raw_servers[i].get("api_port") or "" if i < len(raw_servers) else "",
             }
             for i in range(MAX_CADDY_SERVERS)
         ]
         caddy_server_form = {
+            "vip_api_url": cfg.get("caddy_vip_api_url") or "",
             "ping_interval": get_caddy_server_ping_interval_seconds(),
-            "warning_after": get_caddy_server_warning_after_misses(),
-            "danger_after": get_caddy_server_danger_after_misses(),
+            "offline_after": get_caddy_server_offline_after_misses(),
+            "status_interval": get_caddy_status_interval_seconds(),
+            "failed_after": get_caddy_status_failed_after(),
         }
 
     # A POST that failed validation re-shows its own tab; a GET reads ?tab= from the save redirect.

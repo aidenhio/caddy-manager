@@ -331,7 +331,7 @@
               </div>
             </div>
             {% else %}
-            <p class="text-secondary mb-0">Set a Caddy admin API URL in <a href="{{ url_for('main.settings') }}">Settings</a> to see upstream health here.</p>
+            <p class="text-secondary mb-0">No Caddy admin API is reachable. Add your Caddy servers in <a href="{{ url_for('main.settings', tab='servers') }}">Settings</a> to see upstream health here.</p>
             {% endif %}
           </div>
         </div>

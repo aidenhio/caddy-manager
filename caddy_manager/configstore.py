@@ -40,6 +40,14 @@ def load_config():
         cfg.setdefault("caddyfile_path", defaults["caddyfile_path"])
         save_config(cfg)
 
+    if "caddy_admin_api_url" in cfg or "caddy_server_warning_after_misses" in cfg:
+        # Migrate the old single Caddy API URL into the VIP URL; the ping warning threshold is gone.
+        old_url = (cfg.pop("caddy_admin_api_url", None) or "").strip()
+        if old_url and not cfg.get("caddy_vip_api_url"):
+            cfg["caddy_vip_api_url"] = old_url
+        cfg.pop("caddy_server_warning_after_misses", None)
+        save_config(cfg)
+
     return cfg
 
 
@@ -84,13 +92,6 @@ def get_caddy_log_output_dir():
     cfg = load_config()
     value = (cfg.get("caddy_log_output_dir") or "").strip() if cfg else ""
     return value or get_log_dir()
-
-
-def get_caddy_admin_api_url():
-    """Caddy admin API address, used for Dashboard stats. Empty string if
-    unset -- entirely optional, nothing else depends on it."""
-    cfg = load_config()
-    return (cfg.get("caddy_admin_api_url") or "").strip() if cfg else ""
 
 
 # Caddy starts renewal 30 days out; 37 gives it a week of retries before
@@ -151,20 +152,37 @@ DASHBOARD_WIDGETS = (
     ("upstream_health", "Upstream Health"),
 )
 
-# Up to this many servers can be ping-monitored (see server_monitor.py),
+# Up to this many servers can be monitored (see server_monitor.py),
 # matching the navbar layout's design.
 MAX_CADDY_SERVERS = 2
+
+# Caddy's own default admin API port, used when a server's port is left blank.
+DEFAULT_CADDY_API_PORT = 2019
 
 DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS = 60
 # Floor for the settings form's validation, kept here so it can't drift from the getter.
 MIN_CADDY_SERVER_PING_INTERVAL_SECONDS = 10
-DEFAULT_CADDY_SERVER_WARNING_AFTER_MISSES = 3
-DEFAULT_CADDY_SERVER_DANGER_AFTER_MISSES = 5
+DEFAULT_CADDY_SERVER_OFFLINE_AFTER_MISSES = 3
+
+DEFAULT_CADDY_STATUS_INTERVAL_SECONDS = 60
+MIN_CADDY_STATUS_INTERVAL_SECONDS = 10
+DEFAULT_CADDY_STATUS_FAILED_AFTER = 1
+
+
+def _positive_int(cfg, key, default, minimum=1):
+    value = cfg.get(key) if cfg else None
+    try:
+        number = int(value)
+        if number >= minimum:
+            return number
+    except (TypeError, ValueError):
+        pass
+    return default
 
 
 def get_caddy_servers():
-    """Up to MAX_CADDY_SERVERS servers to ping-monitor, each as
-    {"display_name": str, "host": str}, both always non-empty."""
+    """Up to MAX_CADDY_SERVERS servers to monitor, each as {"display_name": str,
+    "host": str, "api_port": int}; name and host always non-empty."""
     cfg = load_config()
     stored = cfg.get("caddy_servers") if cfg else None
     if not isinstance(stored, list):
@@ -176,44 +194,39 @@ def get_caddy_servers():
         display_name = (entry.get("display_name") or "").strip()
         host = (entry.get("host") or "").strip()
         if display_name and host:
-            servers.append({"display_name": display_name, "host": host})
+            servers.append({
+                "display_name": display_name,
+                "host": host,
+                "api_port": _positive_int(entry, "api_port", DEFAULT_CADDY_API_PORT),
+            })
     return servers
 
 
+def get_caddy_vip_api_url():
+    """Admin API URL on a shared virtual IP (e.g. keepalived). Only used for
+    Dashboard stats, and only once both servers are configured."""
+    cfg = load_config()
+    return (cfg.get("caddy_vip_api_url") or "").strip() if cfg else ""
+
+
 def get_caddy_server_ping_interval_seconds():
-    cfg = load_config()
-    value = cfg.get("caddy_server_ping_interval_seconds") if cfg else None
-    try:
-        seconds = int(value)
-        if seconds >= MIN_CADDY_SERVER_PING_INTERVAL_SECONDS:
-            return seconds
-    except (TypeError, ValueError):
-        pass
-    return DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS
+    return _positive_int(load_config(), "caddy_server_ping_interval_seconds",
+                         DEFAULT_CADDY_SERVER_PING_INTERVAL_SECONDS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS)
 
 
-def get_caddy_server_warning_after_misses():
-    cfg = load_config()
-    value = cfg.get("caddy_server_warning_after_misses") if cfg else None
-    try:
-        misses = int(value)
-        if misses > 0:
-            return misses
-    except (TypeError, ValueError):
-        pass
-    return DEFAULT_CADDY_SERVER_WARNING_AFTER_MISSES
+def get_caddy_server_offline_after_misses():
+    # Stored under its pre-status-monitor key name, so existing saved values carry over.
+    return _positive_int(load_config(), "caddy_server_danger_after_misses",
+                         DEFAULT_CADDY_SERVER_OFFLINE_AFTER_MISSES)
 
 
-def get_caddy_server_danger_after_misses():
-    cfg = load_config()
-    value = cfg.get("caddy_server_danger_after_misses") if cfg else None
-    try:
-        misses = int(value)
-        if misses > 0:
-            return misses
-    except (TypeError, ValueError):
-        pass
-    return DEFAULT_CADDY_SERVER_DANGER_AFTER_MISSES
+def get_caddy_status_interval_seconds():
+    return _positive_int(load_config(), "caddy_status_interval_seconds",
+                         DEFAULT_CADDY_STATUS_INTERVAL_SECONDS, MIN_CADDY_STATUS_INTERVAL_SECONDS)
+
+
+def get_caddy_status_failed_after():
+    return _positive_int(load_config(), "caddy_status_failed_after", DEFAULT_CADDY_STATUS_FAILED_AFTER)
 
 
 def get_dashboard_widget_visibility():

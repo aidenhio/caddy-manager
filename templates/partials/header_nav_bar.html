@@ -171,7 +171,7 @@
             {% for server in nav_caddy_servers %}
             <li class="nav-item{{ '' if loop.last else ' me-1' }}">
               <span class="tag {{ server.bg_class }}" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    data-bs-original-title="{{ server.label }} ({{ server.host }})" data-server-host="{{ server.host }}">
+                    data-bs-original-title="{{ server.label }}" data-server-host="{{ server.host }}">
                 <span class="status-dot {{ server.dot_class }} status-dot-animated"></span>
                 {{ server.display_name }}
               </span>

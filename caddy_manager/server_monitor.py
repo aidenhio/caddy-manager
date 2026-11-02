@@ -1,31 +1,42 @@
-"""Background ping monitor driving the navbar's live status tags. One thread
-loops into an in-memory dict (not config.json); requests only ever read it."""
+"""Background monitor driving the navbar's live status tags: one thread pings each
+server, another checks Caddy's admin API on it. Results live in memory only."""
 import subprocess
 import threading
+import urllib.error
+import urllib.request
 
 from .configstore import (
-    get_caddy_servers, get_caddy_server_ping_interval_seconds,
-    get_caddy_server_warning_after_misses, get_caddy_server_danger_after_misses,
+    get_caddy_servers, get_caddy_server_ping_interval_seconds, get_caddy_server_offline_after_misses,
+    get_caddy_status_interval_seconds, get_caddy_status_failed_after,
 )
 
-# Comfortably under MIN_CADDY_SERVER_PING_INTERVAL_SECONDS so pinging both
-# servers never runs long enough to delay the next scheduled check.
+# Comfortably under the 10s minimum intervals, so checking both servers never
+# runs long enough to delay the next scheduled check.
 PING_TIMEOUT_SECONDS = 3
+STATUS_TIMEOUT_SECONDS = 3
 
-# status -> tag background class, status-dot class, one-word tooltip label.
+# status -> tag background class, status-dot class, tooltip text.
 # Shared by the navbar's server-rendered tags and the JSON refresh endpoint.
 STATUS_DISPLAY = {
-    "online": {"bg_class": "bg-success-lt", "dot_class": "status-success", "label": "Online"},
-    "warning": {"bg_class": "bg-warning-lt", "dot_class": "status-warning", "label": "Unavailable"},
-    "danger": {"bg_class": "bg-danger-lt", "dot_class": "status-danger", "label": "Offline"},
-    # Brief window before a server's first ping completes -- clears within moments, not a full interval.
-    "pending": {"bg_class": "bg-secondary-lt", "dot_class": "status-secondary", "label": "Checking"},
+    "online": {"bg_class": "bg-success-lt", "dot_class": "status-success", "label": "Server: Online, Caddy: Running"},
+    "warning": {"bg_class": "bg-warning-lt", "dot_class": "status-warning", "label": "Server: Online, Caddy: Stopped"},
+    "danger": {"bg_class": "bg-danger-lt", "dot_class": "status-danger", "label": "Server: Offline, Caddy: Unreachable"},
+    # Brief window before the first ping/status results arrive.
+    "pending": {"bg_class": "bg-secondary-lt", "dot_class": "status-secondary", "label": "Server: Checking, Caddy: Checking"},
 }
 
 _lock = threading.Lock()
-_state = {}  # host -> {"consecutive_misses": int, "checked": bool}
-_wake_event = threading.Event()
+_ping_state = {}    # host -> {"misses": int, "checked": bool}
+_status_state = {}  # (host, api_port) -> {"failures": int, "checked": bool}
+_wake_events = []
 _started = False
+
+
+def admin_api_base_url(host, api_port):
+    """http://host:port for a server's admin API, bracketing a bare IPv6 address."""
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{api_port}"
 
 
 def _ping_once(host):
@@ -44,69 +55,103 @@ def _ping_once(host):
     return result.returncode == 0
 
 
-def _check_all(servers):
+def _caddy_running(host, api_port):
+    """True if GET /config/ on the server's admin API answers HTTP 200."""
+    try:
+        req = urllib.request.Request(f"{admin_api_base_url(host, api_port)}/config/")
+        with urllib.request.urlopen(req, timeout=STATUS_TIMEOUT_SECONDS) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return False
+
+
+def _ping_all(servers):
     for server in servers:
-        host = server["host"]
-        success = _ping_once(host)
+        success = _ping_once(server["host"])
         with _lock:
-            entry = _state.setdefault(host, {"consecutive_misses": 0, "checked": False})
+            entry = _ping_state.setdefault(server["host"], {"misses": 0, "checked": False})
             entry["checked"] = True
-            entry["consecutive_misses"] = 0 if success else entry["consecutive_misses"] + 1
+            entry["misses"] = 0 if success else entry["misses"] + 1
 
 
-def _monitor_loop():
+def _status_all(servers):
+    for server in servers:
+        key = (server["host"], server["api_port"])
+        success = _caddy_running(*key)
+        with _lock:
+            entry = _status_state.setdefault(key, {"failures": 0, "checked": False})
+            entry["checked"] = True
+            entry["failures"] = 0 if success else entry["failures"] + 1
+
+
+def _loop(check, get_interval, wake_event):
     while True:
-        _check_all(get_caddy_servers())
-        interval = get_caddy_server_ping_interval_seconds()
+        check(get_caddy_servers())
         # notify_config_changed() wakes this early so a settings save resolves within moments.
-        _wake_event.wait(timeout=interval)
-        _wake_event.clear()
+        wake_event.wait(timeout=get_interval())
+        wake_event.clear()
 
 
 def notify_config_changed():
     """Called after a Caddy Servers settings save so status resolves
-    quickly instead of sitting stale for up to a full ping interval."""
-    _wake_event.set()
+    quickly instead of sitting stale for up to a full interval."""
+    for event in _wake_events:
+        event.set()
 
 
 def start_server_monitor():
-    """Starts the background ping thread; safe to call more than once, only
-    the first call does anything. Not called from create_app() -- see app.py -- to avoid leaking threads in tests."""
+    """Starts the ping and status threads; safe to call more than once, only the
+    first call does anything. Not called from create_app() -- see app.py -- to avoid leaking threads in tests."""
     global _started
     with _lock:
         if _started:
             return
         _started = True
-    threading.Thread(target=_monitor_loop, daemon=True, name="caddy-server-monitor").start()
+    for name, check, get_interval in (
+        ("caddy-server-ping", _ping_all, get_caddy_server_ping_interval_seconds),
+        ("caddy-server-status", _status_all, get_caddy_status_interval_seconds),
+    ):
+        event = threading.Event()
+        _wake_events.append(event)
+        threading.Thread(target=_loop, args=(check, get_interval, event), daemon=True, name=name).start()
+
+
+def caddy_status(server):
+    """"running", "stopped", or None if not checked yet -- the admin API check on its own."""
+    with _lock:
+        entry = _status_state.get((server["host"], server["api_port"]))
+        if not entry or not entry["checked"]:
+            return None
+        return "stopped" if entry["failures"] >= get_caddy_status_failed_after() else "running"
 
 
 def get_server_statuses():
-    """Current status of every configured server, for the navbar tags and the
-    JSON refresh endpoint. Each entry includes its STATUS_DISPLAY metadata."""
+    """Combined status of every configured server, for the navbar tags and the JSON
+    refresh endpoint: red if ping is down, yellow if only Caddy is down, else green."""
     servers = get_caddy_servers()
-    warning_after = get_caddy_server_warning_after_misses()
-    danger_after = get_caddy_server_danger_after_misses()
+    offline_after = get_caddy_server_offline_after_misses()
     results = []
-    with _lock:
-        for server in servers:
-            entry = _state.get(server["host"])
-            if not entry or not entry["checked"]:
-                status = "pending"
-            else:
-                misses = entry["consecutive_misses"]
-                if misses >= danger_after:
-                    status = "danger"
-                elif misses >= warning_after:
-                    status = "warning"
-                else:
-                    status = "online"
-            display = STATUS_DISPLAY[status]
-            results.append({
-                "display_name": server["display_name"],
-                "host": server["host"],
-                "status": status,
-                "bg_class": display["bg_class"],
-                "dot_class": display["dot_class"],
-                "label": display["label"],
-            })
+    for server in servers:
+        with _lock:
+            ping = _ping_state.get(server["host"])
+        caddy = caddy_status(server)
+        if not ping or not ping["checked"]:
+            status = "pending"
+        elif ping["misses"] >= offline_after:
+            status = "danger"
+        elif caddy is None:
+            status = "pending"
+        elif caddy == "stopped":
+            status = "warning"
+        else:
+            status = "online"
+        display = STATUS_DISPLAY[status]
+        results.append({
+            "display_name": server["display_name"],
+            "host": server["host"],
+            "status": status,
+            "bg_class": display["bg_class"],
+            "dot_class": display["dot_class"],
+            "label": display["label"],
+        })
     return results

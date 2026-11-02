@@ -1,6 +1,6 @@
 // BEGIN NAVBAR CADDY SERVER STATUS
 // Keeps the navbar's Caddy Server status tags live on every page by
-// polling the background ping monitor's state (server_monitor.py).
+// polling the background ping/status monitor's state (server_monitor.py).
 (function () {
   const tags = document.querySelectorAll('[data-server-host]');
   if (!tags.length) return;
@@ -21,7 +21,7 @@
       dot.classList.add(server.dot_class);
     }
     // Bootstrap re-reads this attribute fresh on every show(), so no need to recreate the Tooltip instance.
-    tag.setAttribute('data-bs-original-title', server.label + ' (' + server.host + ')');
+    tag.setAttribute('data-bs-original-title', server.label);
   }
 
   function refresh() {
