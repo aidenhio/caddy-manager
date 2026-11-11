@@ -1,27 +1,33 @@
-// BEGIN NAVBAR CADDY SERVER STATUS
-// Keeps the navbar's Caddy Server status tags live on every page by
-// polling the background ping/status monitor's state (server_monitor.py).
+// BEGIN SIDEBAR SERVER STATUS
+// Keeps the sidebar's server status (dot + Server/Caddy badges) live on every
+// page by polling the background ping/status monitor's state (server_monitor.py).
 (function () {
-  const tags = document.querySelectorAll('[data-server-host]');
-  if (!tags.length) return;
+  const items = document.querySelectorAll('[data-server-host]');
+  if (!items.length) return;
 
-  // Independent of the actual ping interval -- the endpoint reads cheap in-memory
+  // Independent of the actual check intervals -- the endpoint reads cheap in-memory
   // state, so polling more often just surfaces a change sooner.
   const REFRESH_INTERVAL_MS = 20000;
 
-  const BG_CLASSES = ['bg-success-lt', 'bg-warning-lt', 'bg-danger-lt', 'bg-secondary-lt'];
   const DOT_CLASSES = ['status-success', 'status-warning', 'status-danger', 'status-secondary'];
+  const BADGE_CLASSES = ['bg-green-lt', 'bg-yellow-lt', 'bg-red-lt', 'bg-secondary-lt'];
 
-  function applyStatus(tag, server) {
-    tag.classList.remove(...BG_CLASSES);
-    tag.classList.add(server.bg_class);
-    const dot = tag.querySelector('.status-dot');
+  function setBadge(item, name, label, badgeClass) {
+    const badge = item.querySelector('[data-status-badge="' + name + '"]');
+    if (!badge) return;
+    badge.classList.remove(...BADGE_CLASSES);
+    badge.classList.add(badgeClass);
+    badge.textContent = label;
+  }
+
+  function applyStatus(item, server) {
+    const dot = item.querySelector('.status-dot');
     if (dot) {
       dot.classList.remove(...DOT_CLASSES);
       dot.classList.add(server.dot_class);
     }
-    // Bootstrap re-reads this attribute fresh on every show(), so no need to recreate the Tooltip instance.
-    tag.setAttribute('data-bs-original-title', server.label);
+    setBadge(item, 'server', server.server_label, server.server_badge_class);
+    setBadge(item, 'caddy', server.caddy_label, server.caddy_badge_class);
   }
 
   function refresh() {
@@ -30,9 +36,9 @@
       .then((data) => {
         const byHost = {};
         (data.servers || []).forEach((server) => { byHost[server.host] = server; });
-        tags.forEach((tag) => {
-          const server = byHost[tag.dataset.serverHost];
-          if (server) applyStatus(tag, server);
+        items.forEach((item) => {
+          const server = byHost[item.dataset.serverHost];
+          if (server) applyStatus(item, server);
         });
       })
       .catch(() => {
@@ -42,4 +48,4 @@
 
   setInterval(refresh, REFRESH_INTERVAL_MS);
 })();
-// END NAVBAR CADDY SERVER STATUS
+// END SIDEBAR SERVER STATUS

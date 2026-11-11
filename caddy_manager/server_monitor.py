@@ -1,4 +1,4 @@
-"""Background monitor driving the navbar's live status tags: one thread pings each
+"""Background monitor driving the sidebar's live server status: one thread pings each
 server, another checks Caddy's admin API on it. Results live in memory only."""
 import subprocess
 import threading
@@ -15,14 +15,16 @@ from .configstore import (
 PING_TIMEOUT_SECONDS = 3
 STATUS_TIMEOUT_SECONDS = 3
 
-# status -> tag background class, status-dot class, tooltip text.
-# Shared by the navbar's server-rendered tags and the JSON refresh endpoint.
-STATUS_DISPLAY = {
-    "online": {"bg_class": "bg-success-lt", "dot_class": "status-success", "label": "Server: Online, Caddy: Running"},
-    "warning": {"bg_class": "bg-warning-lt", "dot_class": "status-warning", "label": "Server: Online, Caddy: Stopped"},
-    "danger": {"bg_class": "bg-danger-lt", "dot_class": "status-danger", "label": "Server: Offline, Caddy: Unreachable"},
-    # Brief window before the first ping/status results arrive.
-    "pending": {"bg_class": "bg-secondary-lt", "dot_class": "status-secondary", "label": "Server: Checking, Caddy: Checking"},
+# Sidebar badge per check result, as (label, badge class). None = not checked yet.
+SERVER_BADGES = {
+    "online": ("Online", "bg-green-lt"),
+    "offline": ("Offline", "bg-red-lt"),
+    None: ("Checking", "bg-secondary-lt"),
+}
+CADDY_BADGES = {
+    "running": ("Running", "bg-green-lt"),
+    "stopped": ("Stopped", "bg-yellow-lt"),
+    None: ("Checking", "bg-secondary-lt"),
 }
 
 _lock = threading.Lock()
@@ -126,32 +128,36 @@ def caddy_status(server):
 
 
 def get_server_statuses():
-    """Combined status of every configured server, for the navbar tags and the JSON
-    refresh endpoint: red if ping is down, yellow if only Caddy is down, else green."""
+    """Ping and Caddy status of every configured server, for the sidebar and its JSON
+    refresh endpoint. The dot is red if ping is down, yellow if only Caddy is down, else green."""
     servers = get_caddy_servers()
     offline_after = get_caddy_server_offline_after_misses()
     results = []
     for server in servers:
         with _lock:
             ping = _ping_state.get(server["host"])
-        caddy = caddy_status(server)
         if not ping or not ping["checked"]:
-            status = "pending"
-        elif ping["misses"] >= offline_after:
-            status = "danger"
-        elif caddy is None:
-            status = "pending"
-        elif caddy == "stopped":
-            status = "warning"
+            server_state = None
         else:
-            status = "online"
-        display = STATUS_DISPLAY[status]
+            server_state = "offline" if ping["misses"] >= offline_after else "online"
+        caddy_state = caddy_status(server)
+        if server_state == "offline":
+            dot_class = "status-danger"
+        elif server_state is None or caddy_state is None:
+            dot_class = "status-secondary"
+        elif caddy_state == "stopped":
+            dot_class = "status-warning"
+        else:
+            dot_class = "status-success"
+        server_label, server_badge = SERVER_BADGES[server_state]
+        caddy_label, caddy_badge = CADDY_BADGES[caddy_state]
         results.append({
             "display_name": server["display_name"],
             "host": server["host"],
-            "status": status,
-            "bg_class": display["bg_class"],
-            "dot_class": display["dot_class"],
-            "label": display["label"],
+            "dot_class": dot_class,
+            "server_label": server_label,
+            "server_badge_class": server_badge,
+            "caddy_label": caddy_label,
+            "caddy_badge_class": caddy_badge,
         })
     return results

@@ -206,7 +206,7 @@
         {% if nav_caddy_servers %}
           <li class="nav-section-title">Servers</li>
           {% for server in nav_caddy_servers %}
-            <li class="nav-item dropdown">
+            <li class="nav-item dropdown" data-server-host="{{ server.host }}">
               <button type="button" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="false">
                 <span class="nav-link-icon">
                   <span class="status-dot {{ server.dot_class }} status-dot-animated"></span>
@@ -214,16 +214,15 @@
                 <span class="nav-link-title">{{ server.display_name }}</span>
               </button>
               <div class="dropdown-menu">
-                  <span class="dropdown-item">Server
-                    <span class="badge badge-sm bg-green-lt text-uppercase ms-auto">Online</span>
-                  </span>
-                  <span class="dropdown-item">Caddy
-                    <span class="badge badge-sm bg-green-lt text-uppercase ms-auto">Running</span>
-                  </span>
-                </div>
+                <span class="dropdown-item">Server
+                  <span class="badge badge-sm {{ server.server_badge_class }} text-uppercase ms-auto" data-status-badge="server">{{ server.server_label }}</span>
+                </span>
+                <span class="dropdown-item">Caddy
+                  <span class="badge badge-sm {{ server.caddy_badge_class }} text-uppercase ms-auto" data-status-badge="caddy">{{ server.caddy_label }}</span>
+                </span>
+              </div>
             </li>
           {% endfor %}
-
         {% endif %}
         <!-- END SERVER STATUS -->
 
@@ -256,6 +255,6 @@
 </aside>
 <!-- END SIDEBAR -->
 
-<!-- BEGIN NAVBAR CADDY SERVER STATUS SCRIPT -->
+<!-- BEGIN SIDEBAR SERVER STATUS SCRIPT -->
 <script src="{{ url_for('static', filename='js/nav-status.js') }}"></script>
-<!-- END NAVBAR CADDY SERVER STATUS SCRIPT -->
+<!-- END SIDEBAR SERVER STATUS SCRIPT -->

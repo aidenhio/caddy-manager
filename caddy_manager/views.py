@@ -78,7 +78,7 @@ def dashboard_caddy_stats():
 @bp.route("/nav/server-status")
 @login_required
 def nav_server_status():
-    """JSON refresh for the navbar's status tags (see nav-status.js). Reads the
+    """JSON refresh for the sidebar's server status (see nav-status.js). Reads the
     monitor's in-memory state rather than pinging or calling Caddy per request."""
     return jsonify(servers=get_server_statuses())
 
