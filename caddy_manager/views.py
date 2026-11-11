@@ -8,13 +8,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .auth import login_required
 from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
-    QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
     get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
     DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
     MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS, MIN_CADDY_STATUS_INTERVAL_SECONDS,
     get_caddy_server_ping_interval_seconds, get_caddy_server_offline_after_misses,
     get_caddy_status_interval_seconds, get_caddy_status_failed_after,
 )
+from .block_types import BLOCK_TYPE_ORDER
 from .caddy_api import upstream_stats
 from .server_monitor import get_server_statuses, notify_config_changed
 from .caddyfile import slugify, extract_body, site_addresses_from_textarea
@@ -38,7 +38,7 @@ def dashboard():
     certs_root = certificates_root()
     certs = list_certificates() if certs_root and os.path.isdir(certs_root) else []
     caddy_stats = upstream_stats()
-    by_type = {t: 0 for t in QUICK_ADD_BLOCK_TYPES}
+    by_type = {t: 0 for t in BLOCK_TYPE_ORDER}
     for b in blocks:
         by_type[b["type"]] = by_type.get(b["type"], 0) + 1
     stats = {
@@ -56,7 +56,7 @@ def dashboard():
     recent_blocks = sorted(blocks, key=lambda b: b["created_ts"], reverse=True)[:5]
     return render_template(
         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
-        recent_blocks=recent_blocks, quick_add_type=get_quick_add_type_dashboard(),
+        recent_blocks=recent_blocks,
         dashboard_widgets=get_dashboard_widget_visibility(),
     )
 
@@ -91,7 +91,6 @@ def site_blocks():
     blocks = list_blocks() if dir_exists else []
     return render_template(
         "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists,
-        quick_add_type=get_quick_add_type_site_blocks(),
     )
 
 
@@ -131,15 +130,15 @@ def certificates():
 @login_required
 def new_block(block_type=None):
     # /new/<type> just preselects a type in the universal form's picker.
-    if block_type is not None and block_type not in QUICK_ADD_BLOCK_TYPES:
+    if block_type is not None and block_type not in BLOCK_TYPE_ORDER:
         abort(404)
-    block_type = block_type or QUICK_ADD_BLOCK_TYPES[0]
+    block_type = block_type or BLOCK_TYPE_ORDER[0]
     error = None
     meta = {}
 
     if request.method == "POST":
         posted_type = request.form.get("block_type", "")
-        if posted_type not in QUICK_ADD_BLOCK_TYPES:
+        if posted_type not in BLOCK_TYPE_ORDER:
             error = "Choose a block type."
         else:
             block_type = posted_type
@@ -191,7 +190,7 @@ def edit_block(filename):
 
     meta = read_metadata(filename, path)
     block_type = meta.get("type", "custom")
-    if block_type not in QUICK_ADD_BLOCK_TYPES:
+    if block_type not in BLOCK_TYPE_ORDER:
         block_type = "custom"
     old_site_addresses = meta.get("site_addresses", [])
     previous_log_enabled = meta.get("log_enabled", False)
@@ -323,7 +322,7 @@ def delete_block(filename):
 
 # Which tab-pane each form action belongs to, and the valid tab ids -- keeps a save on its own
 # tab instead of bouncing to User; an unrecognized ?tab= falls back to DEFAULT_TAB.
-TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "servers", "logs")
+TAB_IDS = ("user", "password", "general", "directory", "dashboard", "global", "servers", "logs")
 DEFAULT_TAB = "user"
 ACTION_TAB = {
     "update_user": "user",
@@ -332,7 +331,6 @@ ACTION_TAB = {
     "update_certificates": "general",
     "update_dir": "directory",
     "update_dashboard_widgets": "dashboard",
-    "update_quick_add": "quick-add",
     "update_global_config": "global",
     "rollback_global_config": "global",
     "update_caddy_servers": "servers",
@@ -512,19 +510,6 @@ def settings():
             save_config(cfg)
             flash("Dashboard settings updated.", "success")
             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
-
-        elif action == "update_quick_add":
-            quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")
-            quick_add_type_site_blocks = request.form.get("quick_add_type_site_blocks", "")
-            valid_choices = ("",) + QUICK_ADD_BLOCK_TYPES
-            if quick_add_type_dashboard not in valid_choices or quick_add_type_site_blocks not in valid_choices:
-                error = "Invalid Quick Add block type selected."
-            else:
-                cfg["quick_add_type_dashboard"] = quick_add_type_dashboard
-                cfg["quick_add_type_site_blocks"] = quick_add_type_site_blocks
-                save_config(cfg)
-                flash("Quick Add settings updated.", "success")
-                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_user":
             username = request.form.get("username", "").strip()

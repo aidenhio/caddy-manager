@@ -3,7 +3,6 @@ credentials, the Caddy root directory and derived paths, and a session secret ke
 import os
 import json
 
-from .block_types import BLOCK_TYPE_ORDER
 
 # config.json lives at the project root, one level up from this package.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,6 +45,12 @@ def load_config():
         if old_url and not cfg.get("caddy_vip_api_url"):
             cfg["caddy_vip_api_url"] = old_url
         cfg.pop("caddy_server_warning_after_misses", None)
+        save_config(cfg)
+
+    if "quick_add_type_dashboard" in cfg or "quick_add_type_site_blocks" in cfg:
+        # The Quick Add button was removed; drop its stale per-page settings.
+        cfg.pop("quick_add_type_dashboard", None)
+        cfg.pop("quick_add_type_site_blocks", None)
         save_config(cfg)
 
     return cfg
@@ -124,23 +129,6 @@ def get_log_tail_lines():
     except (TypeError, ValueError):
         pass
     return DEFAULT_LOG_TAIL_LINES
-
-
-# The "Quick Add" button skips the type-picker modal for one pre-chosen type,
-# set per page. "None" both is the default and turns the button off.
-QUICK_ADD_BLOCK_TYPES = BLOCK_TYPE_ORDER
-
-
-def get_quick_add_type_dashboard():
-    cfg = load_config()
-    value = cfg.get("quick_add_type_dashboard") if cfg else None
-    return value if value in QUICK_ADD_BLOCK_TYPES else None
-
-
-def get_quick_add_type_site_blocks():
-    cfg = load_config()
-    value = cfg.get("quick_add_type_site_blocks") if cfg else None
-    return value if value in QUICK_ADD_BLOCK_TYPES else None
 
 
 # Dashboard widgets in display order, as (config key, toggle label). All shown by default.

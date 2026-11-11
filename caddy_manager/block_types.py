@@ -62,8 +62,8 @@ BLOCK_TYPES = {
     },
 }
 
-# Iteration order for anything that lists every block type (Quick Add
-# dropdowns, the New Site Block modal, the Site Blocks by Type widget).
+# Iteration order for anything that lists every block type (the block form's
+# type picker, the Site Blocks by Type widget).
 BLOCK_TYPE_ORDER = tuple(BLOCK_TYPES.keys())
 
 DEFAULT_TYPE = "custom"
