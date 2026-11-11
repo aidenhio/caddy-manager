@@ -108,7 +108,7 @@ password hash.
 app.py                        # entry point: create_app() + dev server
 caddy_manager/
   __init__.py                 # application factory (secret key, blueprints, Jinja globals)
-  configstore.py              # config.json load/save/is_configured/get_caddy_dir
+  configstore.py              # config.json load/save/is_configured/get_conf_dir
   colors.py                   # the one place block-type -> Tabler color is defined
   caddyfile.py                # pure Caddyfile string building & parsing (no file I/O)
   blocks.py                   # filesystem/metadata layer + shared block-form parsing

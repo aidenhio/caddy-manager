@@ -484,7 +484,7 @@ def settings():
                 cfg["caddy_servers"] = servers
                 cfg["caddy_vip_api_url"] = vip_api_url
                 cfg["caddy_server_ping_interval_seconds"] = int(ping_interval_raw)
-                cfg["caddy_server_danger_after_misses"] = int(offline_raw)
+                cfg["caddy_server_offline_after_misses"] = int(offline_raw)
                 cfg["caddy_status_interval_seconds"] = int(status_interval_raw)
                 cfg["caddy_status_failed_after"] = int(failed_raw)
                 save_config(cfg)

@@ -25,35 +25,7 @@ def load_config():
     if not os.path.exists(CONFIG_PATH):
         return None
     with open(CONFIG_PATH, "r") as f:
-        cfg = json.load(f)
-
-    if "conf_dir" not in cfg and "caddy_dir" in cfg:
-        # Migrate pre-root-directory installs: caddy_dir -> conf_dir, its parent -> a guessed root_dir.
-        conf_dir = cfg.pop("caddy_dir")
-        root_dir = os.path.dirname(conf_dir.rstrip("/\\")) or conf_dir
-        cfg["root_dir"] = root_dir
-        cfg["conf_dir"] = conf_dir
-        defaults = default_paths_for_root(root_dir)
-        cfg.setdefault("certificate_dir", defaults["certificate_dir"])
-        cfg.setdefault("log_dir", defaults["log_dir"])
-        cfg.setdefault("caddyfile_path", defaults["caddyfile_path"])
-        save_config(cfg)
-
-    if "caddy_admin_api_url" in cfg or "caddy_server_warning_after_misses" in cfg:
-        # Migrate the old single Caddy API URL into the VIP URL; the ping warning threshold is gone.
-        old_url = (cfg.pop("caddy_admin_api_url", None) or "").strip()
-        if old_url and not cfg.get("caddy_vip_api_url"):
-            cfg["caddy_vip_api_url"] = old_url
-        cfg.pop("caddy_server_warning_after_misses", None)
-        save_config(cfg)
-
-    if "quick_add_type_dashboard" in cfg or "quick_add_type_site_blocks" in cfg:
-        # The Quick Add button was removed; drop its stale per-page settings.
-        cfg.pop("quick_add_type_dashboard", None)
-        cfg.pop("quick_add_type_site_blocks", None)
-        save_config(cfg)
-
-    return cfg
+        return json.load(f)
 
 
 def save_config(cfg):
@@ -203,8 +175,7 @@ def get_caddy_server_ping_interval_seconds():
 
 
 def get_caddy_server_offline_after_misses():
-    # Stored under its pre-status-monitor key name, so existing saved values carry over.
-    return _positive_int(load_config(), "caddy_server_danger_after_misses",
+    return _positive_int(load_config(), "caddy_server_offline_after_misses",
                          DEFAULT_CADDY_SERVER_OFFLINE_AFTER_MISSES)
 
 

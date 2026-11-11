@@ -1,0 +1,284 @@
+From 9592cdac449781354db9d7341533d9283e07e837 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 11 Nov 2026 19:38:59 +1100
+Subject: [PATCH] Remove Quick Add
+
+The universal block form's type picker replaces it. Removes the Quick
+Add button partial and its includes, the Settings tab, the
+update_quick_add action and the configstore getters. Block-type
+validation now uses BLOCK_TYPE_ORDER directly.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GFYvS9tgNsRjfuEB4vjX1t
+---
+ caddy_manager/block_types.py             |  4 +--
+ caddy_manager/configstore.py             | 18 -----------
+ caddy_manager/views.py                   | 31 +++++--------------
+ templates/home.html                      |  1 -
+ templates/partials/quick_add_button.html | 10 ------
+ templates/settings.html                  | 39 ------------------------
+ templates/site_blocks.html               |  1 -
+ 7 files changed, 10 insertions(+), 94 deletions(-)
+ delete mode 100644 templates/partials/quick_add_button.html
+
+diff --git a/caddy_manager/block_types.py b/caddy_manager/block_types.py
+index 627914a..4524c2e 100644
+--- a/caddy_manager/block_types.py
++++ b/caddy_manager/block_types.py
+@@ -62,8 +62,8 @@ BLOCK_TYPES = {
+     },
+ }
+ 
+-# Iteration order for anything that lists every block type (Quick Add
+-# dropdowns, the New Site Block modal, the Site Blocks by Type widget).
++# Iteration order for anything that lists every block type (the block form's
++# type picker, the Site Blocks by Type widget).
+ BLOCK_TYPE_ORDER = tuple(BLOCK_TYPES.keys())
+ 
+ DEFAULT_TYPE = "custom"
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index 8b9f91d..35f8c63 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -3,7 +3,6 @@ credentials, the Caddy root directory and derived paths, and a session secret ke
+ import os
+ import json
+ 
+-from .block_types import BLOCK_TYPE_ORDER
+ 
+ # config.json lives at the project root, one level up from this package.
+ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+@@ -126,23 +125,6 @@ def get_log_tail_lines():
+     return DEFAULT_LOG_TAIL_LINES
+ 
+ 
+-# The "Quick Add" button skips the type-picker modal for one pre-chosen type,
+-# set per page. "None" both is the default and turns the button off.
+-QUICK_ADD_BLOCK_TYPES = BLOCK_TYPE_ORDER
+-
+-
+-def get_quick_add_type_dashboard():
+-    cfg = load_config()
+-    value = cfg.get("quick_add_type_dashboard") if cfg else None
+-    return value if value in QUICK_ADD_BLOCK_TYPES else None
+-
+-
+-def get_quick_add_type_site_blocks():
+-    cfg = load_config()
+-    value = cfg.get("quick_add_type_site_blocks") if cfg else None
+-    return value if value in QUICK_ADD_BLOCK_TYPES else None
+-
+-
+ # Dashboard widgets in display order, as (config key, toggle label). All shown by default.
+ DASHBOARD_WIDGETS = (
+     ("quick_glance_row", "Quick Glance Row"),
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index f236c27..121cf16 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -8,13 +8,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
+ from .auth import login_required
+ from .configstore import (
+     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
+-    QUICK_ADD_BLOCK_TYPES, get_quick_add_type_dashboard, get_quick_add_type_site_blocks,
+     get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
+     DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
+     MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS, MIN_CADDY_STATUS_INTERVAL_SECONDS,
+     get_caddy_server_ping_interval_seconds, get_caddy_server_offline_after_misses,
+     get_caddy_status_interval_seconds, get_caddy_status_failed_after,
+ )
++from .block_types import BLOCK_TYPE_ORDER
+ from .caddy_api import upstream_stats
+ from .server_monitor import get_server_statuses, notify_config_changed
+ from .caddyfile import slugify, extract_body, site_addresses_from_textarea
+@@ -38,7 +38,7 @@ def dashboard():
+     certs_root = certificates_root()
+     certs = list_certificates() if certs_root and os.path.isdir(certs_root) else []
+     caddy_stats = upstream_stats()
+-    by_type = {t: 0 for t in QUICK_ADD_BLOCK_TYPES}
++    by_type = {t: 0 for t in BLOCK_TYPE_ORDER}
+     for b in blocks:
+         by_type[b["type"]] = by_type.get(b["type"], 0) + 1
+     stats = {
+@@ -56,7 +56,7 @@ def dashboard():
+     recent_blocks = sorted(blocks, key=lambda b: b["created_ts"], reverse=True)[:5]
+     return render_template(
+         "home.html", stats=stats, conf_dir=conf_dir, dir_exists=dir_exists,
+-        recent_blocks=recent_blocks, quick_add_type=get_quick_add_type_dashboard(),
++        recent_blocks=recent_blocks,
+         dashboard_widgets=get_dashboard_widget_visibility(),
+     )
+ 
+@@ -91,7 +91,6 @@ def site_blocks():
+     blocks = list_blocks() if dir_exists else []
+     return render_template(
+         "site_blocks.html", blocks=blocks, conf_dir=conf_dir, dir_exists=dir_exists,
+-        quick_add_type=get_quick_add_type_site_blocks(),
+     )
+ 
+ 
+@@ -131,15 +130,15 @@ def certificates():
+ @login_required
+ def new_block(block_type=None):
+     # /new/<type> just preselects a type in the universal form's picker.
+-    if block_type is not None and block_type not in QUICK_ADD_BLOCK_TYPES:
++    if block_type is not None and block_type not in BLOCK_TYPE_ORDER:
+         abort(404)
+-    block_type = block_type or QUICK_ADD_BLOCK_TYPES[0]
++    block_type = block_type or BLOCK_TYPE_ORDER[0]
+     error = None
+     meta = {}
+ 
+     if request.method == "POST":
+         posted_type = request.form.get("block_type", "")
+-        if posted_type not in QUICK_ADD_BLOCK_TYPES:
++        if posted_type not in BLOCK_TYPE_ORDER:
+             error = "Choose a block type."
+         else:
+             block_type = posted_type
+@@ -191,7 +190,7 @@ def edit_block(filename):
+ 
+     meta = read_metadata(filename, path)
+     block_type = meta.get("type", "custom")
+-    if block_type not in QUICK_ADD_BLOCK_TYPES:
++    if block_type not in BLOCK_TYPE_ORDER:
+         block_type = "custom"
+     old_site_addresses = meta.get("site_addresses", [])
+     previous_log_enabled = meta.get("log_enabled", False)
+@@ -323,7 +322,7 @@ def delete_block(filename):
+ 
+ # Which tab-pane each form action belongs to, and the valid tab ids -- keeps a save on its own
+ # tab instead of bouncing to User; an unrecognized ?tab= falls back to DEFAULT_TAB.
+-TAB_IDS = ("user", "password", "general", "directory", "dashboard", "quick-add", "global", "servers", "logs")
++TAB_IDS = ("user", "password", "general", "directory", "dashboard", "global", "servers", "logs")
+ DEFAULT_TAB = "user"
+ ACTION_TAB = {
+     "update_user": "user",
+@@ -332,7 +331,6 @@ ACTION_TAB = {
+     "update_certificates": "general",
+     "update_dir": "directory",
+     "update_dashboard_widgets": "dashboard",
+-    "update_quick_add": "quick-add",
+     "update_global_config": "global",
+     "rollback_global_config": "global",
+     "update_caddy_servers": "servers",
+@@ -513,19 +511,6 @@ def settings():
+             flash("Dashboard settings updated.", "success")
+             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
+ 
+-        elif action == "update_quick_add":
+-            quick_add_type_dashboard = request.form.get("quick_add_type_dashboard", "")
+-            quick_add_type_site_blocks = request.form.get("quick_add_type_site_blocks", "")
+-            valid_choices = ("",) + QUICK_ADD_BLOCK_TYPES
+-            if quick_add_type_dashboard not in valid_choices or quick_add_type_site_blocks not in valid_choices:
+-                error = "Invalid Quick Add block type selected."
+-            else:
+-                cfg["quick_add_type_dashboard"] = quick_add_type_dashboard
+-                cfg["quick_add_type_site_blocks"] = quick_add_type_site_blocks
+-                save_config(cfg)
+-                flash("Quick Add settings updated.", "success")
+-                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
+-
+         elif action == "update_user":
+             username = request.form.get("username", "").strip()
+             email = request.form.get("email", "").strip()
+diff --git a/templates/home.html b/templates/home.html
+index d454b25..588faa1 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -10,7 +10,6 @@
+ 
+ {% block header_actions %}
+ <div class="btn-list">
+-  {% include 'partials/quick_add_button.html' %}
+   <a href="{{ url_for('main.new_block') }}" class="btn btn-primary d-none d-sm-inline-block">
+     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
+diff --git a/templates/partials/quick_add_button.html b/templates/partials/quick_add_button.html
+deleted file mode 100644
+index f94afb0..0000000
+--- a/templates/partials/quick_add_button.html
++++ /dev/null
+@@ -1,10 +0,0 @@
+-<!-- BEGIN QUICK ADD BUTTON -->
+-{% if quick_add_type %}
+-  {% set qa_label = type_label(quick_add_type) %}
+-  <a href="{{ url_for('main.new_block', block_type=quick_add_type) }}" class="btn btn-{{ type_color(quick_add_type) }} btn-5 d-none d-sm-inline-block"
+-     title="Quick add a {{ qa_label }} block">
+-    {{ type_icon(quick_add_type, 'icon icon-2') }}
+-    Add {{ qa_label }}
+-  </a>
+-{% endif %}
+-<!-- END QUICK ADD BUTTON -->
+diff --git a/templates/settings.html b/templates/settings.html
+index 8a79f4d..a484a83 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -39,7 +39,6 @@
+             <a href="#general" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'general' %} active{% endif %}" data-bs-toggle="tab">General</a>
+             <a href="#directory" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'directory' %} active{% endif %}" data-bs-toggle="tab">Directories</a>
+             <a href="#dashboard" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'dashboard' %} active{% endif %}" data-bs-toggle="tab">Dashboard</a>
+-            <a href="#quick-add" class="list-group-item list-group-item-action d-flex align-items-center{% if active_tab == 'quick-add' %} active{% endif %}" data-bs-toggle="tab">Quick Add</a>
+           </div>
+           <h4 class="card-header subheader mt-4">Caddy Settings</h4>
+           <div>
+@@ -268,44 +267,6 @@
+           </div>
+         </div>
+ 
+-        <!-- TAB QUICK ADD-->
+-        <div id="quick-add" class="tab-pane{% if active_tab == 'quick-add' %} active{% endif %}">
+-          <div class="card-body">
+-            <h2 class="mb-4">Quick Add</h2>
+-            <h3 class="card-title">Quick Add Button</h3>
+-            <p class="text-secondary">
+-              Adds a one-click shortcut button to the header of the <a href="{{ url_for('main.dashboard') }}">Home Dashboard</a> and/or <a href="{{ url_for('main.site_blocks') }}">Site Blocks</a> page that jumps straight to a chosen block type's form, skipping the "New Site Block" type picker.
+-            </p>
+-            <form method="post" id="quick-add-form">
+-              <input type="hidden" name="action" value="update_quick_add">
+-              <div class="mb-3">
+-                <label class="form-label">Home Dashboard quick add type</label>
+-                <select name="quick_add_type_dashboard" class="form-select">
+-                  <option value="" {{ 'selected' if not cfg.quick_add_type_dashboard }}>None</option>
+-                  {% for t in block_type_order %}
+-                  <option value="{{ t }}" {{ 'selected' if cfg.quick_add_type_dashboard == t }}>{{ type_label(t) }}</option>
+-                  {% endfor %}
+-                </select>
+-              </div>
+-              <div class="mb-0">
+-                <label class="form-label">Site Blocks page quick add type</label>
+-                <select name="quick_add_type_site_blocks" class="form-select">
+-                  <option value="" {{ 'selected' if not cfg.quick_add_type_site_blocks }}>None</option>
+-                  {% for t in block_type_order %}
+-                  <option value="{{ t }}" {{ 'selected' if cfg.quick_add_type_site_blocks == t }}>{{ type_label(t) }}</option>
+-                  {% endfor %}
+-                </select>
+-              </div>
+-              <div class="form-footer">
+-                <button type="submit" class="btn btn-primary">Update</button>
+-              </div>
+-            </form>
+-            <script>
+-              initFormValidation(document.getElementById('quick-add-form'));
+-            </script>
+-          </div>
+-        </div>
+-
+         <!-- TAB GLOBAL -->
+         <div id="global" class="tab-pane{% if active_tab == 'global' %} active{% endif %}">
+           <div class="card-body">
+diff --git a/templates/site_blocks.html b/templates/site_blocks.html
+index edf1824..1c3388b 100644
+--- a/templates/site_blocks.html
++++ b/templates/site_blocks.html
+@@ -11,7 +11,6 @@
+ 
+ {% block header_actions %}
+ <div class="btn-list">
+-  {% include 'partials/quick_add_button.html' %}
+   <a href="{{ url_for('main.new_block') }}" class="btn btn-primary d-none d-sm-inline-block">
+     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
+-- 
+2.43.0
+

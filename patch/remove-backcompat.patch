@@ -1,0 +1,131 @@
+From aab72a6e904cf13a0c8e336f79c29c9f1ec06b01 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 11 Nov 2026 21:03:17 +1100
+Subject: [PATCH] Remove backwards-compatibility code
+
+The app has no deployed users, so drop every migration for old saved
+data: the caddy_dir, caddy_admin_api_url and quick_add config
+migrations, the hosts -> site_addresses sidecar rename and the custom
+snippet backfill. The ping offline threshold is now stored as
+caddy_server_offline_after_misses instead of its old danger key name.
+
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GFYvS9tgNsRjfuEB4vjX1t
+---
+ README.md                    |  2 +-
+ caddy_manager/blocks.py      | 13 +------------
+ caddy_manager/configstore.py | 33 ++-------------------------------
+ caddy_manager/views.py       |  2 +-
+ 4 files changed, 5 insertions(+), 45 deletions(-)
+
+diff --git a/README.md b/README.md
+index f9436bc..c3109d4 100644
+--- a/README.md
++++ b/README.md
+@@ -108,7 +108,7 @@ password hash.
+ app.py                        # entry point: create_app() + dev server
+ caddy_manager/
+   __init__.py                 # application factory (secret key, blueprints, Jinja globals)
+-  configstore.py              # config.json load/save/is_configured/get_caddy_dir
++  configstore.py              # config.json load/save/is_configured/get_conf_dir
+   colors.py                   # the one place block-type -> Tabler color is defined
+   caddyfile.py                # pure Caddyfile string building & parsing (no file I/O)
+   blocks.py                   # filesystem/metadata layer + shared block-form parsing
+diff --git a/caddy_manager/blocks.py b/caddy_manager/blocks.py
+index 3231698..7eb06e2 100644
+--- a/caddy_manager/blocks.py
++++ b/caddy_manager/blocks.py
+@@ -10,7 +10,7 @@ from flask import abort
+ from .configstore import get_conf_dir, get_log_dir, get_caddy_log_output_dir
+ from .caddyfile import (
+     site_addresses_from_textarea, site_address_header, slugify,
+-    join_target, split_target, parse_conf_content, custom_block_preview, extract_body,
++    join_target, split_target, parse_conf_content, custom_block_preview,
+     render_reverse_proxy, render_redirect, render_load_balancer, render_custom, render_static_site,
+     render_log_block, ENCODE_FORMATS, LOG_LEVELS, LOG_FORMATS,
+ )
+@@ -162,17 +162,6 @@ def read_metadata(conf_filename, conf_path):
+             with open(meta_file) as f:
+                 cached = json.load(f)
+             if cached.get("source_mtime") == st.st_mtime and cached.get("source_size") == st.st_size:
+-                # Migrate pre-rename sidecars (hosts -> site_addresses) transparently.
+-                if "site_addresses" not in cached and "hosts" in cached:
+-                    cached["site_addresses"] = cached.pop("hosts")
+-                # Backfill the Site Blocks table snippet for custom sidecars saved before it existed.
+-                if cached.get("type") == "custom" and "snippet" not in cached:
+-                    try:
+-                        with open(conf_path) as f:
+-                            cached["snippet"] = custom_block_preview(extract_body(f.read()))
+-                        write_metadata(conf_filename, conf_path, cached)
+-                    except OSError:
+-                        cached["snippet"] = ""
+                 return cached
+         except (OSError, ValueError):
+             pass
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index 008b37f..03e5fd2 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -25,35 +25,7 @@ def load_config():
+     if not os.path.exists(CONFIG_PATH):
+         return None
+     with open(CONFIG_PATH, "r") as f:
+-        cfg = json.load(f)
+-
+-    if "conf_dir" not in cfg and "caddy_dir" in cfg:
+-        # Migrate pre-root-directory installs: caddy_dir -> conf_dir, its parent -> a guessed root_dir.
+-        conf_dir = cfg.pop("caddy_dir")
+-        root_dir = os.path.dirname(conf_dir.rstrip("/\\")) or conf_dir
+-        cfg["root_dir"] = root_dir
+-        cfg["conf_dir"] = conf_dir
+-        defaults = default_paths_for_root(root_dir)
+-        cfg.setdefault("certificate_dir", defaults["certificate_dir"])
+-        cfg.setdefault("log_dir", defaults["log_dir"])
+-        cfg.setdefault("caddyfile_path", defaults["caddyfile_path"])
+-        save_config(cfg)
+-
+-    if "caddy_admin_api_url" in cfg or "caddy_server_warning_after_misses" in cfg:
+-        # Migrate the old single Caddy API URL into the VIP URL; the ping warning threshold is gone.
+-        old_url = (cfg.pop("caddy_admin_api_url", None) or "").strip()
+-        if old_url and not cfg.get("caddy_vip_api_url"):
+-            cfg["caddy_vip_api_url"] = old_url
+-        cfg.pop("caddy_server_warning_after_misses", None)
+-        save_config(cfg)
+-
+-    if "quick_add_type_dashboard" in cfg or "quick_add_type_site_blocks" in cfg:
+-        # The Quick Add button was removed; drop its stale per-page settings.
+-        cfg.pop("quick_add_type_dashboard", None)
+-        cfg.pop("quick_add_type_site_blocks", None)
+-        save_config(cfg)
+-
+-    return cfg
++        return json.load(f)
+ 
+ 
+ def save_config(cfg):
+@@ -203,8 +175,7 @@ def get_caddy_server_ping_interval_seconds():
+ 
+ 
+ def get_caddy_server_offline_after_misses():
+-    # Stored under its pre-status-monitor key name, so existing saved values carry over.
+-    return _positive_int(load_config(), "caddy_server_danger_after_misses",
++    return _positive_int(load_config(), "caddy_server_offline_after_misses",
+                          DEFAULT_CADDY_SERVER_OFFLINE_AFTER_MISSES)
+ 
+ 
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 121cf16..84a952d 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -484,7 +484,7 @@ def settings():
+                 cfg["caddy_servers"] = servers
+                 cfg["caddy_vip_api_url"] = vip_api_url
+                 cfg["caddy_server_ping_interval_seconds"] = int(ping_interval_raw)
+-                cfg["caddy_server_danger_after_misses"] = int(offline_raw)
++                cfg["caddy_server_offline_after_misses"] = int(offline_raw)
+                 cfg["caddy_status_interval_seconds"] = int(status_interval_raw)
+                 cfg["caddy_status_failed_after"] = int(failed_raw)
+                 save_config(cfg)
+-- 
+2.43.0
+
