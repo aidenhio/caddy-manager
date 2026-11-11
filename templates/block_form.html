@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% from "macros/alerts.html" import alert %}
+{% from "macros/block_form.html" import form_card, type_section %}
 
-{% set type_color = type_color(block_type) %}
+{% set proxy_types = ['reverse_proxy', 'load_balancer'] %}
+{% set logging_types = ['reverse_proxy', 'redirect', 'load_balancer', 'static_site'] %}
 
-{% block title %}{% if mode == 'edit' %}Edit {{ site_addresses[0] if site_addresses else filename }}{% else %}New Site{% endif %} - Caddy Manager{% endblock %}
+{% block title %}{% if mode == 'edit' %}Edit {{ site_addresses[0] if site_addresses else filename }}{% else %}New site block{% endif %} - Caddy Manager{% endblock %}
 
 {% block page_title %}
   {% if mode == 'edit' %}
@@ -23,284 +25,468 @@
     <li class="breadcrumb-item">{{ site_addresses[0] if site_addresses else filename }}</li>
     <li class="breadcrumb-item">Edit</li>
   {% else %}
-
     <li class="breadcrumb-item">New</li>
   {% endif %}
 {% endblock %}
 
-<!---->
-
 {% block content %}
 
-<!-- BEGIN BLOCK FORM CARD -->
-<div class="row row-cards">
-  
-  <!-- BEGIN SECTION TABS NAV -->
-  <div class="col-12">
-    <nav class="nav nav-segmented w-100" role="tablist">
-      <button class="nav-link active" role="tab" data-bs-toggle="tab" href="#general-tab">General</button>
-      <button class="nav-link" role="tab" data-bs-toggle="tab" tabindex="-1" href="#advanced-tab">Advanced</button>
-      <button class="nav-link" role="tab" data-bs-toggle="tab" tabindex="-1" href="#security-tab">Security</button>
-      <button class="nav-link" role="tab" data-bs-toggle="tab" tabindex="-1" href="#logging-tab">Logging</button>
-      <button class="nav-link" role="tab" data-bs-toggle="tab" tabindex="-1" href="#file-tab">File</button>
-    </nav>
-  </div>
-  <!-- END SECTION TABS NAV-->
+<!-- BEGIN BLOCK FORM -->
+<form method="post" id="block-form" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
+  <div class="row row-cards">
 
-  <!-- BEGIN GENERAL SECTION -->
+    {% if error %}
+    <!-- BEGIN FORM ERROR -->
+    <div class="col-12">
+      {% call alert('danger', classes='mb-0') %}{{ error }}{% endcall %}
+    </div>
+    <!-- END FORM ERROR -->
+    {% endif %}
 
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">Block type</h2>
-        <p class="card-subtitle">Select the type of block you want to create.</p>
+    <!-- BEGIN SECTION TABS NAV -->
+    <div class="col-12">
+      <nav class="nav nav-segmented w-100 flex-nowrap overflow-x-auto" role="tablist">
+        <button type="button" class="nav-link active" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-general" aria-selected="true">General</button>
+        <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-advanced" aria-selected="false" tabindex="-1">Advanced</button>
+        <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-security" aria-selected="false" tabindex="-1">Security</button>
+        <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-logging" aria-selected="false" tabindex="-1">Logging</button>
+        <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-file" aria-selected="false" tabindex="-1">File</button>
+      </nav>
+    </div>
+    <!-- END SECTION TABS NAV -->
 
-        <fieldset>
-          <div class="form-selectgroup form-selectgroup-boxes d-flex flex-column">
-            <label class="form-selectgroup-item flex-fill">
-              <input type="radio" name="site-block-type" value="1" class="form-selectgroup-input" checked="">
-              <div class="form-selectgroup-label d-flex align-items-center p-3">
-                <div class="me-3">
-                  <span class="form-selectgroup-check"></span>
+    <div class="col-12">
+      <div class="tab-content">
+
+        <!-- BEGIN GENERAL SECTION -->
+        <div class="tab-pane active show" id="block-tab-general" role="tabpanel">
+          <div class="row row-cards">
+
+            <!-- BEGIN BLOCK TYPE -->
+            <div class="col-12">
+              {% if mode == 'edit' %}
+                {% set type_subtitle = "The block type can't be changed once a block has been created." %}
+              {% else %}
+                {% set type_subtitle = "Select the type of block you want to create." %}
+              {% endif %}
+              {% call form_card('Block type', type_subtitle) %}
+              <fieldset>
+                <div class="form-selectgroup form-selectgroup-boxes d-flex flex-column">
+                  {% for t in block_type_order if mode == 'new' or t == block_type %}
+                  <label class="form-selectgroup-item flex-fill">
+                    <input type="radio" name="block_type" value="{{ t }}" class="form-selectgroup-input" {{ 'checked' if t == block_type }}>
+                    <div class="form-selectgroup-label d-flex align-items-center p-3">
+                      <div class="me-3">
+                        <span class="form-selectgroup-check"></span>
+                      </div>
+                      <div class="form-selectgroup-label-content d-flex align-items-center">
+                        <span class="avatar avatar-circle bg-primary-lt me-3 flex-shrink-0">
+                          {{ type_icon(t) }}
+                        </span>
+                        <div>
+                          <div class="fw-medium">{{ type_label(t) | capitalize }}</div>
+                          <div class="text-secondary">{{ type_description(t) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                  {% endfor %}
                 </div>
-                <div class="form-selectgroup-label-content d-flex align-items-center">
-                  <span class="avatar avatar-circle bg-primary-lt me-3">
-                    {{ type_icon("reverse_proxy") }}
-                  </span>
-                  <div>
-                    <div class="fw-medium">Reverse proxy</div>
-                    <div class="text-secondary">{{ type_description("reverse_proxy") }}</div>
-                  </div>
+              </fieldset>
+              {% endcall %}
+            </div>
+            <!-- END BLOCK TYPE -->
+
+            <!-- BEGIN SITE ADDRESSES -->
+            <div class="col-12">
+              {% call form_card('Site addresses', 'Type a site address, press space or enter to add it.') %}
+              <div class="form-control d-flex flex-wrap align-items-center gap-2" id="site-address-input">
+                <input type="text" id="site-address-text-input" class="form-control-plaintext p-0 flex-grow-1" placeholder="app.example.com" autocomplete="off">
+              </div>
+              <div class="invalid-feedback">At least one site address is required.</div>
+              <textarea name="site_addresses" id="site-addresses" hidden>{{ site_addresses_text }}</textarea>
+              {% endcall %}
+            </div>
+            <!-- END SITE ADDRESSES -->
+
+            <!-- BEGIN REVERSE PROXY UPSTREAM -->
+            {% call type_section(['reverse_proxy'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Upstream', 'Scheme, host and port of the upstream server.') %}
+              <div class="row g-2">
+                <div class="col-md-3">
+                  <select name="scheme" id="scheme" class="form-select">
+                    <option value="http" {{ 'selected' if (meta.scheme or 'http') == 'http' }}>http</option>
+                    <option value="https" {{ 'selected' if meta.scheme == 'https' }}>https</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1" required>
+                  <div class="invalid-feedback">Upstream host is required.</div>
+                </div>
+                <div class="col-md-3">
+                  <input type="text" name="port" class="form-control" value="{{ meta.port or '' }}" placeholder="8080">
                 </div>
               </div>
-            </label>
-            <label class="form-selectgroup-item flex-fill">
-              <input type="radio" name="site-block-type" value="2" class="form-selectgroup-input">
-              <div class="form-selectgroup-label d-flex align-items-center p-3">
-                <div class="me-3">
-                  <span class="form-selectgroup-check"></span>
-                </div>
-                <div class="form-selectgroup-label-content d-flex align-items-center">
-                  <span class="avatar avatar-circle bg-primary-lt me-3">
-                    {{ type_icon("load_balancer") }}
-                  </span>
-                  <div>
-                    <div class="fw-medium">Load balancer</div>
-                    <div class="text-secondary">{{ type_description("load_balancer") }}</div>
-                  </div>
+              <div class="mt-3" id="insecure-skip-verify-row" {{ 'hidden' if (meta.scheme or 'http') != 'https' }}>
+                <label class="form-check mb-1">
+                  <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+                  <span class="form-check-label">Skip TLS verification (insecure)</span>
+                </label>
+                <span class="form-hint">Only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+              </div>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END REVERSE PROXY UPSTREAM -->
+
+            <!-- BEGIN LOAD BALANCER UPSTREAMS -->
+            {% call type_section(['load_balancer'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Upstreams', 'Scheme shared by every upstream, then a host and port for each. At least two are required.') %}
+              <div class="row g-2 mb-3">
+                <div class="col-md-3">
+                  <select id="lb-scheme" class="form-select" aria-label="Scheme">
+                    <option value="http">http</option>
+                    <option value="https">https</option>
+                  </select>
                 </div>
               </div>
-            </label>
-            <label class="form-selectgroup-item flex-fill">
-              <input type="radio" name="site-block-type" value="3" class="form-selectgroup-input">
-              <div class="form-selectgroup-label d-flex align-items-center p-3">
-                <div class="me-3">
-                  <span class="form-selectgroup-check"></span>
+              <div id="upstream-rows"></div>
+              <button type="button" id="add-upstream-btn" class="btn mt-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                  <path d="M12 5l0 14" />
+                  <path d="M5 12l14 0" />
+                </svg>
+                Add upstream
+              </button>
+              <textarea name="upstreams" id="upstreams" hidden>{{ upstreams_text }}</textarea>
+              <div class="mt-3" id="lb-insecure-skip-verify-row" {{ 'hidden' if not (meta.upstreams and meta.upstreams[0].startswith('https://')) }}>
+                <label class="form-check mb-1">
+                  <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+                  <span class="form-check-label">Skip TLS verification (insecure)</span>
+                </label>
+                <span class="form-hint">Only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+              </div>
+              {% endcall %}
+            </div>
+            <div class="col-12">
+              {% call form_card('Load balancing policy', 'How requests are spread across the upstreams.') %}
+              <select name="lb_policy" class="form-select" aria-label="Load balancing policy">
+                {% for policy in ['round_robin', 'least_conn', 'random', 'ip_hash', 'uri_hash', 'header', 'first'] %}
+                <option value="{{ policy }}" {{ 'selected' if meta.lb_policy == policy }}>{{ policy }}</option>
+                {% endfor %}
+              </select>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END LOAD BALANCER UPSTREAMS -->
+
+            <!-- BEGIN REDIRECT TARGET -->
+            {% call type_section(['redirect'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Redirect', 'Where visitors are sent, and the status code used to send them.') %}
+              <div class="row g-2">
+                <div class="col-md-8">
+                  <label class="form-label">Redirect target</label>
+                  <input type="text" name="target" class="form-control" value="{{ meta.target or '' }}" placeholder="https://new.example.com{uri}" required>
+                  <div class="invalid-feedback">Redirect target is required.</div>
                 </div>
-                <div class="form-selectgroup-label-content d-flex align-items-center">
-                  <span class="avatar avatar-circle bg-primary-lt me-3">
-                    {{ type_icon("redirect") }}
-                  </span>
-                  <div>
-                    <div class="fw-medium">Redirect</div>
-                    <div class="text-secondary">{{ type_description("redirect") }}</div>
-                  </div>
+                <div class="col-md-4">
+                  <label class="form-label">Redirect code</label>
+                  <select name="redirect_code" class="form-select">
+                    {% for code, label in [('301','301 (Permanent)'), ('302','302 (Temporary)'), ('307','307 (Temporary, preserve method)'), ('308','308 (Permanent, preserve method)')] %}
+                    <option value="{{ code }}" {{ 'selected' if (meta.redirect_code or '301') == code }}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
                 </div>
               </div>
-            </label>
-            <label class="form-selectgroup-item flex-fill">
-              <input type="radio" name="site-block-type" value="4" class="form-selectgroup-input">
-              <div class="form-selectgroup-label d-flex align-items-center p-3">
-                <div class="me-3">
-                  <span class="form-selectgroup-check"></span>
-                </div>
-                <div class="form-selectgroup-label-content d-flex align-items-center">
-                  <span class="avatar avatar-circle bg-primary-lt me-3">
-                    {{ type_icon("static_site") }}
-                  </span>
-                  <div>
-                    <div class="fw-medium">Static site</div>
-                    <div class="text-secondary">{{ type_description("static_site") }}</div>
-                  </div>
-                </div>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END REDIRECT TARGET -->
+
+            <!-- BEGIN STATIC SITE FILES -->
+            {% call type_section(['static_site'], block_type) %}
+            <div class="col-12">
+              {% call form_card('File server', 'The directory on the Caddy server to serve files from.') %}
+              <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" aria-label="File path" required>
+              <div class="invalid-feedback">File path is required.</div>
+              <label class="form-label mt-3">Encode</label>
+              <div>
+                {% for fmt in ['gzip', 'zstd', 'br'] %}
+                <label class="form-check form-check-inline">
+                  <input type="checkbox" class="form-check-input" name="encode" value="{{ fmt }}" {{ 'checked' if fmt in (meta.encode or []) }}>
+                  <span class="form-check-label">{{ fmt }}</span>
+                </label>
+                {% endfor %}
               </div>
-            </label>
-            <label class="form-selectgroup-item flex-fill">
-              <input type="radio" name="site-block-type" value="5" class="form-selectgroup-input">
-              <div class="form-selectgroup-label d-flex align-items-center p-3">
-                <div class="me-3">
-                  <span class="form-selectgroup-check"></span>
-                </div>
-                <div class="form-selectgroup-label-content d-flex align-items-center">
-                  <span class="avatar avatar-circle bg-primary-lt me-3">
-                    {{ type_icon("custom") }}
-                  </span>
-                  <div>
-                    <div class="fw-medium">Custom block</div>
-                    <div class="text-secondary">{{ type_description("custom") }}</div>
-                  </div>
-                </div>
-              </div>
-            </label>
-          </div>
-        </fieldset>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END STATIC SITE FILES -->
 
-      </div>
-    </div>
-  </div>
+            <!-- BEGIN CUSTOM CONTENT -->
+            {% call type_section(['custom'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Block content', 'Raw Caddyfile directives. The site addresses above are wrapped around them automatically.') %}
+              <textarea name="raw_content" id="raw_content" class="form-control" rows="12" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="reverse_proxy 127.0.0.1:8080&#10;encode gzip" aria-label="Block content" required>{{ raw_body_text }}</textarea>
+              <div class="invalid-feedback">Block content is required.</div>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END CUSTOM CONTENT -->
 
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">Site addresses</h2>
-        <p class="card-subtitle">Type a site address, press space or enter to add it.</p>
-        <div class="form-control d-flex flex-wrap align-items-center gap-2" id="site-address-input">
-          <input type="text" id="site-address-text-input" class="form-control-plaintext p-0 flex-grow-1"
-            placeholder="app.example.com" autocomplete="off">
-        </div>
-        <div class="invalid-feedback">At least one site address is required.</div>
-        <textarea name="site_addresses" id="site-addresses" hidden>{{ site_addresses_text }}</textarea>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">Upstreams</h2>
-        <p class="card-subtitle">Scheme, host and port of the upstream server.</p>
-        <div class="row">
-          <div class="col-md-3">
-            <select name="scheme" id="scheme" class="form-select">
-              <option value="http" {{ 'selected' if (meta.scheme or 'http' )=='http' }}>http</option>
-              <option value="https" {{ 'selected' if meta.scheme=='https' }}>https</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <input type="text" name="host" class="form-control" value="{{ meta.host or '' }}" placeholder="127.0.0.1"
-              required>
-            <div class="invalid-feedback">Upstream host is required.</div>
-          </div>
-          <div class="col-md-3">
-            <input type="text" name="port" class="form-control" value="{{ meta.port or '' }}" placeholder="8080">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- BEGIN ADVANCED SECTION -->
-
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">Extra directives</h2>
-        <p class="card-subtitle">Define and extra directives to be included inside the block.</p>
-        <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}">{{ meta.extra or '' }}</textarea>
-      </div>
-    </div>
-  </div>
-
- <!-- BEGIN SECURITY SECTION -->
-
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">HTTP basic auth</h2>
-        <p class="card-subtitle">Setup HTTP basic authentication for the block.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">Access list</h2>
-        <p class="card-subtitle">Configure access permissions for the block.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- BEGIN LOGGING SECTION -->
-
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">Log options</h2>
-        <p class="card-subtitle">Add subtitle.</p>
-        <div class="row">
-          <div class="col-md-6">
-            <label class="form-label">Log level</label>
-            <select name="log_level" class="form-select">
-              <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
-              <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Log format</label>
-            <select name="log_format" class="form-select">
-              <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
-              <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
-            </select>
-          </div>
-        </div> 
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">Log rotation</h2>
-        <p class="card-subtitle">Add subtitle.</p>
-        <div class="row">
-          <div class="col-md-4">
-            <label class="form-label">Max file size</label>
-            <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Files to keep</label>
-            <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Keep for</label>
-            <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
           </div>
         </div>
+        <!-- END GENERAL SECTION -->
+
+        <!-- BEGIN ADVANCED SECTION -->
+        <div class="tab-pane" id="block-tab-advanced" role="tabpanel">
+          <div class="row row-cards">
+
+            <!-- BEGIN LOAD BALANCER RETRY + HEALTH CHECK -->
+            {% call type_section(['load_balancer'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Retry behaviour', 'How long to keep trying other upstreams when one fails.') %}
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <label class="form-label">Retries</label>
+                  <input type="number" min="0" step="1" name="lb_retries" class="form-control" value="{{ meta.lb_retries or '' }}" placeholder="0">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Try duration</label>
+                  <input type="text" name="lb_try_duration" class="form-control" value="{{ meta.lb_try_duration or '' }}" placeholder="10s">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Try interval</label>
+                  <input type="text" name="lb_try_interval" class="form-control" value="{{ meta.lb_try_interval or '' }}" placeholder="250ms">
+                </div>
+              </div>
+              {% endcall %}
+            </div>
+            <div class="col-12">
+              {% call form_card('Active health check', 'Poll each upstream and stop sending traffic to unhealthy ones.') %}
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label">Health check URI</label>
+                  <input type="text" name="health_uri" class="form-control" value="{{ meta.health_uri or '' }}" placeholder="/healthz">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Method</label>
+                  <select name="health_method" class="form-select">
+                    <option value="" {{ 'selected' if not meta.health_method }}>GET</option>
+                    {% for method in ['POST', 'PUT', 'DELETE', 'PATCH'] %}
+                    <option value="{{ method }}" {{ 'selected' if meta.health_method == method }}>{{ method }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Expected status</label>
+                  <input type="text" name="health_status" class="form-control" value="{{ meta.health_status or '' }}" placeholder="200">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Interval</label>
+                  <input type="text" name="health_interval" class="form-control" value="{{ meta.health_interval or '' }}" placeholder="30s">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Timeout</label>
+                  <input type="text" name="health_timeout" class="form-control" value="{{ meta.health_timeout or '' }}" placeholder="5s">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Healthy after</label>
+                  <input type="number" min="1" step="1" name="health_passes" class="form-control" value="{{ meta.health_passes or '' }}" placeholder="1">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Unhealthy after</label>
+                  <input type="number" min="1" step="1" name="health_fails" class="form-control" value="{{ meta.health_fails or '' }}" placeholder="1">
+                </div>
+              </div>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END LOAD BALANCER RETRY + HEALTH CHECK -->
+
+            <!-- BEGIN EXTRA DIRECTIVES -->
+            {% call type_section(proxy_types, block_type) %}
+            <div class="col-12">
+              {% call form_card('Extra directives', 'Added inside the reverse_proxy directive, one per line.') %}
+              <textarea name="extra" class="form-control" rows="4" style="font-family:var(--tblr-font-monospace, monospace)" placeholder="header_up X-Real-IP {remote_host}" aria-label="Extra directives">{{ meta.extra or '' }}</textarea>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END EXTRA DIRECTIVES -->
+
+            <!-- BEGIN STATIC SITE OPTIONS -->
+            {% call type_section(['static_site'], block_type) %}
+            <div class="col-12">
+              {% call form_card('File server options', 'Control which files are served and how directories are shown.') %}
+              <div class="row g-2">
+                <div class="col-md-6">
+                  <label class="form-label">Hide</label>
+                  <input type="text" name="hide" class="form-control" value="{{ meta.hide or '' }}" placeholder=".git .env">
+                  <span class="form-hint">Space-separated glob patterns kept out of listings and direct requests.</span>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Index files</label>
+                  <input type="text" name="index" class="form-control" value="{{ meta.index or '' }}" placeholder="index.html index.htm">
+                  <span class="form-hint">Space-separated. Defaults to index.html and index.txt.</span>
+                </div>
+              </div>
+              <label class="form-check mt-3 mb-1">
+                <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
+                <span class="form-check-label">Directory browsing</span>
+              </label>
+              <span class="form-hint">Shows a file listing for directories that have no index file.</span>
+              {% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END STATIC SITE OPTIONS -->
+
+            <!-- BEGIN NO ADVANCED OPTIONS -->
+            {% call type_section(['redirect', 'custom'], block_type) %}
+            <div class="col-12">
+              {% call form_card('No advanced options', 'This block type has no advanced options.') %}{% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END NO ADVANCED OPTIONS -->
+
+          </div>
+        </div>
+        <!-- END ADVANCED SECTION -->
+
+        <!-- BEGIN SECURITY SECTION -->
+        <div class="tab-pane" id="block-tab-security" role="tabpanel">
+          <div class="row row-cards">
+            <div class="col-12">
+              {% call form_card('HTTP basic auth', 'Setup HTTP basic authentication for the block.') %}{% endcall %}
+            </div>
+            <div class="col-12">
+              {% call form_card('Access list', 'Configure access permissions for the block.') %}{% endcall %}
+            </div>
+          </div>
+        </div>
+        <!-- END SECURITY SECTION -->
+
+        <!-- BEGIN LOGGING SECTION -->
+        <div class="tab-pane" id="block-tab-logging" role="tabpanel">
+          <div class="row row-cards">
+
+            {% call type_section(logging_types, block_type) %}
+            <!-- BEGIN ENABLE LOGGING -->
+            <div class="col-12">
+              <div class="card">
+                <div class="card-body">
+                  <div class="row align-items-center">
+                    <div class="col">
+                      <h2 class="card-title">Access log</h2>
+                      <p class="card-subtitle mb-0">Writes this block's access log to <code>{{ log_dir_display }}</code>. Changing logging options may require a restart of the Caddy service.</p>
+                    </div>
+                    <div class="col-auto">
+                      <label class="form-check form-switch m-0">
+                        <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }} aria-label="Enable logging">
+                        <span class="form-check-label">Enable logging</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- END ENABLE LOGGING -->
+
+            <!-- BEGIN LOG OPTIONS -->
+            <div class="col-12" id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
+              <div class="row row-cards">
+                <div class="col-12">
+                  {% call form_card('Log options', 'Level and format of the entries written to the log.') %}
+                  <div class="row g-2">
+                    <div class="col-md-6">
+                      <label class="form-label">Log level</label>
+                      <select name="log_level" class="form-select">
+                        <option value="INFO" {{ 'selected' if (meta.log_level or 'INFO') == 'INFO' }}>INFO</option>
+                        <option value="ERROR" {{ 'selected' if meta.log_level == 'ERROR' }}>ERROR</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Log format</label>
+                      <select name="log_format" class="form-select">
+                        <option value="json" {{ 'selected' if (meta.log_format or 'json') == 'json' }}>JSON</option>
+                        <option value="console" {{ 'selected' if meta.log_format == 'console' }}>Console</option>
+                      </select>
+                    </div>
+                  </div>
+                  {% endcall %}
+                </div>
+                <div class="col-12">
+                  {% call form_card('Log rotation', 'When the log file rolls over, and how many old files are kept.') %}
+                  <div class="row g-2">
+                    <div class="col-md-4">
+                      <label class="form-label">Max file size</label>
+                      <input type="text" name="log_roll_size" class="form-control" value="{{ meta.log_roll_size or '' }}" placeholder="100MiB">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Files to keep</label>
+                      <input type="number" min="1" step="1" name="log_roll_keep" class="form-control" value="{{ meta.log_roll_keep or '' }}" placeholder="10">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Keep for</label>
+                      <input type="text" name="log_roll_keep_for" class="form-control" value="{{ meta.log_roll_keep_for or '' }}" placeholder="2160h">
+                    </div>
+                  </div>
+                  {% endcall %}
+                </div>
+              </div>
+            </div>
+            <!-- END LOG OPTIONS -->
+            {% endcall %}
+
+            <!-- BEGIN CUSTOM LOGGING NOTE -->
+            {% call type_section(['custom'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Access log', 'Custom blocks have no logging options. Add a log directive to the block content instead.') %}{% endcall %}
+            </div>
+            {% endcall %}
+            <!-- END CUSTOM LOGGING NOTE -->
+
+          </div>
+        </div>
+        <!-- END LOGGING SECTION -->
+
+        <!-- BEGIN FILE SECTION -->
+        <div class="tab-pane" id="block-tab-file" role="tabpanel">
+          <div class="row row-cards">
+            <div class="col-12">
+              {% call form_card('File name', 'Override the default file name for the block. The .conf is appended automatically.') %}
+              <label class="form-label">Saved as</label>
+              <input type="text" class="form-control font-monospace" id="conf-path-badge" value="{{ conf_path if mode == 'edit' else '' }}" readonly>
+              {% endcall %}
+            </div>
+          </div>
+        </div>
+        <!-- END FILE SECTION -->
+
       </div>
     </div>
-  </div>
 
-  <!-- BEGIN FILE SECTION -->
-
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="card-title">File name</h2>
-        <p class="card-subtitle">Override the default file name for the block. The .conf is appened automatically.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- BEGIN FORM FOOTER -->
-  <div class="col-12">
-    <div class="card">
-      <div class="card-body">
-        <div>
-          <div class="row align-items-center">
+    <!-- BEGIN FORM FOOTER -->
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="row g-3 align-items-center">
             <!-- BEGIN DISABLE TOGGLE -->
-            <div class="col">
+            <div class="col-12 col-sm">
               <label class="form-check form-switch m-0">
-                <input type="checkbox" class="form-check-input" id="block-disabled-input" name="disabled" value="1" {{ 'checked' if disabled_toggle_checked }} onchange="window.__updateConfPathBadge && window.__updateConfPathBadge()">
+                <input type="checkbox" class="form-check-input" id="block-disabled-input" name="disabled" value="1" {{ 'checked' if disabled_toggle_checked }}>
                 <span class="form-check-label">{{ 'Create disabled' if mode == 'new' else 'Disable this block' }}</span>
               </label>
             </div>
             <!-- END DISABLE TOGGLE -->
             <!-- BEGIN FORM ACTIONS -->
-            <div class="col-auto">
+            <div class="col-12 col-sm-auto">
               <div class="btn-list">
                 <a href="{{ url_for('main.site_blocks') }}" class="btn">Cancel</a>
-                <button class="btn">Preview</button>
+                <button type="button" class="btn">Preview</button>
                 <button type="submit" class="btn btn-primary">Save</button>
               </div>
             </div>
@@ -309,10 +495,11 @@
         </div>
       </div>
     </div>
+    <!-- END FORM FOOTER -->
+
   </div>
-  <!-- END FORM FOOTER -->
-</div>  
-<!-- END BLOCK FORM CARD -->
+</form>
+<!-- END BLOCK FORM -->
 
 {% endblock %}
 

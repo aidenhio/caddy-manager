@@ -126,15 +126,23 @@ def certificates():
     )
 
 
+@bp.route("/new", methods=["GET", "POST"])
 @bp.route("/new/<block_type>", methods=["GET", "POST"])
 @login_required
-def new_block(block_type):
-    if block_type not in QUICK_ADD_BLOCK_TYPES:
+def new_block(block_type=None):
+    # /new/<type> just preselects a type in the universal form's picker.
+    if block_type is not None and block_type not in QUICK_ADD_BLOCK_TYPES:
         abort(404)
+    block_type = block_type or QUICK_ADD_BLOCK_TYPES[0]
     error = None
     meta = {}
 
     if request.method == "POST":
+        posted_type = request.form.get("block_type", "")
+        if posted_type not in QUICK_ADD_BLOCK_TYPES:
+            error = "Choose a block type."
+        else:
+            block_type = posted_type
         # Redo the cheap site-address parse just for a filename hint;
         # build_block_from_form parses the same data identically, so they can't disagree.
         create_disabled = request.form.get("disabled") == "1"
@@ -145,7 +153,8 @@ def new_block(block_type):
             if create_disabled:
                 filename_hint += ".disabled"
 
-        content, meta, error = build_block_from_form(block_type, request.form, log_filename_hint=filename_hint)
+        if not error:
+            content, meta, error = build_block_from_form(block_type, request.form, log_filename_hint=filename_hint)
         if not error:
             filename = filename_hint
             os.makedirs(get_conf_dir(), exist_ok=True)
@@ -165,7 +174,7 @@ def new_block(block_type):
     raw_body_text = request.form.get("raw_content", "") if request.method == "POST" and block_type == "custom" else ""
     disabled_toggle_checked = request.form.get("disabled") == "1" if request.method == "POST" else False
     return render_template(
-        f"blocks/{block_type}.html", mode="new", block_type=block_type,
+        "block_form.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
         raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),
         log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
@@ -240,7 +249,7 @@ def edit_block(filename):
         else filename.endswith(".disabled")
 
     return render_template(
-        f"blocks/{block_type}.html", mode="edit", block_type=block_type, filename=filename,
+        "block_form.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
         site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
         error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),

@@ -1,3 +1,26 @@
+// BEGIN BLOCK TYPE SWITCHER
+// Shows the cards for the selected type; hidden sections are also disabled so their fields aren't submitted.
+(function () {
+  const form = document.getElementById('block-form');
+  if (!form) return;
+  const radios = form.querySelectorAll('input[name="block_type"]');
+  const sections = form.querySelectorAll('[data-block-types]');
+
+  function sync() {
+    const checked = form.querySelector('input[name="block_type"]:checked');
+    if (!checked) return;
+    sections.forEach((section) => {
+      const show = section.dataset.blockTypes.split(' ').includes(checked.value);
+      section.hidden = !show;
+      section.disabled = !show;
+    });
+  }
+
+  radios.forEach((radio) => radio.addEventListener('change', sync));
+  sync();
+})();
+// END BLOCK TYPE SWITCHER
+
 // BEGIN SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
 (function () {
   const wrap = document.getElementById('site-address-input');
@@ -6,7 +29,6 @@
   const form = document.getElementById('block-form');
   if (!wrap || !textInput || !hidden || !form) return;
 
-  const typeColor = form.dataset.typeColor || 'primary';
   const confDir = form.dataset.confDir || '';
   const confPathBadge = document.getElementById('conf-path-badge');
   const originallyDisabled = form.dataset.originallyDisabled === 'true';
@@ -47,12 +69,12 @@
     const dirPrefix = confDir.replace(/\/$/, '') + '/';
     const first = sortedFirstSiteAddress();
     if (!first) {
-      confPathBadge.textContent = dirPrefix + '...';
+      confPathBadge.value = dirPrefix + '...';
       return;
     }
     const disabledInput = document.getElementById('block-disabled-input');
     const isDisabled = disabledInput ? disabledInput.checked : originallyDisabled;
-    confPathBadge.textContent = dirPrefix + slugify(first) + '.conf' + (isDisabled ? '.disabled' : '');
+    confPathBadge.value = dirPrefix + slugify(first) + '.conf' + (isDisabled ? '.disabled' : '');
   }
 
   function syncHidden() {
@@ -67,7 +89,7 @@
     wrap.classList.remove('is-invalid');
 
     const chip = document.createElement('span');
-    chip.className = 'site-address-chip tag bg-' + typeColor + '-lt d-inline-flex align-items-center gap-1';
+    chip.className = 'site-address-chip tag bg-primary-lt d-inline-flex align-items-center gap-1';
     chip.dataset.siteAddress = value;
 
     const label = document.createElement('span');
@@ -124,7 +146,8 @@
     wrap.classList.toggle('is-invalid', !valid);
     return valid;
   };
-  window.__updateConfPathBadge = updateConfPathBadge;
+  const disabledInput = document.getElementById('block-disabled-input');
+  if (disabledInput) disabledInput.addEventListener('change', updateConfPathBadge);
 })();
 // END SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
 
@@ -249,6 +272,16 @@
 
   initFormValidation(form, function () {
     return window.__validateSiteAddresses ? window.__validateSiteAddresses() : true;
+  });
+
+  // Registered after initFormValidation, so defaultPrevented already reflects its verdict.
+  form.addEventListener('submit', (event) => {
+    if (!event.defaultPrevented) return;
+    const invalid = form.querySelector('.is-invalid, :invalid:not(fieldset)');
+    const pane = invalid && invalid.closest('.tab-pane');
+    if (!pane || pane.classList.contains('active')) return;
+    const tabButton = form.querySelector('[data-bs-toggle="tab"][data-bs-target="#' + pane.id + '"]');
+    if (tabButton) tabButton.click();
   });
 })();
 // END FORM VALIDATION WIRING
