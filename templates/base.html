@@ -1,6 +1,6 @@
 {% from "macros/alerts.html" import alert %}
 <!doctype html>
-<html lang="en">
+<html data-bs-navbar-style="floating" data-bs-sidebar="folded-hover" lang="en">
 
   <!-- BEGIN HEAD -->
   <head>
@@ -28,13 +28,13 @@
   </head>
   <!-- END HEAD -->
 
-  <body>
+  <body class="layout-fluid">
     <!-- BEGIN PAGE -->
     <div class="page">
 
       {% if session.get('logged_in') %}
         <!-- BEGIN NAVBAR -->
-        {% include 'partials/header_nav_bar.html' %}
+        {% include 'partials/header_sidebar.html' %}
         <!-- END NAVBAR -->
       {% endif %}
 
@@ -46,6 +46,13 @@
           <div class="container-xl">
             <div class="row g-2 align-items-center">
               <div class="col">
+                <!-- BEGIN BREADCRUMB -->
+                <nav class="page-pretitle">
+                  <ol class="breadcrumb breadcrumb-muted breadcrumb-dots pb-1">
+                    {% block page_breadcrumb_list %}{% endblock %}
+                  </ol>
+                </nav>
+                <!-- END BREADCRUMB -->
                 <!-- BEGIN PAGE TITLE -->
                 <div class="page-pretitle">{% block page_pretitle %}{% endblock %}</div>
                 <h2 class="page-title">{% block page_title %}{% endblock %}</h2>
@@ -82,7 +89,7 @@
         <!-- END PAGE BODY -->
 
         <!-- BEGIN PAGE FOOTER -->
-        <footer class="footer mt-auto">
+        <footer class="footer footer-transparent mt-auto">
           <div class="container-xl">
             <div class="row text-center align-items-center flex-row-reverse">
               <div class="col-lg-auto ms-lg-auto">

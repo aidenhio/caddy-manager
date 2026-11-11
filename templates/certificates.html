@@ -2,8 +2,12 @@
 {% from "macros/alerts.html" import alert %}
 
 {% block title %}Certificates - Caddy Manager{% endblock %}
-{% block page_pretitle %}Caddy{% endblock %}
 {% block page_title %}Certificates{% endblock %}
+
+{% block page_breadcrumb_list %}
+  <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Caddy</a></li>
+  <li class="breadcrumb-item">SSL</li>
+{% endblock %}
 
 {% block header_actions %}
 {% endblock %}

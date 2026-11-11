@@ -4,8 +4,13 @@
 {% set type_label = type_label(block_type) %}
 
 {% block title %}Preview {{ filename }} - Caddy Manager{% endblock %}
-{% block page_pretitle %}Preview{% endblock %}
 {% block page_title %}{{ site_addresses[0] if site_addresses else filename }}{% endblock %}
+
+{% block page_breadcrumb_list %}
+  <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Caddy</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('main.site_blocks') }}">Sites</a></li>
+  <li class="breadcrumb-item">Preview</li>
+{% endblock %}
 
 {% block header_actions %}
 <div class="btn-list">

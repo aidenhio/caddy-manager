@@ -1,19 +1,23 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Caddy Manager{% endblock %}
-{% block page_pretitle %}Home{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block title %}Overview - Caddy Manager{% endblock %}
+{% block page_title %}Overview{% endblock %}
+
+{% block page_breadcrumb_list %}
+  <li class="breadcrumb-item">Tuesday 3 November</li>
+  <li class="breadcrumb-item">2:24PM</li>
+{% endblock %}
 
 {% block header_actions %}
 <div class="btn-list">
   {% include 'partials/quick_add_button.html' %}
-  <button type="button" class="btn btn-1 d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
+  <button type="button" class="btn btn-primary d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
       <path d="M12 5l0 14"></path>
       <path d="M5 12l14 0"></path>
     </svg>
-    New Site Block
+    New site block
   </button>
 </div>
 {% endblock %}
@@ -32,12 +36,11 @@
   <!-- BEGIN QUICK GLANCE ROW -->
   <div class="col-sm-6 col-lg-3">
     <div class="card card-sm">
-      <div class="card-status-top bg-green"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-green avatar avatar-square text-white">
+              class="bg-green avatar avatar-circle text-white">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                 class="icon icon-tabler icons-tabler-outline icon-tabler-world-www">
@@ -64,12 +67,11 @@
   </div>
   <div class="col-sm-6 col-lg-3">
     <div class="card card-sm">
-      <div class="card-status-top bg-red"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-red avatar avatar-square text-white">
+              class="bg-red avatar avatar-circle text-white">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-world-off">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5.657 5.615a9 9 0 1 0 12.717 12.739m1.672 -2.322a9 9 0 0 0 -12.066 -12.084" />
@@ -91,11 +93,10 @@
   </div>
   <div class="col-sm-6 col-lg-3">
     <div class="card card-sm">
-      <div class="card-status-top bg-yellow"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
-            <span class="bg-yellow avatar avatar-square text-white">
+            <span class="bg-yellow avatar avatar-circle text-white">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
               class="icon icon-tabler-certificate">
@@ -119,12 +120,11 @@
   </div>
   <div class="col-sm-6 col-lg-3">
     <div class="card card-sm">
-      <div class="card-status-top bg-azure"></div>
       <div class="card-body">
         <div class="row align-items-center">
           <div class="col-auto">
             <span
-              class="bg-azure avatar avatar-square text-white">
+              class="bg-azure avatar avatar-circle text-white">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-affiliate">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M5.931 6.936l1.275 4.249m5.607 5.609l4.251 1.275" />
@@ -176,7 +176,7 @@
               <div class="card-body">
                 <div class="row align-items-center">
                   <div class="col-auto">
-                    <span class="avatar avatar-square bg-{{ row_color }} text-white">
+                    <span class="avatar avatar-circle bg-{{ row_color }} text-white">
                       {{ type_icon(b.type) }}
                     </span>
                   </div>

@@ -1,20 +1,24 @@
 {% extends "base.html" %}
 {% from "macros/alerts.html" import alert %}
 
-{% block title %}Site Blocks - Caddy Manager{% endblock %}
-{% block page_pretitle %}Caddy{% endblock %}
-{% block page_title %}All Site Blocks{% endblock %}
+{% block title %}Site blocks - Caddy Manager{% endblock %}
+{% block page_title %}Site blocks{% endblock %}
+
+{% block page_breadcrumb_list %}
+  <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Caddy</a></li>
+  <li class="breadcrumb-item">Sites</li>
+{% endblock %}
 
 {% block header_actions %}
 <div class="btn-list">
   {% include 'partials/quick_add_button.html' %}
-  <button type="button" class="btn btn-1 d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
+  <button type="button" class="btn btn-primary d-none d-sm-inline-block" data-bs-toggle="modal" data-bs-target="#modal-blocks">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
       <path d="M12 5l0 14"></path>
       <path d="M5 12l14 0"></path>
     </svg>
-    New Site Block
+    New site block
   </button>
 </div>
 {% endblock %}

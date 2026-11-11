@@ -2,8 +2,12 @@
 {% from "macros/alerts.html" import alert %}
 
 {% block title %}Logs - Caddy Manager{% endblock %}
-{% block page_pretitle %}Caddy{% endblock %}
-{% block page_title %}Logs{% endblock %}
+{% block page_title %}Access logs{% endblock %}
+
+{% block page_breadcrumb_list %}
+  <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Observe</a></li>
+  <li class="breadcrumb-item">Logs</li>
+{% endblock %}
 
 {% block header_actions %}
 {% endblock %}

@@ -1,7 +1,15 @@
 :root {
+    /* Caddy colors */
+    --jade-green: #22b638ff;
+    --emerald: #3ed277ff;
+    --mint-leaf: #52cda4ff;
+    --maya-blue: #74c1f6ff;
+    --azure-blue: #2e82e0ff;
+
     --tblr-primary: var(--tblr-azure);
-    --tblr-border-radius-scale: 1;
+    --tblr-border-radius-scale: 2;
     --tblr-font-sans-serif: "Inter";
+
     --tblr-gray-50: #fafafa;
     --tblr-gray-100: #f4f4f5;
     --tblr-gray-200: #e4e4e7;
