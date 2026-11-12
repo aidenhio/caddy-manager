@@ -3,7 +3,7 @@ import secrets
 
 from flask import Flask
 
-from .configstore import BASE_DIR, load_config
+from .configstore import BASE_DIR, load_config, get_time_format
 from .block_types import BLOCK_TYPES, BLOCK_TYPE_ORDER, type_color, type_label, type_icon, type_description
 from .server_monitor import get_server_statuses
 
@@ -26,6 +26,7 @@ def create_app():
         block_types=BLOCK_TYPES,
         block_type_order=BLOCK_TYPE_ORDER,
         nav_caddy_servers=get_server_statuses(),
+        time_format=get_time_format(),
     ))
 
     # Placeholder so sessions/flash work before setup saves a real secret_key.

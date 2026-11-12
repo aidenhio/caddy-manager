@@ -1,0 +1,73 @@
+From 51bc066b6b13d161a86a8f13182400f5f4dcf0af Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 12 Nov 2026 19:19:18 +1100
+Subject: [PATCH] Certificates: show ZeroSSL, Buypass and other CAs as Other
+
+The Provider filter now offers only Local, Let's Encrypt and Other, and
+the table and detail modal show "Other" for every CA besides Local and
+Let's Encrypt, matching the filter grouping.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GFYvS9tgNsRjfuEB4vjX1t
+---
+ caddy_manager/certs.py      | 16 ++++------------
+ templates/certificates.html |  2 --
+ 2 files changed, 4 insertions(+), 14 deletions(-)
+
+diff --git a/caddy_manager/certs.py b/caddy_manager/certs.py
+index 20085f8..7aa66a8 100644
+--- a/caddy_manager/certs.py
++++ b/caddy_manager/certs.py
+@@ -19,32 +19,24 @@ def certificates_root():
+ 
+ 
+ def provider_for_issuer_dir(issuer_dir_name):
+-    """Human-readable provider name for an issuer folder name. Falls back
+-    to the raw folder name for an unrecognized ACME CA."""
++    """Human-readable provider name for an issuer folder name. Every CA other
++    than Local and Let's Encrypt shows as "Other", matching the Provider filter."""
+     name = (issuer_dir_name or "").lower()
+     if name == "local":
+         return "Local"
+     if "letsencrypt" in name:
+         return "Let's Encrypt (staging)" if "staging" in name else "Let's Encrypt"
+-    if "zerossl" in name:
+-        return "ZeroSSL"
+-    if "buypass" in name:
+-        return "Buypass"
+-    return issuer_dir_name or "Unknown"
++    return "Other"
+ 
+ 
+ def provider_key_for_issuer_dir(issuer_dir_name):
+     """Stable key for the Provider filter checkboxes, independent of the
+-    varying display text. Unrecognized ACME CAs land in "other"."""
++    varying display text. Every CA other than Local and Let's Encrypt lands in "other"."""
+     name = (issuer_dir_name or "").lower()
+     if name == "local":
+         return "local"
+     if "letsencrypt" in name:
+         return "letsencrypt"
+-    if "zerossl" in name:
+-        return "zerossl"
+-    if "buypass" in name:
+-        return "buypass"
+     return "other"
+ 
+ 
+diff --git a/templates/certificates.html b/templates/certificates.html
+index 1ed1005..0efec5b 100644
+--- a/templates/certificates.html
++++ b/templates/certificates.html
+@@ -70,8 +70,6 @@
+           <h6 class="dropdown-header">Provider</h6>
+           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="local"> Local</label>
+           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="letsencrypt"> Let's Encrypt</label>
+-          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="zerossl"> ZeroSSL</label>
+-          <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="buypass"> Buypass</label>
+           <label class="dropdown-item"><input class="form-check-input m-0 me-2" type="checkbox" data-filter-group="provider" value="other"> Other</label>
+           <div class="dropdown-divider"></div>
+           <a class="dropdown-item text-danger" href="#" data-dt-clear-filters>
+-- 
+2.43.0
+

@@ -19,32 +19,24 @@ def certificates_root():
 
 
 def provider_for_issuer_dir(issuer_dir_name):
-    """Human-readable provider name for an issuer folder name. Falls back
-    to the raw folder name for an unrecognized ACME CA."""
+    """Human-readable provider name for an issuer folder name. Every CA other
+    than Local and Let's Encrypt shows as "Other", matching the Provider filter."""
     name = (issuer_dir_name or "").lower()
     if name == "local":
         return "Local"
     if "letsencrypt" in name:
         return "Let's Encrypt (staging)" if "staging" in name else "Let's Encrypt"
-    if "zerossl" in name:
-        return "ZeroSSL"
-    if "buypass" in name:
-        return "Buypass"
-    return issuer_dir_name or "Unknown"
+    return "Other"
 
 
 def provider_key_for_issuer_dir(issuer_dir_name):
     """Stable key for the Provider filter checkboxes, independent of the
-    varying display text. Unrecognized ACME CAs land in "other"."""
+    varying display text. Every CA other than Local and Let's Encrypt lands in "other"."""
     name = (issuer_dir_name or "").lower()
     if name == "local":
         return "local"
     if "letsencrypt" in name:
         return "letsencrypt"
-    if "zerossl" in name:
-        return "zerossl"
-    if "buypass" in name:
-        return "buypass"
     return "other"
 
 

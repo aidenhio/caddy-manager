@@ -1,0 +1,292 @@
+From 70c250396faa4360ed90209235b80eb4c7e97c1a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 12 Nov 2026 19:03:42 +1100
+Subject: [PATCH] Live breadcrumb clock, 12h/24h setting, logo link, theme
+ switcher
+
+The Overview and Settings breadcrumbs show the device's current date and
+time (clock.js), in a 12h/24h format set under Settings -> Dashboard.
+The sidebar logo links to Overview, and the user dropdown gets the
+dark/light theme switcher back, switching in place without a reload.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GFYvS9tgNsRjfuEB4vjX1t
+---
+ caddy_manager/__init__.py                |  3 ++-
+ caddy_manager/configstore.py             | 10 ++++++++
+ caddy_manager/views.py                   | 14 +++++++++++-
+ static/js/clock.js                       | 27 ++++++++++++++++++++++
+ static/js/theme.js                       | 16 ++++++++++++-
+ templates/home.html                      |  3 +--
+ templates/partials/breadcrumb_clock.html |  5 ++++
+ templates/partials/header_sidebar.html   | 18 ++++++++++++++-
+ templates/settings.html                  | 29 ++++++++++++++++++++++--
+ 9 files changed, 117 insertions(+), 8 deletions(-)
+ create mode 100644 static/js/clock.js
+ create mode 100644 templates/partials/breadcrumb_clock.html
+
+diff --git a/caddy_manager/__init__.py b/caddy_manager/__init__.py
+index d9f621f..4db4b20 100644
+--- a/caddy_manager/__init__.py
++++ b/caddy_manager/__init__.py
+@@ -3,7 +3,7 @@ import secrets
+ 
+ from flask import Flask
+ 
+-from .configstore import BASE_DIR, load_config
++from .configstore import BASE_DIR, load_config, get_time_format
+ from .block_types import BLOCK_TYPES, BLOCK_TYPE_ORDER, type_color, type_label, type_icon, type_description
+ from .server_monitor import get_server_statuses
+ 
+@@ -26,6 +26,7 @@ def create_app():
+         block_types=BLOCK_TYPES,
+         block_type_order=BLOCK_TYPE_ORDER,
+         nav_caddy_servers=get_server_statuses(),
++        time_format=get_time_format(),
+     ))
+ 
+     # Placeholder so sessions/flash work before setup saves a real secret_key.
+diff --git a/caddy_manager/configstore.py b/caddy_manager/configstore.py
+index 03e5fd2..758463d 100644
+--- a/caddy_manager/configstore.py
++++ b/caddy_manager/configstore.py
+@@ -112,6 +112,10 @@ DASHBOARD_WIDGETS = (
+     ("upstream_health", "Upstream Health"),
+ )
+ 
++# Breadcrumb clock format on the Overview and Settings pages.
++TIME_FORMATS = (("12h", "12-hour"), ("24h", "24-hour"))
++DEFAULT_TIME_FORMAT = "12h"
++
+ # Up to this many servers can be monitored (see server_monitor.py),
+ # matching the navbar layout's design.
+ MAX_CADDY_SERVERS = 2
+@@ -188,6 +192,12 @@ def get_caddy_status_failed_after():
+     return _positive_int(load_config(), "caddy_status_failed_after", DEFAULT_CADDY_STATUS_FAILED_AFTER)
+ 
+ 
++def get_time_format():
++    cfg = load_config()
++    value = cfg.get("time_format") if cfg else None
++    return value if value in dict(TIME_FORMATS) else DEFAULT_TIME_FORMAT
++
++
+ def get_dashboard_widget_visibility():
+     """{key: bool} for every key in DASHBOARD_WIDGETS, defaulting to
+     shown (True) when unset or malformed."""
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 2f3d3cb..c2b99df 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -9,7 +9,7 @@ from .auth import login_required
+ from .configstore import (
+     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
+     get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
+-    DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
++    DASHBOARD_WIDGETS, get_dashboard_widget_visibility, TIME_FORMATS, default_paths_for_root,
+     MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS, MIN_CADDY_STATUS_INTERVAL_SECONDS,
+     get_caddy_server_ping_interval_seconds, get_caddy_server_offline_after_misses,
+     get_caddy_status_interval_seconds, get_caddy_status_failed_after,
+@@ -331,6 +331,7 @@ ACTION_TAB = {
+     "update_certificates": "general",
+     "update_dir": "directory",
+     "update_dashboard_widgets": "dashboard",
++    "update_time_format": "dashboard",
+     "update_global_config": "global",
+     "rollback_global_config": "global",
+     "update_caddy_servers": "servers",
+@@ -511,6 +512,16 @@ def settings():
+             flash("Dashboard settings updated.", "success")
+             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
+ 
++        elif action == "update_time_format":
++            time_format = request.form.get("time_format", "")
++            if time_format not in dict(TIME_FORMATS):
++                error = "Choose a time format."
++            else:
++                cfg["time_format"] = time_format
++                save_config(cfg)
++                flash("Time format updated.", "success")
++                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
++
+         elif action == "update_user":
+             username = request.form.get("username", "").strip()
+             email = request.form.get("email", "").strip()
+@@ -609,6 +620,7 @@ def settings():
+     return render_template(
+         "settings.html", cfg=cfg, error=error,
+         dashboard_widgets=get_dashboard_widget_visibility(),
++        time_formats=TIME_FORMATS,
+         conf_dir=get_conf_dir(),
+         caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
+         caddyfile_backup_updated=caddyfile_backup_updated,
+diff --git a/static/js/clock.js b/static/js/clock.js
+new file mode 100644
+index 0000000..3c4712d
+--- /dev/null
++++ b/static/js/clock.js
+@@ -0,0 +1,27 @@
++// BEGIN BREADCRUMB CLOCK
++// Fills the breadcrumb date/time from this device's clock, in the 12h/24h format
++// chosen in Settings -> Dashboard, and keeps it current on the minute.
++(function () {
++  const dateEl = document.querySelector('[data-clock="date"]');
++  const timeEl = document.querySelector('[data-clock="time"]');
++  if (!dateEl || !timeEl) return;
++  const use24h = timeEl.dataset.timeFormat === '24h';
++
++  function formatTime(now) {
++    const minutes = String(now.getMinutes()).padStart(2, '0');
++    if (use24h) return String(now.getHours()).padStart(2, '0') + ':' + minutes;
++    const hours = now.getHours() % 12 || 12;
++    return hours + ':' + minutes + (now.getHours() < 12 ? 'AM' : 'PM');
++  }
++
++  function tick() {
++    const now = new Date();
++    dateEl.textContent = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
++    timeEl.textContent = formatTime(now);
++    // Re-run just after the next minute starts, so the clock never lags by up to a minute.
++    setTimeout(tick, 60000 - (now.getSeconds() * 1000 + now.getMilliseconds()) + 50);
++  }
++
++  tick();
++})();
++// END BREADCRUMB CLOCK
+diff --git a/static/js/theme.js b/static/js/theme.js
+index a06485c..f5ec36a 100644
+--- a/static/js/theme.js
++++ b/static/js/theme.js
+@@ -23,4 +23,18 @@ for (const key in themeConfig) {
+ 	} else {
+ 		document.documentElement.removeAttribute('data-bs-' + key)
+ 	}
+-}
+\ No newline at end of file
++}
++
++// Theme links (?theme=dark|light) switch in place instead of reloading; the href still works without JS.
++document.addEventListener('click', (event) => {
++	const link = event.target.closest('[data-theme-value]')
++	if (!link) return
++	event.preventDefault()
++	const theme = link.dataset.themeValue
++	localStorage.setItem('theme', theme)
++	if (theme === themeConfig.theme) {
++		document.documentElement.removeAttribute('data-bs-theme')
++	} else {
++		document.documentElement.setAttribute('data-bs-theme', theme)
++	}
++})
+\ No newline at end of file
+diff --git a/templates/home.html b/templates/home.html
+index 588faa1..9baca4c 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -4,8 +4,7 @@
+ {% block page_title %}Overview{% endblock %}
+ 
+ {% block page_breadcrumb_list %}
+-  <li class="breadcrumb-item">Tuesday 3 November</li>
+-  <li class="breadcrumb-item">2:24PM</li>
++  {% include 'partials/breadcrumb_clock.html' %}
+ {% endblock %}
+ 
+ {% block header_actions %}
+diff --git a/templates/partials/breadcrumb_clock.html b/templates/partials/breadcrumb_clock.html
+new file mode 100644
+index 0000000..1875988
+--- /dev/null
++++ b/templates/partials/breadcrumb_clock.html
+@@ -0,0 +1,5 @@
++<!-- BEGIN BREADCRUMB CLOCK -->
++<li class="breadcrumb-item" data-clock="date"></li>
++<li class="breadcrumb-item" data-clock="time" data-time-format="{{ time_format }}"></li>
++<script src="{{ url_for('static', filename='js/clock.js') }}"></script>
++<!-- END BREADCRUMB CLOCK -->
+diff --git a/templates/partials/header_sidebar.html b/templates/partials/header_sidebar.html
+index 4d12572..e6c9ef6 100644
+--- a/templates/partials/header_sidebar.html
++++ b/templates/partials/header_sidebar.html
+@@ -10,7 +10,7 @@
+ 
+     <!-- BEGIN NAVBAR LOGO -->
+     <div class="navbar-brand">
+-      <a href="#">
++      <a href="{{ url_for('main.dashboard') }}" aria-label="Overview">
+         <img style="width: 2rem;" class="navbar-brand-image" src="{{ url_for('static', filename='img/caddy.png') }}"></img>
+         <!-- <span class="nav-brand">Caddy Manager</span> -->
+       </a>
+@@ -31,6 +31,22 @@
+             </div>
+           </a>
+           <div class="dropdown-menu">
++            <!-- BEGIN THEME SWITCHER -->
++            <a href="?theme=dark" class="dropdown-item hide-theme-dark" data-theme-value="dark">
++              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler icons-tabler-outline icon-tabler-moon">
++                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008" />
++              </svg>Dark mode
++            </a>
++            <a href="?theme=light" class="dropdown-item hide-theme-light" data-theme-value="light">
++              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon dropdown-item-icon icon-tabler icons-tabler-outline icon-tabler-sun">
++                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
++                <path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
++                <path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" />
++              </svg>Light mode
++            </a>
++            <div class="dropdown-divider"></div>
++            <!-- END THEME SWITCHER -->
+             <a href="{{ url_for('auth.logout') }}" class="dropdown-item text-danger">
+               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler-logout">
+                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+diff --git a/templates/settings.html b/templates/settings.html
+index a484a83..8ce3776 100644
+--- a/templates/settings.html
++++ b/templates/settings.html
+@@ -5,8 +5,7 @@
+ {% block page_title %}Settings{% endblock %}
+ 
+ {% block page_breadcrumb_list %}
+-  <li class="breadcrumb-item">Tuesday 3 November</li>
+-  <li class="breadcrumb-item">2:24PM</li>
++  {% include 'partials/breadcrumb_clock.html' %}
+ {% endblock %}
+ 
+ {% block header_actions %}
+@@ -264,6 +263,32 @@
+             <script>
+               initFormValidation(document.getElementById('dashboard-widgets-form'));
+             </script>
++
++            <hr class="my-4">
++
++            <!-- BEGIN TIME FORMAT -->
++            <h3 class="card-title">Time Format</h3>
++            <p class="text-secondary">
++              Clock format shown on the Overview and Settings pages. The time comes from this device's clock.
++            </p>
++            <form method="post" id="time-format-form">
++              <input type="hidden" name="action" value="update_time_format">
++              <div class="mb-2">
++                {% for value, label in time_formats %}
++                <label class="form-check form-check-inline">
++                  <input type="radio" class="form-check-input" name="time_format" value="{{ value }}" {{ 'checked' if time_format == value }}>
++                  <span class="form-check-label">{{ label }} <span class="text-secondary">({{ '2:24PM' if value == '12h' else '14:24' }})</span></span>
++                </label>
++                {% endfor %}
++              </div>
++              <div class="form-footer">
++                <button type="submit" class="btn btn-primary">Update</button>
++              </div>
++            </form>
++            <script>
++              initFormValidation(document.getElementById('time-format-form'));
++            </script>
++            <!-- END TIME FORMAT -->
+           </div>
+         </div>
+ 
+-- 
+2.43.0
+

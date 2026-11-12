@@ -1,0 +1,68 @@
+From 41df646eb01d7c56da0814aa8ee38b62a11c1e98 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 12 Nov 2026 19:11:53 +1100
+Subject: [PATCH] Remove page_pretitle; show New site block on mobile
+
+Drops the unused page_pretitle block from base.html. The Overview and
+Site blocks headers add an icon-only New site block button below the
+sm breakpoint, where the full button is hidden.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GFYvS9tgNsRjfuEB4vjX1t
+---
+ templates/base.html        | 1 -
+ templates/home.html        | 7 +++++++
+ templates/site_blocks.html | 7 +++++++
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/templates/base.html b/templates/base.html
+index 7bcf5de..61ddb52 100644
+--- a/templates/base.html
++++ b/templates/base.html
+@@ -54,7 +54,6 @@
+                 </nav>
+                 <!-- END BREADCRUMB -->
+                 <!-- BEGIN PAGE TITLE -->
+-                <div class="page-pretitle">{% block page_pretitle %}{% endblock %}</div>
+                 <h2 class="page-title">{% block page_title %}{% endblock %}</h2>
+                 <!-- END PAGE TITLE -->
+               </div>
+diff --git a/templates/home.html b/templates/home.html
+index 9baca4c..898a64e 100644
+--- a/templates/home.html
++++ b/templates/home.html
+@@ -17,6 +17,13 @@
+     </svg>
+     New site block
+   </a>
++  <a href="{{ url_for('main.new_block') }}" class="btn btn-primary btn-icon d-sm-none" aria-label="New site block">
++    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
++      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
++      <path d="M12 5l0 14"></path>
++      <path d="M5 12l14 0"></path>
++    </svg>
++  </a>
+ </div>
+ {% endblock %}
+ 
+diff --git a/templates/site_blocks.html b/templates/site_blocks.html
+index 1c3388b..780695c 100644
+--- a/templates/site_blocks.html
++++ b/templates/site_blocks.html
+@@ -19,6 +19,13 @@
+     </svg>
+     New site block
+   </a>
++  <a href="{{ url_for('main.new_block') }}" class="btn btn-primary btn-icon d-sm-none" aria-label="New site block">
++    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
++      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-2">
++      <path d="M12 5l0 14"></path>
++      <path d="M5 12l14 0"></path>
++    </svg>
++  </a>
+ </div>
+ {% endblock %}
+ 
+-- 
+2.43.0
+

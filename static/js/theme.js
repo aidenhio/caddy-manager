@@ -24,3 +24,17 @@ for (const key in themeConfig) {
 		document.documentElement.removeAttribute('data-bs-' + key)
 	}
 }
+
+// Theme links (?theme=dark|light) switch in place instead of reloading; the href still works without JS.
+document.addEventListener('click', (event) => {
+	const link = event.target.closest('[data-theme-value]')
+	if (!link) return
+	event.preventDefault()
+	const theme = link.dataset.themeValue
+	localStorage.setItem('theme', theme)
+	if (theme === themeConfig.theme) {
+		document.documentElement.removeAttribute('data-bs-theme')
+	} else {
+		document.documentElement.setAttribute('data-bs-theme', theme)
+	}
+})

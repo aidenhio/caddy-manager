@@ -9,7 +9,7 @@ from .auth import login_required
 from .configstore import (
     load_config, save_config, get_conf_dir, get_log_dir, get_cert_expiring_soon_days, get_log_tail_lines,
     get_caddy_log_output_dir, get_caddyfile_path, get_caddyfile_backup_path,
-    DASHBOARD_WIDGETS, get_dashboard_widget_visibility, default_paths_for_root,
+    DASHBOARD_WIDGETS, get_dashboard_widget_visibility, TIME_FORMATS, default_paths_for_root,
     MAX_CADDY_SERVERS, MIN_CADDY_SERVER_PING_INTERVAL_SECONDS, MIN_CADDY_STATUS_INTERVAL_SECONDS,
     get_caddy_server_ping_interval_seconds, get_caddy_server_offline_after_misses,
     get_caddy_status_interval_seconds, get_caddy_status_failed_after,
@@ -331,6 +331,7 @@ ACTION_TAB = {
     "update_certificates": "general",
     "update_dir": "directory",
     "update_dashboard_widgets": "dashboard",
+    "update_time_format": "dashboard",
     "update_global_config": "global",
     "rollback_global_config": "global",
     "update_caddy_servers": "servers",
@@ -511,6 +512,16 @@ def settings():
             flash("Dashboard settings updated.", "success")
             return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
+        elif action == "update_time_format":
+            time_format = request.form.get("time_format", "")
+            if time_format not in dict(TIME_FORMATS):
+                error = "Choose a time format."
+            else:
+                cfg["time_format"] = time_format
+                save_config(cfg)
+                flash("Time format updated.", "success")
+                return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
+
         elif action == "update_user":
             username = request.form.get("username", "").strip()
             email = request.form.get("email", "").strip()
@@ -609,6 +620,7 @@ def settings():
     return render_template(
         "settings.html", cfg=cfg, error=error,
         dashboard_widgets=get_dashboard_widget_visibility(),
+        time_formats=TIME_FORMATS,
         conf_dir=get_conf_dir(),
         caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
         caddyfile_backup_updated=caddyfile_backup_updated,

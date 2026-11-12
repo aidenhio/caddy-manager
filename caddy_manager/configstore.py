@@ -112,6 +112,10 @@ DASHBOARD_WIDGETS = (
     ("upstream_health", "Upstream Health"),
 )
 
+# Breadcrumb clock format on the Overview and Settings pages.
+TIME_FORMATS = (("12h", "12-hour"), ("24h", "24-hour"))
+DEFAULT_TIME_FORMAT = "12h"
+
 # Up to this many servers can be monitored (see server_monitor.py),
 # matching the navbar layout's design.
 MAX_CADDY_SERVERS = 2
@@ -186,6 +190,12 @@ def get_caddy_status_interval_seconds():
 
 def get_caddy_status_failed_after():
     return _positive_int(load_config(), "caddy_status_failed_after", DEFAULT_CADDY_STATUS_FAILED_AFTER)
+
+
+def get_time_format():
+    cfg = load_config()
+    value = cfg.get("time_format") if cfg else None
+    return value if value in dict(TIME_FORMATS) else DEFAULT_TIME_FORMAT
 
 
 def get_dashboard_widget_visibility():
