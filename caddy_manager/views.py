@@ -320,9 +320,79 @@ def delete_block(filename):
     return redirect(url_for("main.site_blocks"))
 
 
+@bp.route("/global-config", methods=["GET", "POST"])
+@login_required
+def global_config():
+    """Editor for the main Caddyfile, with a single Caddyfile.bak backup slot to roll back to."""
+    error = None
+    caddyfile_path = get_caddyfile_path()
+    backup_path = get_caddyfile_backup_path()
+
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        if not caddyfile_path:
+            error = "No Caddyfile path is configured. Set one in Settings, Directories first."
+
+        elif action == "save":
+            content = request.form.get("caddyfile_content", "")
+            # Normalize to exactly one trailing newline, like a normal editor would.
+            if content and not content.endswith("\n"):
+                content += "\n"
+            try:
+                os.makedirs(os.path.dirname(caddyfile_path), exist_ok=True)
+                # One backup slot, not a history -- each save replaces it with the prior version.
+                if os.path.isfile(caddyfile_path):
+                    shutil.copyfile(caddyfile_path, backup_path)
+                with open(caddyfile_path, "w") as f:
+                    f.write(content)
+            except OSError as e:
+                error = f"Could not write the Caddyfile: {e}"
+            else:
+                flash("Caddyfile saved.", "success")
+                return redirect(url_for("main.global_config"))
+
+        elif action == "rollback":
+            if not backup_path or not os.path.isfile(backup_path):
+                error = "No Caddyfile.bak backup was found to roll back to."
+            else:
+                try:
+                    shutil.copyfile(backup_path, caddyfile_path)
+                    # Consumed by the rollback it undoes, so a second rollback can't reapply a stale version.
+                    os.remove(backup_path)
+                except OSError as e:
+                    error = f"Could not roll back the Caddyfile: {e}"
+                else:
+                    flash("Caddyfile rolled back to the last backup.", "success")
+                    return redirect(url_for("main.global_config"))
+
+    # Shows what's on disk, or what was just submitted if the save failed, so a rejected save doesn't wipe the edit.
+    caddyfile_content = ""
+    caddyfile_read_error = None
+    if request.method == "POST" and request.form.get("action") == "save":
+        caddyfile_content = request.form.get("caddyfile_content", "")
+    elif caddyfile_path and os.path.isfile(caddyfile_path):
+        try:
+            with open(caddyfile_path) as f:
+                caddyfile_content = f.read()
+        except OSError as e:
+            caddyfile_read_error = f"Could not read the Caddyfile: {e}"
+
+    caddyfile_backup_updated = None
+    if backup_path and os.path.isfile(backup_path):
+        caddyfile_backup_updated = datetime.fromtimestamp(
+            os.path.getmtime(backup_path)
+        ).strftime("%d/%m/%Y %I:%M%p")
+
+    return render_template(
+        "global_config.html", error=error, caddyfile_path=caddyfile_path, conf_dir=get_conf_dir(),
+        caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
+        caddyfile_backup_updated=caddyfile_backup_updated,
+    )
+
+
 # Which tab-pane each form action belongs to, and the valid tab ids -- keeps a save on its own
 # tab instead of bouncing to User; an unrecognized ?tab= falls back to DEFAULT_TAB.
-TAB_IDS = ("user", "password", "general", "directory", "dashboard", "global", "servers", "logs")
+TAB_IDS = ("user", "password", "general", "directory", "dashboard", "servers", "logs")
 DEFAULT_TAB = "user"
 ACTION_TAB = {
     "update_user": "user",
@@ -332,8 +402,6 @@ ACTION_TAB = {
     "update_dir": "directory",
     "update_dashboard_widgets": "dashboard",
     "update_time_format": "dashboard",
-    "update_global_config": "global",
-    "rollback_global_config": "global",
     "update_caddy_servers": "servers",
     "update_caddy_logging": "logs",
 }
@@ -395,46 +463,6 @@ def settings():
                 save_config(cfg)
                 flash("Logging settings updated.", "success")
                 return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
-
-        elif action == "update_global_config":
-            caddyfile_path = get_caddyfile_path()
-            if not caddyfile_path:
-                error = "No Caddyfile path is configured. Set one in Directories first."
-            else:
-                content = request.form.get("caddyfile_content", "")
-                # Normalize to exactly one trailing newline, like a normal editor would.
-                if content and not content.endswith("\n"):
-                    content += "\n"
-                try:
-                    os.makedirs(os.path.dirname(caddyfile_path), exist_ok=True)
-                    # One backup slot, not a history -- each save replaces it with the prior version.
-                    if os.path.isfile(caddyfile_path):
-                        shutil.copyfile(caddyfile_path, get_caddyfile_backup_path())
-                    with open(caddyfile_path, "w") as f:
-                        f.write(content)
-                except OSError as e:
-                    error = f"Could not write the Caddyfile: {e}"
-                else:
-                    flash("Caddyfile saved.", "success")
-                    return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
-
-        elif action == "rollback_global_config":
-            caddyfile_path = get_caddyfile_path()
-            backup_path = get_caddyfile_backup_path()
-            if not caddyfile_path:
-                error = "No Caddyfile path is configured. Set one in Directories first."
-            elif not backup_path or not os.path.isfile(backup_path):
-                error = "No Caddyfile.bak backup was found to roll back to."
-            else:
-                try:
-                    shutil.copyfile(backup_path, caddyfile_path)
-                    # Consumed by the rollback it undoes, so a second rollback can't reapply a stale version.
-                    os.remove(backup_path)
-                except OSError as e:
-                    error = f"Could not roll back the Caddyfile: {e}"
-                else:
-                    flash("Caddyfile rolled back to the last backup.", "success")
-                    return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
         elif action == "update_caddy_logging":
             cfg["caddy_log_output_dir"] = request.form.get("caddy_log_output_dir", "").strip()
@@ -551,29 +579,7 @@ def settings():
                 flash("Password updated.", "success")
                 return redirect(url_for("main.settings", tab=ACTION_TAB[action]))
 
-    # Shows what's on disk, or what was just submitted if validation failed, so a rejected save doesn't wipe the edit.
-    if request.method == "POST" and request.form.get("action") == "update_global_config":
-        caddyfile_content = request.form.get("caddyfile_content", "")
-        caddyfile_read_error = None
-    else:
-        caddyfile_content = ""
-        caddyfile_read_error = None
-        caddyfile_path = get_caddyfile_path()
-        if caddyfile_path and os.path.isfile(caddyfile_path):
-            try:
-                with open(caddyfile_path) as f:
-                    caddyfile_content = f.read()
-            except OSError as e:
-                caddyfile_read_error = f"Could not read the Caddyfile: {e}"
-
-    caddyfile_backup_path = get_caddyfile_backup_path()
-    caddyfile_backup_updated = None
-    if caddyfile_backup_path and os.path.isfile(caddyfile_backup_path):
-        caddyfile_backup_updated = datetime.fromtimestamp(
-            os.path.getmtime(caddyfile_backup_path)
-        ).strftime("%d/%m/%Y %I:%M%p")
-
-    # Same "don't wipe a rejected edit" treatment as Global Configuration above.
+    # A rejected save re-shows what was typed rather than the saved values.
     # caddy_servers_padded always has exactly MAX_CADDY_SERVERS entries for the template to index into.
     if request.method == "POST" and request.form.get("action") == "update_caddy_servers":
         caddy_servers_padded = [
@@ -621,9 +627,6 @@ def settings():
         "settings.html", cfg=cfg, error=error,
         dashboard_widgets=get_dashboard_widget_visibility(),
         time_formats=TIME_FORMATS,
-        conf_dir=get_conf_dir(),
-        caddyfile_content=caddyfile_content, caddyfile_read_error=caddyfile_read_error,
-        caddyfile_backup_updated=caddyfile_backup_updated,
         caddy_servers_padded=caddy_servers_padded, caddy_server_form=caddy_server_form,
         active_tab=active_tab,
     )

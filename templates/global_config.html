@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% from "macros/alerts.html" import alert %}
+
+{% block title %}Global config - Caddy Manager{% endblock %}
+{% block page_title %}Global config{% endblock %}
+
+{% block page_breadcrumb_list %}
+  <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Caddy</a></li>
+  <li class="breadcrumb-item">Global config</li>
+{% endblock %}
+
+{% block header_actions %}
+{% endblock %}
+
+{% block content %}
+
+<div class="row row-cards">
+
+  {% if error %}
+  <!-- BEGIN FORM ERROR -->
+  <div class="col-12">
+    {% call alert('danger', classes='mb-0') %}{{ error }}{% endcall %}
+  </div>
+  <!-- END FORM ERROR -->
+  {% endif %}
+
+  <!-- BEGIN DISK WARNING -->
+  <div class="col-12">
+    {% call alert('warning', classes='mb-0') %}
+      Saving here writes straight to the Caddyfile on disk, outside of Caddy Manager's usual validation. Invalid syntax can stop Caddy from starting or reloading. Every save backs up the file that was on disk beforehand to <code>Caddyfile.bak</code> so you can roll back if something goes wrong.
+    {% endcall %}
+  </div>
+  <!-- END DISK WARNING -->
+
+  <!-- BEGIN CADDYFILE CARD -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="card-title">Caddyfile</h2>
+        <p class="card-subtitle">
+          Edit the main Caddyfile{% if caddyfile_path %} (<code>{{ caddyfile_path }}</code>){% endif %} directly.
+        </p>
+
+        {% if not caddyfile_path %}
+        {% call alert('danger', classes='mb-0') %}No Caddyfile path is configured, please set one in <a href="{{ url_for('main.settings', tab='directory') }}">Settings, Directories</a> first.{% endcall %}
+        {% elif caddyfile_read_error %}
+        {% call alert('danger', classes='mb-0') %}{{ caddyfile_read_error }}{% endcall %}
+        {% else %}
+
+        <!-- BEGIN CONF IMPORT CHECK -->
+        <div class="mb-2" id="conf-import-check">
+          <span class="badge bg-success-lt" data-state="found" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              class="icon icons-tabler-outline icon-tabler-circle-check">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+              <path d="M9 12l2 2l4 -4" />
+            </svg>
+            Conf directory is imported
+          </span>
+          <span class="badge bg-danger-lt" data-state="missing" hidden>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              class="icon icons-tabler-outline icon-tabler-alert-triangle">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M12 9v4" />
+              <path
+                d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0" />
+              <path d="M12 16h.01" />
+            </svg>
+            Conf dir not imported, blocks won't be loaded by Caddy Manager
+          </span>
+        </div>
+        <!-- END CONF IMPORT CHECK -->
+
+        <!-- BEGIN CADDYFILE FORM -->
+        <form method="post" id="global-config-form">
+          <input type="hidden" name="action" value="save">
+          <textarea name="caddyfile_content" id="caddyfile-content" class="form-control" rows="25"
+            style="font-family:var(--tblr-font-monospace, monospace); tab-size: 2;" spellcheck="false"
+            aria-label="Caddyfile" data-conf-dir="{{ conf_dir }}">{{ caddyfile_content }}</textarea>
+        </form>
+        {% if caddyfile_backup_updated %}
+        <form method="post" id="rollback-global-config-form"
+          onsubmit="return confirm('Roll back to the Caddyfile.bak backup from {{ caddyfile_backup_updated }}? This overwrites the current Caddyfile and cannot be undone.');">
+          <input type="hidden" name="action" value="rollback">
+        </form>
+        {% endif %}
+        <!-- END CADDYFILE FORM -->
+
+        {% endif %}
+      </div>
+
+      {% if caddyfile_path and not caddyfile_read_error %}
+      <!-- BEGIN CADDYFILE ACTIONS -->
+      <div class="card-footer">
+        <div class="btn-list justify-content-end">
+          {% if caddyfile_backup_updated %}
+          <button type="submit" form="rollback-global-config-form" class="btn btn-outline-danger">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+              <path d="M9 14l-4 -4l4 -4" />
+              <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+            </svg>
+            <span>Roll back to backup <span class="text-secondary">(saved {{ caddyfile_backup_updated }})</span></span>
+          </button>
+          {% endif %}
+          <button type="submit" form="global-config-form" class="btn btn-primary">Save Caddyfile</button>
+        </div>
+      </div>
+      <!-- END CADDYFILE ACTIONS -->
+      {% endif %}
+    </div>
+  </div>
+  <!-- END CADDYFILE CARD -->
+
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/global-config.js') }}"></script>
+{% endblock %}
