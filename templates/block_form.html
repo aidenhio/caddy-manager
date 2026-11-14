@@ -211,17 +211,8 @@
             {% call type_section(['static_site'], block_type) %}
             <div class="col-12">
               {% call form_card('File server', 'The directory on the Caddy server to serve files from.') %}
-              <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" aria-label="File path" required>
-              <div class="invalid-feedback">File path is required.</div>
-              <label class="form-label mt-3">Encode</label>
-              <div>
-                {% for fmt in ['gzip', 'zstd', 'br'] %}
-                <label class="form-check form-check-inline">
-                  <input type="checkbox" class="form-check-input" name="encode" value="{{ fmt }}" {{ 'checked' if fmt in (meta.encode or []) }}>
-                  <span class="form-check-label">{{ fmt }}</span>
-                </label>
-                {% endfor %}
-              </div>
+                <input type="text" name="path" class="form-control" value="{{ meta.path or '' }}" placeholder="/var/www/html" aria-label="File path" required>
+                <div class="invalid-feedback">File path is required.</div>
               {% endcall %}
             </div>
             {% endcall %}
@@ -319,6 +310,34 @@
             <!-- END EXTRA DIRECTIVES -->
 
             <!-- BEGIN STATIC SITE OPTIONS -->
+            {% call type_section(['static_site'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Encoding', 'Subtitle.') %}
+              <div>
+                <fieldset>
+                  <div class="form-selectgroup form-selectgroup-pills">
+                    {% for fmt in ['gzip', 'zstd', 'br'] %}
+                    <label class="form-selectgroup-item">
+                      <input type="checkbox" name="encode" value="{{ fmt }}" class="form-selectgroup-input" {{ 'checked' if fmt in (meta.encode or []) }}>
+                      <span class="form-selectgroup-label">{{ fmt }}</span>
+                    </label>
+                    {% endfor %}
+                  </div>
+                </fieldset>
+              </div>
+              {% endcall %}
+            </div>
+            {% endcall %}
+
+            {% call type_section(['static_site'], block_type) %}
+            <div class="col-12">
+              {% call form_card('Directory browsing', 'Shows a file listing for directories that have no index file.') %}
+              <div>
+              </div>
+              {% endcall %}
+            </div>
+            {% endcall %}
+
             {% call type_section(['static_site'], block_type) %}
             <div class="col-12">
               {% call form_card('File server options', 'Control which files are served and how directories are shown.') %}
