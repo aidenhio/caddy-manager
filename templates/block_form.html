@@ -18,6 +18,10 @@
 {% block header_actions %}
 {% endblock %}
 
+{% block page_modal %}
+{% include 'partials/block_preview_modal.html' %}
+{% endblock %}
+
 {% block page_breadcrumb_list %}
   <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Caddy</a></li>
   <li class="breadcrumb-item"><a href="{{ url_for('main.site_blocks') }}">Sites</a></li>
@@ -32,7 +36,7 @@
 {% block content %}
 
 <!-- BEGIN BLOCK FORM -->
-<form method="post" id="block-form" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
+<form method="post" id="block-form" data-preview-url="{{ url_for('main.block_preview', filename=filename) if mode == 'edit' else url_for('main.block_preview') }}">
   <div class="row row-cards">
 
     {% if error %}
@@ -50,7 +54,6 @@
         <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-advanced" aria-selected="false" tabindex="-1">Advanced</button>
         <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-security" aria-selected="false" tabindex="-1">Security</button>
         <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-logging" aria-selected="false" tabindex="-1">Logging</button>
-        <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-file" aria-selected="false" tabindex="-1">File</button>
       </nav>
     </div>
     <!-- END SECTION TABS NAV -->
@@ -454,18 +457,6 @@
         </div>
         <!-- END LOGGING SECTION -->
 
-        <!-- BEGIN FILE SECTION -->
-        <div class="tab-pane" id="block-tab-file" role="tabpanel">
-          <div class="row row-cards">
-            <div class="col-12">
-              {% call form_card('File name', 'Override the default file name for the block. The .conf is appended automatically.') %}
-              <label class="form-label">Saved as</label>
-              <input type="text" class="form-control font-monospace" id="conf-path-badge" value="{{ conf_path if mode == 'edit' else '' }}" readonly>
-              {% endcall %}
-            </div>
-          </div>
-        </div>
-        <!-- END FILE SECTION -->
 
       </div>
     </div>
@@ -487,7 +478,7 @@
             <div class="col-12 col-sm-auto">
               <div class="btn-list">
                 <a href="{{ url_for('main.site_blocks') }}" class="btn">Cancel</a>
-                <button type="button" class="btn">Preview</button>
+                <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#block-preview-modal">Preview</button>
                 <button type="submit" class="btn btn-primary">Save</button>
               </div>
             </div>

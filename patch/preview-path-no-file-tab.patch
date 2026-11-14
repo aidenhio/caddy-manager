@@ -1,0 +1,230 @@
+From 635437da2d50e97b70526e1757ac921ec52b0b8f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 14 Nov 2026 14:23:04 +1100
+Subject: [PATCH] Block form: full path in the preview, "Saved to" when
+ editing; drop the File tab
+
+/block-preview returns the full .conf path instead of just the file
+name, and the modal labels it "Saved to" in edit mode ("Will be saved
+as" for a new block). The File tab, its read-only path box and the JS
+that kept it updated are removed, along with the form's data-conf-dir /
+data-originally-disabled attributes and the view arguments only it used.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GFYvS9tgNsRjfuEB4vjX1t
+---
+ caddy_manager/views.py                      |  8 +--
+ static/js/block-form.js                     | 63 +++------------------
+ templates/block_form.html                   | 15 +----
+ templates/partials/block_preview_modal.html |  2 +-
+ 4 files changed, 13 insertions(+), 75 deletions(-)
+
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 13c95e5..2ac78c3 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -175,7 +175,7 @@ def new_block(block_type=None):
+     return render_template(
+         "block_form.html", mode="new", block_type=block_type,
+         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
+-        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),
++        raw_body_text=raw_body_text, error=error,
+         log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+         disabled_toggle_checked=disabled_toggle_checked,
+     )
+@@ -216,7 +216,7 @@ def block_preview():
+         return jsonify(error=error)
+     if filename_hint and request.form.get("disabled") == "1":
+         filename_hint += ".disabled"
+-    return jsonify(content=content, filename=filename_hint)
++    return jsonify(content=content, path=os.path.join(get_conf_dir(), filename_hint) if filename_hint else None)
+ 
+ 
+ @bp.route("/edit/<path:filename>", methods=["GET", "POST"])
+@@ -288,8 +288,8 @@ def edit_block(filename):
+     return render_template(
+         "block_form.html", mode="edit", block_type=block_type, filename=filename,
+         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
+-        site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
+-        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),
++        site_addresses_text=site_addresses_text, raw_body_text=raw_body_text,
++        error=error,
+         log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
+         disabled_toggle_checked=disabled_toggle_checked,
+     )
+diff --git a/static/js/block-form.js b/static/js/block-form.js
+index c94066e..a4f0383 100644
+--- a/static/js/block-form.js
++++ b/static/js/block-form.js
+@@ -21,65 +21,19 @@
+ })();
+ // END BLOCK TYPE SWITCHER
+ 
+-// BEGIN SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
++// BEGIN SITE ADDRESS TAG INPUT
+ (function () {
+   const wrap = document.getElementById('site-address-input');
+   const textInput = document.getElementById('site-address-text-input');
+   const hidden = document.getElementById('site-addresses');
+-  const form = document.getElementById('block-form');
+-  if (!wrap || !textInput || !hidden || !form) return;
+-
+-  const confDir = form.dataset.confDir || '';
+-  const confPathBadge = document.getElementById('conf-path-badge');
+-  const originallyDisabled = form.dataset.originallyDisabled === 'true';
++  if (!wrap || !textInput || !hidden) return;
+ 
+   function currentSiteAddresses() {
+     return Array.from(wrap.querySelectorAll('.site-address-chip')).map((el) => el.dataset.siteAddress);
+   }
+ 
+-  function sortedFirstSiteAddress() {
+-    // Mirrors the backend's normalize_site_addresses(): letter-leading sorts before digit-leading.
+-    const siteAddresses = currentSiteAddresses().slice();
+-    siteAddresses.sort((a, b) => {
+-      const aDigit = /^[0-9]/.test(a) ? 1 : 0;
+-      const bDigit = /^[0-9]/.test(b) ? 1 : 0;
+-      if (aDigit !== bDigit) return aDigit - bDigit;
+-      const aLower = a.toLowerCase();
+-      const bLower = b.toLowerCase();
+-      if (aLower < bLower) return -1;
+-      if (aLower > bLower) return 1;
+-      return 0;
+-    });
+-    return siteAddresses[0];
+-  }
+-
+-  function slugify(value) {
+-    value = (value || '').trim().toLowerCase();
+-    let out = '';
+-    for (const ch of value) {
+-      out += (/[a-z0-9.]/.test(ch)) ? ch : '-';
+-    }
+-    let slug = out.replace(/^-+|-+$/g, '');
+-    while (slug.includes('--')) slug = slug.replace(/--/g, '-');
+-    return slug || 'block';
+-  }
+-
+-  function updateConfPathBadge() {
+-    if (!confPathBadge) return;
+-    const dirPrefix = confDir.replace(/\/$/, '') + '/';
+-    const first = sortedFirstSiteAddress();
+-    if (!first) {
+-      confPathBadge.value = dirPrefix + '...';
+-      return;
+-    }
+-    const disabledInput = document.getElementById('block-disabled-input');
+-    const isDisabled = disabledInput ? disabledInput.checked : originallyDisabled;
+-    confPathBadge.value = dirPrefix + slugify(first) + '.conf' + (isDisabled ? '.disabled' : '');
+-  }
+-
+   function syncHidden() {
+     hidden.value = currentSiteAddresses().join('\n');
+-    updateConfPathBadge();
+   }
+ 
+   function addChip(value) {
+@@ -113,7 +67,6 @@
+   }
+ 
+   (hidden.value || '').split('\n').map((h) => h.trim()).filter(Boolean).forEach(addChip);
+-  updateConfPathBadge();
+ 
+   textInput.addEventListener('keydown', (e) => {
+     if (e.key === ' ' || e.key === 'Enter') {
+@@ -149,10 +102,8 @@
+     wrap.classList.toggle('is-invalid', !valid);
+     return valid;
+   };
+-  const disabledInput = document.getElementById('block-disabled-input');
+-  if (disabledInput) disabledInput.addEventListener('change', updateConfPathBadge);
+ })();
+-// END SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
++// END SITE ADDRESS TAG INPUT
+ 
+ // BEGIN REVERSE PROXY SCHEME -> INSECURE SKIP VERIFY TOGGLE
+ (function () {
+@@ -298,15 +249,15 @@
+   if (!form || !modal) return;
+   const field = (name) => modal.querySelector('[data-field="' + name + '"]');
+ 
+-  function show(state, text, filename) {
++  function show(state, text, path) {
+     field('loading').hidden = state !== 'loading';
+     field('error').hidden = state !== 'error';
+     field('content').hidden = state !== 'content';
+-    field('filename').hidden = !(state === 'content' && filename);
++    field('filename').hidden = !(state === 'content' && path);
+     if (state === 'error') field('error-text').textContent = text;
+     if (state === 'content') {
+       field('content-text').textContent = text;
+-      field('filename-text').textContent = filename || '';
++      field('filename-text').textContent = path || '';
+     }
+   }
+ 
+@@ -320,7 +271,7 @@
+       })
+       .then((data) => {
+         if (data.error) show('error', data.error);
+-        else show('content', data.content, data.filename);
++        else show('content', data.content, data.path);
+       })
+       .catch((err) => show('error', err.message || 'The preview could not be generated.'));
+   });
+diff --git a/templates/block_form.html b/templates/block_form.html
+index b3618b8..ec70f54 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -36,7 +36,7 @@
+ {% block content %}
+ 
+ <!-- BEGIN BLOCK FORM -->
+-<form method="post" id="block-form" data-preview-url="{{ url_for('main.block_preview', filename=filename) if mode == 'edit' else url_for('main.block_preview') }}" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
++<form method="post" id="block-form" data-preview-url="{{ url_for('main.block_preview', filename=filename) if mode == 'edit' else url_for('main.block_preview') }}">
+   <div class="row row-cards">
+ 
+     {% if error %}
+@@ -54,7 +54,6 @@
+         <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-advanced" aria-selected="false" tabindex="-1">Advanced</button>
+         <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-security" aria-selected="false" tabindex="-1">Security</button>
+         <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-logging" aria-selected="false" tabindex="-1">Logging</button>
+-        <button type="button" class="nav-link" role="tab" data-bs-toggle="tab" data-bs-target="#block-tab-file" aria-selected="false" tabindex="-1">File</button>
+       </nav>
+     </div>
+     <!-- END SECTION TABS NAV -->
+@@ -458,18 +457,6 @@
+         </div>
+         <!-- END LOGGING SECTION -->
+ 
+-        <!-- BEGIN FILE SECTION -->
+-        <div class="tab-pane" id="block-tab-file" role="tabpanel">
+-          <div class="row row-cards">
+-            <div class="col-12">
+-              {% call form_card('File name', 'Override the default file name for the block. The .conf is appended automatically.') %}
+-              <label class="form-label">Saved as</label>
+-              <input type="text" class="form-control font-monospace" id="conf-path-badge" value="{{ conf_path if mode == 'edit' else '' }}" readonly>
+-              {% endcall %}
+-            </div>
+-          </div>
+-        </div>
+-        <!-- END FILE SECTION -->
+ 
+       </div>
+     </div>
+diff --git a/templates/partials/block_preview_modal.html b/templates/partials/block_preview_modal.html
+index 6a1c22c..8c25f3a 100644
+--- a/templates/partials/block_preview_modal.html
++++ b/templates/partials/block_preview_modal.html
+@@ -11,7 +11,7 @@
+       <!-- END MODAL HEADER -->
+       <!-- BEGIN MODAL BODY -->
+       <div class="modal-body">
+-        <p class="text-secondary" data-field="filename" hidden>Will be saved as <code data-field="filename-text"></code></p>
++        <p class="text-secondary" data-field="filename" hidden>{{ 'Saved to' if mode == 'edit' else 'Will be saved as' }} <code data-field="filename-text"></code></p>
+         <div class="text-center py-4" data-field="loading">
+           <div class="spinner-border text-secondary" role="status" aria-label="Loading"></div>
+         </div>
+-- 
+2.43.0
+

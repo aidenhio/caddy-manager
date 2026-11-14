@@ -1,0 +1,218 @@
+From ee8c6175d7d8fe3b0e45503eda695695a367c845 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 14 Nov 2026 13:20:27 +1100
+Subject: [PATCH] Block form: Preview modal showing the .conf that Save would
+ write
+
+The Preview button opens a modal that POSTs the form's current values
+to a new /block-preview endpoint. It renders them with the same
+build_block_from_form() call Save uses (nothing is written) and returns
+the content plus the file name it would be saved as, or the same
+validation error Save would show.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GFYvS9tgNsRjfuEB4vjX1t
+---
+ caddy_manager/views.py                      | 38 +++++++++++++++++
+ static/js/block-form.js                     | 45 ++++++++++++++++++++-
+ templates/block_form.html                   |  8 +++-
+ templates/partials/block_preview_modal.html | 37 +++++++++++++++++
+ 4 files changed, 124 insertions(+), 4 deletions(-)
+ create mode 100644 templates/partials/block_preview_modal.html
+
+diff --git a/caddy_manager/views.py b/caddy_manager/views.py
+index 3059ec0..13c95e5 100644
+--- a/caddy_manager/views.py
++++ b/caddy_manager/views.py
+@@ -181,6 +181,44 @@ def new_block(block_type=None):
+     )
+ 
+ 
++@bp.route("/block-preview", methods=["POST"])
++@login_required
++def block_preview():
++    """Render the block form's current values to Caddyfile text without saving anything,
++    for the form's Preview modal. ?filename= marks an edit of that existing block."""
++    filename = request.args.get("filename")
++    site_addresses = site_addresses_from_textarea(request.form.get("site_addresses", ""))
++    first = site_addresses[0] if site_addresses else None
++
++    # Same filename the save would end up with, since the log path baked into the content depends on it.
++    if filename:
++        path = safe_path(filename)
++        if not os.path.isfile(path):
++            abort(404)
++        meta = read_metadata(filename, path)
++        block_type = meta.get("type", "custom")
++        if block_type not in BLOCK_TYPE_ORDER:
++            block_type = "custom"
++        old_addresses = meta.get("site_addresses", [])
++        old_first = old_addresses[0] if old_addresses else None
++        if first and not (old_first and slugify(first) == slugify(old_first)):
++            filename_hint = unique_filename(slugify(first))
++        else:
++            filename_hint = filename[: -len(".disabled")] if filename.endswith(".disabled") else filename
++    else:
++        block_type = request.form.get("block_type", "")
++        if block_type not in BLOCK_TYPE_ORDER:
++            return jsonify(error="Choose a block type.")
++        filename_hint = unique_filename(slugify(first)) if first else None
++
++    content, _meta, error = build_block_from_form(block_type, request.form, log_filename_hint=filename_hint)
++    if error:
++        return jsonify(error=error)
++    if filename_hint and request.form.get("disabled") == "1":
++        filename_hint += ".disabled"
++    return jsonify(content=content, filename=filename_hint)
++
++
+ @bp.route("/edit/<path:filename>", methods=["GET", "POST"])
+ @login_required
+ def edit_block(filename):
+diff --git a/static/js/block-form.js b/static/js/block-form.js
+index 8ebaefe..c94066e 100644
+--- a/static/js/block-form.js
++++ b/static/js/block-form.js
+@@ -137,9 +137,12 @@
+   });
+ 
+   wrap.addEventListener('click', () => textInput.focus());
+-  wrap.closest('form').addEventListener('submit', () => {
++  // Text still in the input becomes a chip on submit, and before a preview reads the form.
++  const addPendingChip = () => {
+     if (textInput.value.trim()) addChip(textInput.value);
+-  });
++  };
++  wrap.closest('form').addEventListener('submit', addPendingChip);
++  wrap.closest('form').addEventListener('block-form:sync', addPendingChip);
+ 
+   window.__validateSiteAddresses = function () {
+     const valid = currentSiteAddresses().length > 0;
+@@ -248,6 +251,7 @@
+ 
+   addBtn.addEventListener('click', () => addRow('', ''));
+   rowsWrap.closest('form').addEventListener('submit', syncHidden);
++  rowsWrap.closest('form').addEventListener('block-form:sync', syncHidden);
+ })();
+ // END LOAD BALANCER UPSTREAM ROWS
+ 
+@@ -285,3 +289,40 @@
+   });
+ })();
+ // END FORM VALIDATION WIRING
++
++// BEGIN PREVIEW MODAL
++// Renders the form's current values server-side (same code as Save, nothing written) and shows the result.
++(function () {
++  const form = document.getElementById('block-form');
++  const modal = document.getElementById('block-preview-modal');
++  if (!form || !modal) return;
++  const field = (name) => modal.querySelector('[data-field="' + name + '"]');
++
++  function show(state, text, filename) {
++    field('loading').hidden = state !== 'loading';
++    field('error').hidden = state !== 'error';
++    field('content').hidden = state !== 'content';
++    field('filename').hidden = !(state === 'content' && filename);
++    if (state === 'error') field('error-text').textContent = text;
++    if (state === 'content') {
++      field('content-text').textContent = text;
++      field('filename-text').textContent = filename || '';
++    }
++  }
++
++  modal.addEventListener('show.bs.modal', () => {
++    show('loading');
++    form.dispatchEvent(new Event('block-form:sync'));
++    fetch(form.dataset.previewUrl, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' } })
++      .then((res) => {
++        if (!res.ok) throw new Error('The preview could not be generated (HTTP ' + res.status + ').');
++        return res.json();
++      })
++      .then((data) => {
++        if (data.error) show('error', data.error);
++        else show('content', data.content, data.filename);
++      })
++      .catch((err) => show('error', err.message || 'The preview could not be generated.'));
++  });
++})();
++// END PREVIEW MODAL
+diff --git a/templates/block_form.html b/templates/block_form.html
+index d4c8aa2..b3618b8 100644
+--- a/templates/block_form.html
++++ b/templates/block_form.html
+@@ -18,6 +18,10 @@
+ {% block header_actions %}
+ {% endblock %}
+ 
++{% block page_modal %}
++{% include 'partials/block_preview_modal.html' %}
++{% endblock %}
++
+ {% block page_breadcrumb_list %}
+   <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Caddy</a></li>
+   <li class="breadcrumb-item"><a href="{{ url_for('main.site_blocks') }}">Sites</a></li>
+@@ -32,7 +36,7 @@
+ {% block content %}
+ 
+ <!-- BEGIN BLOCK FORM -->
+-<form method="post" id="block-form" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
++<form method="post" id="block-form" data-preview-url="{{ url_for('main.block_preview', filename=filename) if mode == 'edit' else url_for('main.block_preview') }}" data-conf-dir="{{ conf_dir or '' }}" data-originally-disabled="{{ 'true' if mode == 'edit' and filename.endswith('.disabled') else 'false' }}">
+   <div class="row row-cards">
+ 
+     {% if error %}
+@@ -487,7 +491,7 @@
+             <div class="col-12 col-sm-auto">
+               <div class="btn-list">
+                 <a href="{{ url_for('main.site_blocks') }}" class="btn">Cancel</a>
+-                <button type="button" class="btn">Preview</button>
++                <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#block-preview-modal">Preview</button>
+                 <button type="submit" class="btn btn-primary">Save</button>
+               </div>
+             </div>
+diff --git a/templates/partials/block_preview_modal.html b/templates/partials/block_preview_modal.html
+new file mode 100644
+index 0000000..6a1c22c
+--- /dev/null
++++ b/templates/partials/block_preview_modal.html
+@@ -0,0 +1,37 @@
++{% from "macros/alerts.html" import alert_icon %}
++<!-- BEGIN BLOCK PREVIEW MODAL -->
++<div class="modal modal-blur fade" id="block-preview-modal" tabindex="-1" aria-labelledby="block-preview-title" aria-hidden="true">
++  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
++    <div class="modal-content">
++      <!-- BEGIN MODAL HEADER -->
++      <div class="modal-header">
++        <h5 class="modal-title" id="block-preview-title">Preview</h5>
++        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
++      </div>
++      <!-- END MODAL HEADER -->
++      <!-- BEGIN MODAL BODY -->
++      <div class="modal-body">
++        <p class="text-secondary" data-field="filename" hidden>Will be saved as <code data-field="filename-text"></code></p>
++        <div class="text-center py-4" data-field="loading">
++          <div class="spinner-border text-secondary" role="status" aria-label="Loading"></div>
++        </div>
++        <div class="alert alert-danger mb-0" role="alert" data-field="error" hidden>
++          <div class="alert-icon">
++            {{ alert_icon('danger') }}
++          </div>
++          <div data-field="error-text"></div>
++        </div>
++        <div class="card-code" data-field="content" hidden>
++          <pre class="code-primary-lt p-3 mb-0"><code data-field="content-text"></code></pre>
++        </div>
++      </div>
++      <!-- END MODAL BODY -->
++      <!-- BEGIN MODAL FOOTER -->
++      <div class="modal-footer">
++        <button type="button" class="btn" data-bs-dismiss="modal">Close</button>
++      </div>
++      <!-- END MODAL FOOTER -->
++    </div>
++  </div>
++</div>
++<!-- END BLOCK PREVIEW MODAL -->
+-- 
+2.43.0
+

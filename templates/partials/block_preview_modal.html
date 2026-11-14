@@ -1,0 +1,32 @@
+{% from "macros/alerts.html" import alert_icon %}
+<!-- BEGIN BLOCK PREVIEW MODAL -->
+<div class="modal modal-blur fade" id="block-preview-modal" tabindex="-1" aria-labelledby="block-preview-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <!-- BEGIN MODAL HEADER -->
+      <div class="modal-header">
+        <h5 class="modal-title" id="block-preview-title">Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <!-- END MODAL HEADER -->
+      <!-- BEGIN MODAL BODY -->
+      <div class="modal-body">
+        <p class="text-secondary" data-field="filename" hidden>{{ 'Saved to' if mode == 'edit' else 'Will be saved as' }} <code data-field="filename-text"></code></p>
+        <div class="text-center py-4" data-field="loading">
+          <div class="spinner-border text-secondary" role="status" aria-label="Loading"></div>
+        </div>
+        <div class="alert alert-danger mb-0" role="alert" data-field="error" hidden>
+          <div class="alert-icon">
+            {{ alert_icon('danger') }}
+          </div>
+          <div data-field="error-text"></div>
+        </div>
+        <div class="card-code" data-field="content" hidden>
+          <pre class="code-primary-lt p-3 mb-0"><code data-field="content-text"></code></pre>
+        </div>
+      </div>
+      <!-- END MODAL BODY -->
+    </div>
+  </div>
+</div>
+<!-- END BLOCK PREVIEW MODAL -->

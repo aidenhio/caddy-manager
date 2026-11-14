@@ -21,65 +21,19 @@
 })();
 // END BLOCK TYPE SWITCHER
 
-// BEGIN SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
+// BEGIN SITE ADDRESS TAG INPUT
 (function () {
   const wrap = document.getElementById('site-address-input');
   const textInput = document.getElementById('site-address-text-input');
   const hidden = document.getElementById('site-addresses');
-  const form = document.getElementById('block-form');
-  if (!wrap || !textInput || !hidden || !form) return;
-
-  const confDir = form.dataset.confDir || '';
-  const confPathBadge = document.getElementById('conf-path-badge');
-  const originallyDisabled = form.dataset.originallyDisabled === 'true';
+  if (!wrap || !textInput || !hidden) return;
 
   function currentSiteAddresses() {
     return Array.from(wrap.querySelectorAll('.site-address-chip')).map((el) => el.dataset.siteAddress);
   }
 
-  function sortedFirstSiteAddress() {
-    // Mirrors the backend's normalize_site_addresses(): letter-leading sorts before digit-leading.
-    const siteAddresses = currentSiteAddresses().slice();
-    siteAddresses.sort((a, b) => {
-      const aDigit = /^[0-9]/.test(a) ? 1 : 0;
-      const bDigit = /^[0-9]/.test(b) ? 1 : 0;
-      if (aDigit !== bDigit) return aDigit - bDigit;
-      const aLower = a.toLowerCase();
-      const bLower = b.toLowerCase();
-      if (aLower < bLower) return -1;
-      if (aLower > bLower) return 1;
-      return 0;
-    });
-    return siteAddresses[0];
-  }
-
-  function slugify(value) {
-    value = (value || '').trim().toLowerCase();
-    let out = '';
-    for (const ch of value) {
-      out += (/[a-z0-9.]/.test(ch)) ? ch : '-';
-    }
-    let slug = out.replace(/^-+|-+$/g, '');
-    while (slug.includes('--')) slug = slug.replace(/--/g, '-');
-    return slug || 'block';
-  }
-
-  function updateConfPathBadge() {
-    if (!confPathBadge) return;
-    const dirPrefix = confDir.replace(/\/$/, '') + '/';
-    const first = sortedFirstSiteAddress();
-    if (!first) {
-      confPathBadge.value = dirPrefix + '...';
-      return;
-    }
-    const disabledInput = document.getElementById('block-disabled-input');
-    const isDisabled = disabledInput ? disabledInput.checked : originallyDisabled;
-    confPathBadge.value = dirPrefix + slugify(first) + '.conf' + (isDisabled ? '.disabled' : '');
-  }
-
   function syncHidden() {
     hidden.value = currentSiteAddresses().join('\n');
-    updateConfPathBadge();
   }
 
   function addChip(value) {
@@ -113,7 +67,6 @@
   }
 
   (hidden.value || '').split('\n').map((h) => h.trim()).filter(Boolean).forEach(addChip);
-  updateConfPathBadge();
 
   textInput.addEventListener('keydown', (e) => {
     if (e.key === ' ' || e.key === 'Enter') {
@@ -137,19 +90,20 @@
   });
 
   wrap.addEventListener('click', () => textInput.focus());
-  wrap.closest('form').addEventListener('submit', () => {
+  // Text still in the input becomes a chip on submit, and before a preview reads the form.
+  const addPendingChip = () => {
     if (textInput.value.trim()) addChip(textInput.value);
-  });
+  };
+  wrap.closest('form').addEventListener('submit', addPendingChip);
+  wrap.closest('form').addEventListener('block-form:sync', addPendingChip);
 
   window.__validateSiteAddresses = function () {
     const valid = currentSiteAddresses().length > 0;
     wrap.classList.toggle('is-invalid', !valid);
     return valid;
   };
-  const disabledInput = document.getElementById('block-disabled-input');
-  if (disabledInput) disabledInput.addEventListener('change', updateConfPathBadge);
 })();
-// END SITE ADDRESS TAG INPUT + LIVE CONF-PATH PREVIEW
+// END SITE ADDRESS TAG INPUT
 
 // BEGIN REVERSE PROXY SCHEME -> INSECURE SKIP VERIFY TOGGLE
 (function () {
@@ -248,6 +202,7 @@
 
   addBtn.addEventListener('click', () => addRow('', ''));
   rowsWrap.closest('form').addEventListener('submit', syncHidden);
+  rowsWrap.closest('form').addEventListener('block-form:sync', syncHidden);
 })();
 // END LOAD BALANCER UPSTREAM ROWS
 
@@ -285,3 +240,40 @@
   });
 })();
 // END FORM VALIDATION WIRING
+
+// BEGIN PREVIEW MODAL
+// Renders the form's current values server-side (same code as Save, nothing written) and shows the result.
+(function () {
+  const form = document.getElementById('block-form');
+  const modal = document.getElementById('block-preview-modal');
+  if (!form || !modal) return;
+  const field = (name) => modal.querySelector('[data-field="' + name + '"]');
+
+  function show(state, text, path) {
+    field('loading').hidden = state !== 'loading';
+    field('error').hidden = state !== 'error';
+    field('content').hidden = state !== 'content';
+    field('filename').hidden = !(state === 'content' && path);
+    if (state === 'error') field('error-text').textContent = text;
+    if (state === 'content') {
+      field('content-text').textContent = text;
+      field('filename-text').textContent = path || '';
+    }
+  }
+
+  modal.addEventListener('show.bs.modal', () => {
+    show('loading');
+    form.dispatchEvent(new Event('block-form:sync'));
+    fetch(form.dataset.previewUrl, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' } })
+      .then((res) => {
+        if (!res.ok) throw new Error('The preview could not be generated (HTTP ' + res.status + ').');
+        return res.json();
+      })
+      .then((data) => {
+        if (data.error) show('error', data.error);
+        else show('content', data.content, data.path);
+      })
+      .catch((err) => show('error', err.message || 'The preview could not be generated.'));
+  });
+})();
+// END PREVIEW MODAL

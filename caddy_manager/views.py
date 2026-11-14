@@ -175,10 +175,48 @@ def new_block(block_type=None):
     return render_template(
         "block_form.html", mode="new", block_type=block_type,
         meta=meta, upstreams_text=upstreams_text, site_addresses_text=site_addresses_text,
-        raw_body_text=raw_body_text, error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),
+        raw_body_text=raw_body_text, error=error,
         log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
         disabled_toggle_checked=disabled_toggle_checked,
     )
+
+
+@bp.route("/block-preview", methods=["POST"])
+@login_required
+def block_preview():
+    """Render the block form's current values to Caddyfile text without saving anything,
+    for the form's Preview modal. ?filename= marks an edit of that existing block."""
+    filename = request.args.get("filename")
+    site_addresses = site_addresses_from_textarea(request.form.get("site_addresses", ""))
+    first = site_addresses[0] if site_addresses else None
+
+    # Same filename the save would end up with, since the log path baked into the content depends on it.
+    if filename:
+        path = safe_path(filename)
+        if not os.path.isfile(path):
+            abort(404)
+        meta = read_metadata(filename, path)
+        block_type = meta.get("type", "custom")
+        if block_type not in BLOCK_TYPE_ORDER:
+            block_type = "custom"
+        old_addresses = meta.get("site_addresses", [])
+        old_first = old_addresses[0] if old_addresses else None
+        if first and not (old_first and slugify(first) == slugify(old_first)):
+            filename_hint = unique_filename(slugify(first))
+        else:
+            filename_hint = filename[: -len(".disabled")] if filename.endswith(".disabled") else filename
+    else:
+        block_type = request.form.get("block_type", "")
+        if block_type not in BLOCK_TYPE_ORDER:
+            return jsonify(error="Choose a block type.")
+        filename_hint = unique_filename(slugify(first)) if first else None
+
+    content, _meta, error = build_block_from_form(block_type, request.form, log_filename_hint=filename_hint)
+    if error:
+        return jsonify(error=error)
+    if filename_hint and request.form.get("disabled") == "1":
+        filename_hint += ".disabled"
+    return jsonify(content=content, path=os.path.join(get_conf_dir(), filename_hint) if filename_hint else None)
 
 
 @bp.route("/edit/<path:filename>", methods=["GET", "POST"])
@@ -250,8 +288,8 @@ def edit_block(filename):
     return render_template(
         "block_form.html", mode="edit", block_type=block_type, filename=filename,
         meta=meta, upstreams_text=upstreams_text, site_addresses=meta.get("site_addresses", []),
-        site_addresses_text=site_addresses_text, conf_path=path, raw_body_text=raw_body_text,
-        error=error, conf_dir=get_conf_dir(), log_dir=get_log_dir(),
+        site_addresses_text=site_addresses_text, raw_body_text=raw_body_text,
+        error=error,
         log_dir_display=(get_caddy_log_output_dir() or "<logs dir>").rstrip("/"),
         disabled_toggle_checked=disabled_toggle_checked,
     )
