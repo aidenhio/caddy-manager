@@ -20,7 +20,7 @@ ROLL_KEEP_FOR_RE = re.compile(r"^\s*roll_keep_for\s+(\S+)", re.MULTILINE)
 
 # Encode formats offered in the Static Site form; also used to validate
 # a submitted form or a hand-edited .conf's `encode` line.
-ENCODE_FORMATS = ("gzip", "zstd", "br")
+ENCODE_FORMATS = ("gzip", "zstd")
 
 # Log levels/formats offered in the Logging accordion; also used to
 # validate a submitted form or hand-edited `log` block.

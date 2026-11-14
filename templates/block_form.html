@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/alerts.html" import alert %}
-{% from "macros/block_form.html" import form_card, type_section %}
+{% from "macros/block_form.html" import form_card, toggle_card, type_section %}
 
 {% set proxy_types = ['reverse_proxy', 'load_balancer'] %}
 {% set logging_types = ['reverse_proxy', 'redirect', 'load_balancer', 'static_site'] %}
@@ -312,11 +312,11 @@
             <!-- BEGIN STATIC SITE OPTIONS -->
             {% call type_section(['static_site'], block_type) %}
             <div class="col-12">
-              {% call form_card('Encoding', 'Subtitle.') %}
+              {% call form_card('Encoding', 'Compress responses in these formats when the browser supports them.') %}
               <div>
                 <fieldset>
                   <div class="form-selectgroup form-selectgroup-pills">
-                    {% for fmt in ['gzip', 'zstd', 'br'] %}
+                    {% for fmt in ['gzip', 'zstd'] %}
                     <label class="form-selectgroup-item">
                       <input type="checkbox" name="encode" value="{{ fmt }}" class="form-selectgroup-input" {{ 'checked' if fmt in (meta.encode or []) }}>
                       <span class="form-selectgroup-label">{{ fmt }}</span>
@@ -331,16 +331,13 @@
 
             {% call type_section(['static_site'], block_type) %}
             <div class="col-12">
-              {% call form_card('Directory browsing', 'Shows a file listing for directories that have no index file.') %}
-              <div>
-              </div>
-              {% endcall %}
+              {{ toggle_card('Directory browsing', 'Shows a file listing for directories that have no index file.', 'browse-input', 'Enable browsing', name='browse', checked=meta.browse) }}
             </div>
             {% endcall %}
 
             {% call type_section(['static_site'], block_type) %}
             <div class="col-12">
-              {% call form_card('File server options', 'Control which files are served and how directories are shown.') %}
+              {% call form_card('File server options', 'Control which files are served, and which file is served for a directory.') %}
               <div class="row g-2">
                 <div class="col-md-6">
                   <label class="form-label">Hide</label>
@@ -353,11 +350,6 @@
                   <span class="form-hint">Space-separated. Defaults to index.html and index.txt.</span>
                 </div>
               </div>
-              <label class="form-check mt-3 mb-1">
-                <input type="checkbox" class="form-check-input" name="browse" value="1" {{ 'checked' if meta.browse }}>
-                <span class="form-check-label">Directory browsing</span>
-              </label>
-              <span class="form-hint">Shows a file listing for directories that have no index file.</span>
               {% endcall %}
             </div>
             {% endcall %}
@@ -378,12 +370,16 @@
         <!-- BEGIN SECURITY SECTION -->
         <div class="tab-pane" id="block-tab-security" role="tabpanel">
           <div class="row row-cards">
+            <!-- BEGIN HTTP BASIC AUTH (UI stub, not submitted) -->
             <div class="col-12">
-              {% call form_card('HTTP basic auth', 'Setup HTTP basic authentication for the block.') %}{% endcall %}
+              {{ toggle_card('HTTP basic auth', 'Set up HTTP basic authentication for the block.', 'basic-auth-enabled-input', 'Enable basic auth') }}
             </div>
+            <!-- END HTTP BASIC AUTH -->
+            <!-- BEGIN ACCESS LIST (UI stub, not submitted) -->
             <div class="col-12">
-              {% call form_card('Access list', 'Configure access permissions for the block.') %}{% endcall %}
+              {{ toggle_card('Access list', 'Configure access permissions for the block.', 'access-list-enabled-input', 'Enable access list') }}
             </div>
+            <!-- END ACCESS LIST -->
           </div>
         </div>
         <!-- END SECURITY SECTION -->
@@ -395,22 +391,8 @@
             {% call type_section(logging_types, block_type) %}
             <!-- BEGIN ENABLE LOGGING -->
             <div class="col-12">
-              <div class="card">
-                <div class="card-body">
-                  <div class="row align-items-center">
-                    <div class="col">
-                      <h2 class="card-title">Access log</h2>
-                      <p class="card-subtitle mb-0">Writes this block's access log to <code>{{ log_dir_display }}</code>. Changing logging options may require a restart of the Caddy service.</p>
-                    </div>
-                    <div class="col-auto">
-                      <label class="form-check form-switch m-0">
-                        <input type="checkbox" class="form-check-input" id="log-enabled-input" name="log_enabled" value="1" {{ 'checked' if meta.log_enabled }} aria-label="Enable logging">
-                        <span class="form-check-label">Enable logging</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {% set log_subtitle %}Writes this block's access log to <code>{{ log_dir_display }}</code>. Changing logging options may require a restart of the Caddy service.{% endset %}
+              {{ toggle_card('Access log', log_subtitle, 'log-enabled-input', 'Enable logging', name='log_enabled', checked=meta.log_enabled) }}
             </div>
             <!-- END ENABLE LOGGING -->
 

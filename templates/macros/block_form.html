@@ -9,6 +9,28 @@
 </div>
 {% endmacro %}
 
+{# A card with title + subtitle on the left and an on/off switch on the right, plus optional fields below via caller().
+   A switch with no name is a UI-only stub and is never submitted. #}
+{% macro toggle_card(title, subtitle, id, label, name=None, checked=False) %}
+<div class="card">
+  <div class="card-body">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="card-title">{{ title }}</h2>
+        <p class="card-subtitle mb-0">{{ subtitle }}</p>
+      </div>
+      <div class="col-auto">
+        <label class="form-check form-switch m-0">
+          <input type="checkbox" class="form-check-input" id="{{ id }}"{% if name %} name="{{ name }}" value="1"{% endif %}{{ ' checked' if checked }}>
+          <span class="form-check-label">{{ label }}</span>
+        </label>
+      </div>
+    </div>
+    {% if caller %}{{ caller() }}{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
 {# Cards only used by some block types. Hidden sections are also disabled, so their fields are never submitted or validated. #}
 {% macro type_section(types, block_type) %}
 <fieldset class="col-12" data-block-types="{{ types | join(' ') }}"{% if block_type not in types %} hidden disabled{% endif %}>
