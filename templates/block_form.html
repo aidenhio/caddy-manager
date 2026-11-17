@@ -131,12 +131,14 @@
                   <input type="text" name="port" class="form-control" value="{{ meta.port or '' }}" placeholder="8080">
                 </div>
               </div>
-              <div class="mt-3" id="insecure-skip-verify-row" {{ 'hidden' if (meta.scheme or 'http') != 'https' }}>
-                <label class="form-check mb-1">
-                  <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
-                  <span class="form-check-label">Skip TLS verification (insecure)</span>
-                </label>
-                <span class="form-hint">Only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+              <div class="collapse{{ ' show' if (meta.scheme or 'http') == 'https' }}" id="insecure-skip-verify-row">
+                <div class="pt-3">
+                  <label class="form-check mb-1">
+                    <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+                    <span class="form-check-label">Skip TLS verification (insecure)</span>
+                  </label>
+                  <span class="form-hint">Only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+                </div>
               </div>
               {% endcall %}
             </div>
@@ -165,12 +167,14 @@
                 Add upstream
               </button>
               <textarea name="upstreams" id="upstreams" hidden>{{ upstreams_text }}</textarea>
-              <div class="mt-3" id="lb-insecure-skip-verify-row" {{ 'hidden' if not (meta.upstreams and meta.upstreams[0].startswith('https://')) }}>
-                <label class="form-check mb-1">
-                  <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
-                  <span class="form-check-label">Skip TLS verification (insecure)</span>
-                </label>
-                <span class="form-hint">Only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+              <div class="collapse{{ ' show' if meta.upstreams and meta.upstreams[0].startswith('https://') }}" id="lb-insecure-skip-verify-row">
+                <div class="pt-3">
+                  <label class="form-check mb-1">
+                    <input type="checkbox" class="form-check-input" name="insecure_skip_verify" value="1" {{ 'checked' if meta.insecure_skip_verify }}>
+                    <span class="form-check-label">Skip TLS verification (insecure)</span>
+                  </label>
+                  <span class="form-hint">Only use this for upstreams with self-signed or otherwise unverifiable certificates.</span>
+                </div>
               </div>
               {% endcall %}
             </div>
@@ -395,13 +399,13 @@
             <!-- BEGIN ENABLE LOGGING -->
             <div class="col-12">
               {% set log_subtitle %}Writes this block's access log to <code>{{ log_dir_display }}</code>. Changing logging options may require a restart of the Caddy service.{% endset %}
-              {{ toggle_card('Access log', log_subtitle, 'log-enabled-input', 'Enable logging', name='log_enabled', checked=meta.log_enabled) }}
+              {{ toggle_card('Access log', log_subtitle, 'log-enabled-input', 'Enable logging', name='log_enabled', checked=meta.log_enabled, reveals='#log-options-row') }}
             </div>
             <!-- END ENABLE LOGGING -->
 
             <!-- BEGIN LOG OPTIONS -->
-            <div class="col-12" id="log-options-row" {{ 'hidden' if not meta.log_enabled }}>
-              <div class="row row-cards">
+            <div class="col-12 mt-0 collapse{{ ' show' if meta.log_enabled }}" id="log-options-row">
+              <div class="row row-cards pt-2 pt-lg-3">
                 <div class="col-12">
                   {% call form_card('Log options', 'Level and format of the entries written to the log.') %}
                   <div class="row g-2">

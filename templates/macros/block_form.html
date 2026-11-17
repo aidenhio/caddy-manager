@@ -10,8 +10,9 @@
 {% endmacro %}
 
 {# A card with title + subtitle on the left and an on/off switch on the right, plus optional fields below via caller().
-   A switch with no name is a UI-only stub and is never submitted. #}
-{% macro toggle_card(title, subtitle, id, label, name=None, checked=False) %}
+   A switch with no name is a UI-only stub and is never submitted.
+   reveals: selector of a .collapse element the switch animates open/closed (see ANIMATED SECTIONS in block-form.js). #}
+{% macro toggle_card(title, subtitle, id, label, name=None, checked=False, reveals=None) %}
 <div class="card">
   <div class="card-body">
     <div class="row align-items-center">
@@ -21,7 +22,7 @@
       </div>
       <div class="col-auto">
         <label class="form-check form-switch m-0">
-          <input type="checkbox" class="form-check-input" id="{{ id }}"{% if name %} name="{{ name }}" value="1"{% endif %}{{ ' checked' if checked }}>
+          <input type="checkbox" class="form-check-input" id="{{ id }}"{% if name %} name="{{ name }}" value="1"{% endif %}{% if reveals %} data-reveals="{{ reveals }}"{% endif %}{{ ' checked' if checked }}>
           <span class="form-check-label">{{ label }}</span>
         </label>
       </div>
@@ -31,10 +32,13 @@
 </div>
 {% endmacro %}
 
-{# Cards only used by some block types. Hidden sections are also disabled, so their fields are never submitted or validated. #}
+{# Cards only used by some block types, shown/hidden with Bootstrap's collapse animation.
+   Hidden sections are also disabled, so their fields are never submitted or validated.
+   The row-cards gap above the section is moved inside it (mt-0 here, pt-2 pt-lg-3 below, matching Tabler's
+   0.5rem/1rem page padding) so the gap animates with the height instead of snapping at the end. #}
 {% macro type_section(types, block_type) %}
-<fieldset class="col-12" data-block-types="{{ types | join(' ') }}"{% if block_type not in types %} hidden disabled{% endif %}>
-  <div class="row row-cards">
+<fieldset class="col-12 mt-0 collapse{{ ' show' if block_type in types }}" data-block-types="{{ types | join(' ') }}"{% if block_type not in types %} disabled{% endif %}>
+  <div class="row row-cards pt-2 pt-lg-3">
     {{ caller() }}
   </div>
 </fieldset>

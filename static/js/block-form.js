@@ -1,3 +1,55 @@
+// BEGIN ANIMATED SECTIONS
+// Shows or hides a .collapse element with Bootstrap's collapse animation (height slide; Bootstrap drops the
+// transition for users who prefer reduced motion). On an inactive tab it switches instantly, since there's
+// nothing to see. A hidden <fieldset> is also disabled (once it has finished closing), so its fields are
+// neither submitted nor validated. Calls made mid-animation are applied as soon as that animation ends.
+function setSectionShown(el, show) {
+  el.dataset.shown = show ? 'true' : 'false';
+  const isFieldset = el.tagName === 'FIELDSET';
+  if (show && isFieldset) el.disabled = false;
+  if (el.classList.contains('collapsing')) return;  // the shown/hidden listener below catches up
+
+  const pane = el.closest('.tab-pane');
+  const onScreen = !pane || pane.classList.contains('active');
+  // Tabler's bundle exposes Bootstrap's components on window.tabler (not window.bootstrap).
+  const Collapse = window.tabler && window.tabler.Collapse;
+  if (!onScreen || !Collapse) {
+    el.classList.toggle('show', show);
+    if (!show && isFieldset) el.disabled = true;
+    return;
+  }
+  if (!el.dataset.collapseWired) {
+    el.dataset.collapseWired = 'true';
+    const settle = (event) => {
+      if (event.target !== el) return;  // collapse events bubble from nested sections
+      const want = el.dataset.shown === 'true';
+      if (el.classList.contains('show') !== want) {
+        setSectionShown(el, want);
+      } else if (!want && isFieldset) {
+        el.disabled = true;
+        // Let validation and the tab dots drop the now-disabled fields.
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+    el.addEventListener('shown.bs.collapse', settle);
+    el.addEventListener('hidden.bs.collapse', settle);
+  }
+  if (el.classList.contains('show') === show) return;
+  Collapse.getOrCreateInstance(el, { toggle: false })[show ? 'show' : 'hide']();
+}
+
+// Switches with data-reveals="#selector" (toggle_card's `reveals`) open and close that section.
+(function () {
+  document.querySelectorAll('input[data-reveals]').forEach((toggle) => {
+    const target = document.querySelector(toggle.dataset.reveals);
+    if (!target) return;
+    toggle.addEventListener('change', () => setSectionShown(target, toggle.checked));
+    // A no-op unless the browser restored a different switch state (e.g. on Back).
+    setSectionShown(target, toggle.checked);
+  });
+})();
+// END ANIMATED SECTIONS
+
 // BEGIN BLOCK TYPE SWITCHER
 // Shows the cards for the selected type; hidden sections are also disabled so their fields aren't submitted.
 (function () {
@@ -10,14 +62,12 @@
     const checked = form.querySelector('input[name="block_type"]:checked');
     if (!checked) return;
     sections.forEach((section) => {
-      const show = section.dataset.blockTypes.split(' ').includes(checked.value);
-      section.hidden = !show;
-      section.disabled = !show;
+      setSectionShown(section, section.dataset.blockTypes.split(' ').includes(checked.value));
     });
   }
 
   radios.forEach((radio) => radio.addEventListener('change', sync));
-  sync();
+  sync();  // a no-op unless the browser restored a different type (e.g. on Back)
 })();
 // END BLOCK TYPE SWITCHER
 
@@ -112,8 +162,9 @@
   if (!schemeSelect || !row) return;
 
   schemeSelect.addEventListener('change', () => {
-    row.hidden = schemeSelect.value !== 'https';
-    if (row.hidden) row.querySelector('input[type="checkbox"]').checked = false;
+    const https = schemeSelect.value === 'https';
+    setSectionShown(row, https);
+    if (!https) row.querySelector('input[type="checkbox"]').checked = false;
   });
 })();
 // END REVERSE PROXY SCHEME -> INSECURE SKIP VERIFY TOGGLE
@@ -127,8 +178,9 @@
   if (!schemeSelect || !row) return;
 
   schemeSelect.addEventListener('change', () => {
-    row.hidden = schemeSelect.value !== 'https';
-    if (row.hidden) row.querySelector('input[type="checkbox"]').checked = false;
+    const https = schemeSelect.value === 'https';
+    setSectionShown(row, https);
+    if (!https) row.querySelector('input[type="checkbox"]').checked = false;
   });
 })();
 // END LOAD BALANCER SCHEME -> INSECURE SKIP VERIFY TOGGLE
@@ -205,20 +257,6 @@
   rowsWrap.closest('form').addEventListener('block-form:sync', syncHidden);
 })();
 // END LOAD BALANCER UPSTREAM ROWS
-
-// BEGIN LOGGING ENABLE TOGGLE
-(function () {
-  const toggle = document.getElementById('log-enabled-input');
-  const row = document.getElementById('log-options-row');
-  if (!toggle || !row) return;
-
-  function sync() {
-    row.hidden = !toggle.checked;
-  }
-  toggle.addEventListener('change', sync);
-  sync();
-})();
-// END LOGGING ENABLE TOGGLE
 
 // BEGIN FORM VALIDATION WIRING
 (function () {
