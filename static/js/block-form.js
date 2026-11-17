@@ -229,8 +229,30 @@
     return window.__validateSiteAddresses ? window.__validateSiteAddresses() : true;
   });
 
+  // A red dot on each tab title that holds an invalid field, shown from the first failed Save
+  // (when Bootstrap's was-validated styling kicks in) and kept live as fields are fixed.
+  const invalidSelector = '.is-invalid, :invalid:not(fieldset)';
+  function updateTabDots() {
+    const validated = form.classList.contains('was-validated');
+    if (validated && window.__validateSiteAddresses) window.__validateSiteAddresses();
+    form.querySelectorAll('.tab-pane').forEach((pane) => {
+      const dot = form.querySelector('[data-bs-target="#' + pane.id + '"] [data-invalid-dot]');
+      if (dot) dot.hidden = !(validated && pane.querySelector(invalidSelector));
+    });
+  }
+  let dotsQueued = false;
+  function queueTabDots() {
+    if (dotsQueued) return;
+    dotsQueued = true;
+    requestAnimationFrame(() => { dotsQueued = false; updateTabDots(); });
+  }
+  // click covers adding/removing chips and upstream rows; change covers the type picker.
+  ['input', 'change', 'click', 'keyup'].forEach((type) => form.addEventListener(type, queueTabDots));
+  form.addEventListener('reset', () => setTimeout(updateTabDots, 0));
+
   // Registered after initFormValidation, so defaultPrevented already reflects its verdict.
   form.addEventListener('submit', (event) => {
+    updateTabDots();
     if (!event.defaultPrevented) return;
     const invalid = form.querySelector('.is-invalid, :invalid:not(fieldset)');
     const pane = invalid && invalid.closest('.tab-pane');
