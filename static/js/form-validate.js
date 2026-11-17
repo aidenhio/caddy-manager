@@ -1,5 +1,14 @@
-// Shared client-side form validation: native HTML5 required/minlength drive
-// Bootstrap's .was-validated styling; extraValidator plugs in fields that can't use `required`.
+// Shared client-side form validation: native HTML5 required/minlength checks, shown with
+// Bootstrap's per-field .is-invalid (not .was-validated, so valid fields stay unstyled).
+// extraValidator plugs in fields that can't use `required`.
+
+// Marks each field that fails its native checks with .is-invalid and clears the rest.
+// Disabled fields (including inside a disabled fieldset) never validate, so they're cleared too.
+function refreshInvalidFields(form) {
+  form.querySelectorAll("input, select, textarea").forEach((field) => {
+    field.classList.toggle("is-invalid", field.willValidate && !field.checkValidity());
+  });
+}
 
 function initFormValidation(form, extraValidator) {
   if (!form) return;
@@ -11,10 +20,20 @@ function initFormValidation(form, extraValidator) {
       event.preventDefault();
       event.stopPropagation();
     }
-    form.classList.add("was-validated");
+    // From the first Save on, invalid fields are flagged and kept up to date as they're edited.
+    form.dataset.validated = "true";
+    refreshInvalidFields(form);
   });
+  const refreshIfValidated = () => {
+    if (form.dataset.validated) refreshInvalidFields(form);
+  };
+  form.addEventListener("input", refreshIfValidated);
+  form.addEventListener("change", refreshIfValidated);
   // A reset restores values but not invalid styling; clear it so the form looks untouched.
-  form.addEventListener("reset", () => form.classList.remove("was-validated"));
+  form.addEventListener("reset", () => {
+    delete form.dataset.validated;
+    form.querySelectorAll(".is-invalid").forEach((field) => field.classList.remove("is-invalid"));
+  });
 }
 
 // Keeps two password-style fields in sync: `field` is marked invalid (via the

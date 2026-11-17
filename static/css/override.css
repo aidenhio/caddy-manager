@@ -22,3 +22,9 @@
     --tblr-gray-900: #18181b;
     --tblr-gray-950: #09090b;
 }
+
+:root,
+[data-bs-theme=dark] {
+    --tblr-form-invalid-color: var(--tblr-red);
+    --tblr-form-invalid-border-color: var(--tblr-red);
+}
